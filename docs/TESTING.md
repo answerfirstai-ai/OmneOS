@@ -42,7 +42,9 @@ Python:
 - Missions, world-state revisions, intent, decisions, capabilities, workers, verification, traces,
   dry-run, command classes, and the new HTTP routes.
 - Objective execution, dependency order, retry escalation, parallel work, and voice silence.
-- The installer refusing `/boot`, and the image and VM scripts exiting without an ISO or a boot.
+- The installer refusing `/boot`, the Ubuntu 24.04 system tree, the three system packages, the
+  rootfs builder refusing to write without root, and the image and VM scripts exiting without an ISO
+  or a boot.
 
 TypeScript:
 
@@ -58,5 +60,7 @@ TypeScript:
 ## Not claimed
 
 `scripts/linux/build-iso.sh` and `scripts/linux/vm-boot.sh` are tested for their refusal. They do
-not produce `OMNE-OS.iso` and do not start a virtual machine. Live xAI, a physical GPU workload, and
-hardware installation are outside the default suite.
+not produce `OMNE-OS.iso` and do not start a virtual machine. `scripts/linux/build-base.sh` is
+tested for its Ubuntu 24.04 plan and for refusing to write a rootfs when it is not root. The default
+suite does not run `debootstrap`. Live xAI, a physical GPU workload, and hardware installation are
+outside the default suite.

@@ -1,0 +1,19 @@
+#!/bin/sh
+# Create the system user that owns OMNE state. This does not touch /boot.
+set -eu
+install -d -m 0750 /var/lib/omne
+if ! id omne >/dev/null 2>&1; then
+  if command -v useradd >/dev/null 2>&1; then
+    useradd --system --home-dir /var/lib/omne --shell /usr/sbin/nologin --user-group omne
+  elif command -v adduser >/dev/null 2>&1; then
+    adduser --system --home /var/lib/omne --shell /usr/sbin/nologin --group omne
+  else
+    echo "omne-core: neither useradd nor adduser is available" >&2
+    exit 1
+  fi
+fi
+chown omne:omne /var/lib/omne
+install -d -o omne -g omne -m 0750 /var/lib/omne/workspace /var/lib/omne/memory
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl daemon-reload || true
+fi

@@ -170,5 +170,11 @@ Unknown resource values stay unknown, and an unavailable GPU stays unavailable.
 
 ## Linux integration
 
-`scripts/linux/install.sh` installs a user systemd unit and refuses `/boot`. It does not change the
-bootloader. The image and VM scripts exit 2 and do not create an ISO or start QEMU.
+Ubuntu 24.04 LTS is the development base. OMNE packages and systemd units sit on that userspace.
+`multi-user.target` wants `omne.target`, which starts OMNE Core and the shell. The system user is
+`omne`. State stays under `/var/lib/omne`. The core still binds to `127.0.0.1`.
+
+`scripts/linux/install.sh` remains the user-level unit for a checkout and still refuses `/boot`. It
+does not change the bootloader. The system tree, packages, and rootfs builder are described in
+`docs/LINUX.md`. They do not install a kernel. The ISO and VM scripts exit 2 and do not create an
+ISO or start QEMU.

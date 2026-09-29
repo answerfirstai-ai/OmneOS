@@ -23,3 +23,5 @@ workspace/**
 
 *.log
 .DS_Store
+
+build/linux/

@@ -69,15 +69,17 @@ configs/              development, testing, and production TOML
 shell/                TypeScript desktop shell
 tests/                Python tests
 docs/                 Architecture, security, protocols, and roadmap
-scripts/linux/        User installer, image check, and VM check
-system/linux/         User systemd unit
+scripts/linux/        User installer, system packages, rootfs builder, image check, VM check
+system/linux/         User unit, system units, and the Ubuntu 24.04 base pin
 ```
 
 ## Limits
 
-No `OMNE-OS.iso` is produced by this revision. `scripts/linux/build-iso.sh` exits 2 and does not
-write an image. `scripts/linux/vm-boot.sh` does not start a virtual machine. Physical hardware
-installation is not implemented.
+The development base is Ubuntu 24.04. System packages and `omne.target` start OMNE with the machine.
+`scripts/linux/build-base.sh` can write a rootfs and does not install a kernel or a bootloader. No
+`OMNE-OS.iso` is produced. `scripts/linux/build-iso.sh` exits 2 and does not write an image.
+`scripts/linux/vm-boot.sh` does not start a virtual machine. Physical hardware installation is not
+implemented.
 
 ## License
 

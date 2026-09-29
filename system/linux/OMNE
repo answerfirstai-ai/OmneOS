@@ -1,0 +1,5 @@
+#!/bin/sh
+# System entry point. The Python tree is installed with the omne-core package.
+set -eu
+export PYTHONPATH="/usr/lib/omne/python${PYTHONPATH:+:$PYTHONPATH}"
+exec /usr/bin/python3 -m core "$@"

@@ -1,0 +1,25 @@
+[Unit]
+Description=OMNE Core
+After=network.target
+PartOf=omne.target
+
+[Service]
+Type=simple
+User=omne
+Group=omne
+WorkingDirectory=/var/lib/omne
+Environment=OMNE_ENVIRONMENT=production
+Environment=OMNE_CONFIG=/etc/omne/OMNE.toml
+ExecStart=/usr/bin/OMNE serve
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/omne
+StateDirectory=omne
+StateDirectoryMode=0750
+
+[Install]
+WantedBy=omne.target

@@ -1,0 +1,7 @@
+[Unit]
+Description=OMNE system
+Wants=omne-core.service omne-shell.service
+After=network.target omne-core.service
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,7 @@
+# Development base for OMNE. Ubuntu 24.04 LTS supplies userspace.
+# This pin does not select a kernel or a bootloader.
+OMNE_BASE_ID=ubuntu
+OMNE_BASE_VERSION=24.04
+OMNE_BASE_CODENAME=noble
+OMNE_BASE_MIRROR=http://archive.ubuntu.com/ubuntu
+OMNE_BASE_SECURITY_MIRROR=http://security.ubuntu.com/ubuntu
