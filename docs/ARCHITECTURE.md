@@ -22,7 +22,9 @@ SHELL (TypeScript) -- HTTP --> OMNE CORE (Python)
 
 `OMNE check` validates configuration and creates the workspace and data directories. `OMNE serve`
 exposes the local HTTP API. `OMNE execute` plans one objective and runs it. `OMNE compute` prints
-one resource snapshot from the host.
+one resource snapshot from the host. `GET /desktop` returns parent tasks, agents, models, the latest
+events, and voice status in one response so the shell does not fan out across those endpoints.
+Compute stays on `GET /compute` because a snapshot can sample the host.
 
 The programmatic entry is `core.api.main.main`. `core.api.runtime.build_OMNE` assembles the process.
 Missing agent or model directories leave those registries empty instead of inventing entries.
@@ -58,7 +60,9 @@ Voice listen returns without opening a device unless the permission decision is 
 policy denies `voice.transmit`, and no voice provider is configured.
 
 CPU, memory, disk, and network come from the host. GPU telemetry uses `nvidia-smi` when it exists
-and otherwise reports `available: false`. Unknown values stay null.
+and otherwise reports `available: false`. Unknown values stay null. A full snapshot is reused for
+one second. A later CPU read can use the previous sample when it is already old enough, so
+allocation does not sleep on every batch. `system.cpu` still reads the host.
 
 ## Linux integration
 

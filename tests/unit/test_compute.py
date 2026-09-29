@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import time
+from pathlib import Path
+
+import pytest
+
 from core.compute.allocation import AllocationDecision, AllocationRequest, allocate
 from core.compute.model_cache import ModelCache
 from core.compute.monitor import (
@@ -77,6 +82,31 @@ def test_live_snapshot_uses_host_sources() -> None:
         or snapshot.gpu.available is True
         or snapshot.gpu.available is None
     )
+
+
+def test_snapshot_is_reused_within_the_ttl(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monitor = SystemMonitor(sample_seconds=0.05, cache_ttl=5)
+    calls = {"cpu": 0}
+    original = monitor.cpu
+
+    def counted() -> CpuTelemetry:
+        calls["cpu"] += 1
+        return original()
+
+    monkeypatch.setattr(monitor, "cpu", counted)
+    first = monitor.snapshot()
+    started = time.perf_counter()
+    second = monitor.snapshot()
+    elapsed = time.perf_counter() - started
+
+    assert second == first
+    assert calls["cpu"] == 1
+    assert elapsed < 0.02
+
+    monitor.snapshot(disk_path=tmp_path)
+    assert calls["cpu"] == 2
+    monitor.snapshot()
+    assert calls["cpu"] == 2
 
 
 def test_allocator_decisions() -> None:

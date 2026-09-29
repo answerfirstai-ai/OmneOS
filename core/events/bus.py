@@ -7,7 +7,7 @@ import threading
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -44,6 +44,7 @@ class EventBus:
         self._subscribers: list[Subscriber] = []
         self._lock = threading.Lock()
         self._persist_path = persist_path
+        self._handle: TextIO | None = None
         self._now = now or (lambda: datetime.now(UTC))
         self._limit = limit
 
@@ -76,26 +77,34 @@ class EventBus:
             if len(self._events) > self._limit:
                 self._events = self._events[-self._limit :]
             subscribers = list(self._subscribers)
-            persist_path = self._persist_path
-        if persist_path is not None:
-            _append_jsonl(persist_path, event)
+            self._write_locked(event)
         for subscriber in subscribers:
             subscriber(event)
         return event
 
-    def list_events(self, *, after: str | None = None) -> list[Event]:
+    def list_events(self, *, after: str | None = None, limit: int | None = None) -> list[Event]:
         with self._lock:
             events = list(self._events)
-        if after is None:
+        if after is not None:
+            for index, event in enumerate(events):
+                if event.id == after:
+                    events = events[index + 1 :]
+                    break
+        if limit is None:
             return events
-        for index, event in enumerate(events):
-            if event.id == after:
-                return events[index + 1 :]
-        return events
+        if limit <= 0:
+            return []
+        return events[-limit:]
 
-
-def _append_jsonl(path: Path, event: Event) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    line = json.dumps(event.model_dump(mode="json"), sort_keys=True)
-    with path.open("a", encoding="utf-8") as handle:
+    def _write_locked(self, event: Event) -> None:
+        path = self._persist_path
+        if path is None:
+            return
+        handle = self._handle
+        if handle is None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            handle = path.open("a", encoding="utf-8")
+            self._handle = handle
+        line = json.dumps(event.model_dump(mode="json"), sort_keys=True)
         handle.write(line + "\n")
+        handle.flush()

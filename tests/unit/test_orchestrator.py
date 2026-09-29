@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from tests.support import runtime_settings
 
 from core.agents.lifecycle import AgentLifecycle
@@ -17,6 +18,8 @@ from core.compute.monitor import SystemMonitor
 from core.compute.requirements import ResourceRequirements
 from core.compute.scheduler import ComputeScheduler
 from core.events.bus import EventBus
+from core.models.providers.mock.provider import MockProvider
+from core.models.types import GenerateRequest, GenerateResponse
 from core.orchestrator.scheduler import TaskScheduler
 from core.orchestrator.store import TaskStore
 from core.orchestrator.task import PlannedCall, Task, TaskStatus, TaskStep
@@ -30,6 +33,27 @@ def test_write_file_objective_completes(tmp_path: Path) -> None:
     assert task.status is TaskStatus.COMPLETED
     assert (tmp_path / "workspace" / "notes.txt").read_text(encoding="utf-8") == "hello from OMNE"
     assert all(event.type != "model.loaded" for event in OMNE.list_events())
+
+
+def test_identical_model_prompts_use_the_response_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = {"count": 0}
+    original = MockProvider.generate
+
+    async def counting(self: MockProvider, request: GenerateRequest) -> GenerateResponse:
+        calls["count"] += 1
+        return await original(self, request)
+
+    monkeypatch.setattr(MockProvider, "generate", counting)
+    omne = build_OMNE(runtime_settings(tmp_path))
+
+    first = omne.execute_sync("remember this sentence")
+    second = omne.execute_sync("remember this sentence")
+
+    assert first.status is TaskStatus.COMPLETED
+    assert second.status is TaskStatus.COMPLETED
+    assert calls["count"] == 1
 
 
 def test_website_steps_run_in_dependency_order(tmp_path: Path) -> None:

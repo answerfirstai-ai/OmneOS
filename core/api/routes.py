@@ -15,6 +15,8 @@ def route_get(
 ) -> tuple[HTTPStatus, Payload]:
     if runtime is None:
         return HTTPStatus.SERVICE_UNAVAILABLE, {"error": "runtime_unavailable"}
+    if path == "/desktop":
+        return HTTPStatus.OK, runtime.desktop_view()
     if path == "/tasks":
         return HTTPStatus.OK, {"tasks": [task_document(task) for task in runtime.list_tasks()]}
     if path == "/events":

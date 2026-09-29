@@ -10,6 +10,34 @@ from core.tools.base import ToolContext, ToolError
 
 _MAX_BYTES = 1_000_000
 _MAX_SEARCH_RESULTS = 200
+_BINARY_SUFFIXES = frozenset(
+    {
+        ".bin",
+        ".db",
+        ".dll",
+        ".exe",
+        ".gif",
+        ".gz",
+        ".ico",
+        ".jpeg",
+        ".jpg",
+        ".mp3",
+        ".mp4",
+        ".otf",
+        ".pdf",
+        ".png",
+        ".pyc",
+        ".so",
+        ".sqlite",
+        ".tar",
+        ".ttf",
+        ".wasm",
+        ".webp",
+        ".woff",
+        ".woff2",
+        ".zip",
+    }
+)
 
 
 class _FilesystemTool:
@@ -97,7 +125,11 @@ class SearchTool(_FilesystemTool):
                 continue
             relative = str(item.relative_to(context.workspace_root.resolve()))
             matched = query in item.name.lower() or query in relative.lower()
-            if not matched and item.stat().st_size <= _MAX_BYTES:
+            if (
+                not matched
+                and item.suffix.lower() not in _BINARY_SUFFIXES
+                and item.stat().st_size <= _MAX_BYTES
+            ):
                 text = item.read_text(encoding="utf-8", errors="ignore").lower()
                 matched = query in text
             if matched:

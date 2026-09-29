@@ -32,8 +32,10 @@ Python:
 - Permission allow, deny, confirm, audit, and fail-closed evaluation.
 - Mock responses, xAI with a fake transport, a missing xAI key, and a local provider that does not
   connect.
-- Routing to the mock model, live host telemetry, allocator decisions, and a model cache that does
-  not load weights.
+- Routing to the mock model, live host telemetry, a reused snapshot, allocator decisions, and a
+  model cache that does not load weights.
+- `GET /desktop` returns the shell panels and does not include a compute sample.
+- Identical model prompts reuse the response cache. Tool calls are not cached.
 - Memory scope checks, agent manifests, and lifecycle edges.
 - Objective execution, dependency order, retry escalation, parallel work, and voice silence.
 - The installer refusing `/boot`, and the image and VM scripts exiting without an ISO or a boot.
@@ -43,7 +45,7 @@ TypeScript:
 - Health parsing and core URL selection.
 - Character states, including a missing asset.
 - Voice control staying disabled unless permission, provider, and hardware are all available.
-- Task, agent, model, and notification lines.
+- Task, agent, model, and notification lines, and one `/desktop` document.
 
 ## Not claimed
 

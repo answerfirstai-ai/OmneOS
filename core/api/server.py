@@ -125,6 +125,7 @@ class CoreRequestHandler(BaseHTTPRequestHandler):
                 "version": __version__,
                 "health": "/health",
                 "tasks": "/tasks",
+                "desktop": "/desktop",
             }
         if _is_runtime_path(parsed.path):
             return route_get(self.server.runtime, parsed.path, parse_qs(parsed.query))
@@ -171,7 +172,7 @@ def _allowed_origin(allowed_origins: list[str], origin: str | None) -> str | Non
 
 
 def _is_runtime_path(path: str) -> bool:
-    if path in {"/tasks", "/events", "/agents", "/models", "/compute", "/voice"}:
+    if path in {"/tasks", "/events", "/agents", "/models", "/compute", "/voice", "/desktop"}:
         return True
     return path.startswith("/tasks/")
 

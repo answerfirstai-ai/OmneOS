@@ -6,6 +6,7 @@ the runtime. This module never stores a default API key.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import urllib.error
 import urllib.request
@@ -45,12 +46,12 @@ class XAIProvider:
 
     async def generate(self, request: GenerateRequest) -> GenerateResponse:
         payload = self._request_body(request, stream=False)
-        body = self._post(payload)
+        body = await asyncio.to_thread(self._post, payload)
         return _normalize_completion(body, request.model)
 
     async def stream(self, request: GenerateRequest) -> AsyncIterator[GenerateChunk]:
         payload = self._request_body(request, stream=True)
-        raw = self._post_bytes(payload)
+        raw = await asyncio.to_thread(self._post_bytes, payload)
         text = raw.decode("utf-8", errors="replace")
         yielded = False
         for chunk in _parse_sse(text):
@@ -64,7 +65,7 @@ class XAIProvider:
             GenerateRequest(model=request.model, prompt=request.prompt, tools=request.tools),
             stream=False,
         )
-        body = self._post(payload)
+        body = await asyncio.to_thread(self._post, payload)
         parsed = _tool_call_from_completion(body)
         if parsed is not None:
             return parsed

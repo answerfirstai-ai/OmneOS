@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,7 @@ from core.agents.manifest import AgentManifest
 from core.agents.registry import AgentRegistry
 from core.agents.runtime import AgentRuntime
 from core.events.bus import EventBus
+from core.models.cache import ResponseCache
 from core.models.providers.base import ModelProvider
 from core.models.types import GenerateRequest, ToolCallRequest
 from core.orchestrator.store import TaskStore
@@ -41,6 +43,8 @@ class TaskExecutor:
         environment: str,
         workspace_root: Path,
         timeout_seconds: int,
+        responses: ResponseCache | None = None,
+        provider_labels: dict[str, str] | None = None,
     ) -> None:
         self._store = store
         self._gateway = gateway
@@ -49,6 +53,8 @@ class TaskExecutor:
         self._events = events
         self._providers = providers
         self._model_names = model_names
+        self._responses = responses or ResponseCache()
+        self._provider_labels = provider_labels or {}
         self._environment = environment
         self._workspace = workspace_root
         self._timeout = timeout_seconds
@@ -95,7 +101,11 @@ class TaskExecutor:
                         pending_confirmation=pending,
                     )
                 observations.append(outcome)
-                task = self._store.save(task.model_copy(update={"observations": observations}))
+                task = self._store.save(
+                    task.model_copy(
+                        update={"observations": observations, "pending_confirmation": None}
+                    )
+                )
             task = self._store.transition(task, TaskStatus.VERIFYING, observations=observations)
             task = self._store.transition(
                 task, TaskStatus.COMPLETED, result={"observations": observations}
@@ -119,7 +129,7 @@ class TaskExecutor:
         manifest: AgentManifest | None,
     ) -> dict[str, Any] | ToolResult:
         if call.kind == "tool":
-            result = self._invoke(task, call.tool_id, call.arguments, manifest)
+            result = await self._call_tool(task, call.tool_id, call.arguments, manifest)
             if result.confirmation_required:
                 return result
             if not result.ok:
@@ -142,7 +152,7 @@ class TaskExecutor:
             return {"kind": "model", "text": await self._generate(task, call.prompt)}
         if call.kind == "model_then_write":
             text = await self._generate(task, call.prompt)
-            result = self._invoke(
+            result = await self._call_tool(
                 task,
                 "filesystem.write",
                 {"path": call.output_path, "content": text},
@@ -161,7 +171,7 @@ class TaskExecutor:
             )
             if response.tool_name is None:
                 return {"kind": "model_tool", "text": response.text}
-            result = self._invoke(task, response.tool_name, response.arguments, manifest)
+            result = await self._call_tool(task, response.tool_name, response.arguments, manifest)
             if result.confirmation_required:
                 return result
             if not result.ok:
@@ -169,7 +179,7 @@ class TaskExecutor:
                 raise ExecutionFailure(message, code="tool_failed")
             return {"kind": "model_tool", "tool_id": response.tool_name, "output": result.output}
         if call.kind == "verify_file":
-            result = self._invoke(task, "filesystem.read", call.arguments, manifest)
+            result = await self._call_tool(task, "filesystem.read", call.arguments, manifest)
             if result.confirmation_required:
                 return result
             if not result.ok:
@@ -206,10 +216,24 @@ class TaskExecutor:
             approved=approved,
         )
 
+    async def _call_tool(
+        self,
+        task: Task,
+        tool_id: str,
+        arguments: dict[str, Any],
+        manifest: AgentManifest | None,
+    ) -> ToolResult:
+        return await asyncio.to_thread(self._invoke, task, tool_id, arguments, manifest)
+
     async def _generate(self, task: Task, prompt: str) -> str:
-        response = await self._provider(task).generate(
-            GenerateRequest(model=self._external_model_name(task), prompt=prompt)
-        )
+        provider = self._provider(task)
+        request = GenerateRequest(model=self._external_model_name(task), prompt=prompt)
+        label = self._provider_labels.get(task.assigned_model or "", task.assigned_model or "")
+        cached = self._responses.get(label, request)
+        if cached is not None:
+            return cached.text
+        response = await provider.generate(request)
+        self._responses.put(label, request, response)
         return response.text
 
     def _provider(self, task: Task) -> ModelProvider:

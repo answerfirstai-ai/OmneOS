@@ -11,7 +11,9 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from tests.support import runtime_settings
 
+from core.api.runtime import build_OMNE
 from core.api.server import CoreServer, health_payload
 from core.config.settings import load_settings
 
@@ -132,6 +134,37 @@ def test_options_allows_json_post_from_the_shell(server: CoreServer) -> None:
         assert response.headers.get("Access-Control-Allow-Origin") == "http://127.0.0.1:4173"
         assert "POST" in (response.headers.get("Access-Control-Allow-Methods") or "")
         assert "Content-Type" in (response.headers.get("Access-Control-Allow-Headers") or "")
+
+
+def test_desktop_without_runtime_is_unavailable(server: CoreServer) -> None:
+    status, body, _origin = _request(f"http://127.0.0.1:{server.port}/desktop")
+
+    assert status == 503
+    assert body["error"] == "runtime_unavailable"
+
+
+def test_desktop_returns_shell_panels(tmp_path: Path) -> None:
+    settings = runtime_settings(tmp_path, OMNE_HOST="127.0.0.1", OMNE_PORT=str(_free_port()))
+    started = CoreServer(settings, build_OMNE(settings))
+    started.start_in_thread()
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", started.port), timeout=0.1):
+                break
+        except OSError:
+            time.sleep(0.01)
+    else:
+        started.stop()
+        raise RuntimeError("server did not accept connections")
+    try:
+        status, body, _origin = _request(f"http://127.0.0.1:{started.port}/desktop")
+    finally:
+        started.stop()
+
+    assert status == 200
+    assert set(body) == {"agents", "events", "models", "tasks", "voice"}
+    assert "compute" not in body
 
 
 def test_disallowed_origin_is_omitted(server: CoreServer) -> None:

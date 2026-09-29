@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -79,28 +80,62 @@ class ResourceSnapshot(BaseModel):
 class SystemMonitor:
     """Read CPU, memory, GPU, disk, and network telemetry."""
 
-    def __init__(self, *, root: Path | None = None, sample_seconds: float = 0.05) -> None:
+    def __init__(
+        self,
+        *,
+        root: Path | None = None,
+        sample_seconds: float = 0.05,
+        cache_ttl: float = 1.0,
+    ) -> None:
         self._root = root or Path("/")
         self._sample_seconds = sample_seconds
+        self._cache_ttl = cache_ttl
+        self._lock = threading.Lock()
+        self._cached: tuple[float, ResourceSnapshot] | None = None
+        self._cpu_sample: tuple[float, tuple[int, int]] | None = None
+        self._nvidia_probed = False
+        self._nvidia_command: str | None = None
 
     def snapshot(self, *, disk_path: Path | None = None) -> ResourceSnapshot:
+        if disk_path is not None:
+            return self._collect(disk_path)
+        now = time.monotonic()
+        with self._lock:
+            cached = self._cached
+            if cached is not None and now - cached[0] < self._cache_ttl:
+                return cached[1]
+        fresh = self._collect(Path.cwd())
+        with self._lock:
+            self._cached = (time.monotonic(), fresh)
+        return fresh
+
+    def _collect(self, disk_path: Path) -> ResourceSnapshot:
         return ResourceSnapshot(
             cpu=self.cpu(),
             memory=self.memory(),
             gpu=self.gpu(),
-            disk=self.disk(disk_path or Path.cwd()),
+            disk=self.disk(disk_path),
             network=self.network(),
         )
 
     def cpu(self) -> CpuTelemetry:
-        first = _read_cpu_times(self._root)
-        if first is None:
+        now = time.monotonic()
+        current = _read_cpu_times(self._root)
+        if current is None:
             return CpuTelemetry(usage_percent=None)
+        with self._lock:
+            prior = self._cpu_sample
+        if prior is not None and now - prior[0] >= self._sample_seconds:
+            with self._lock:
+                self._cpu_sample = (time.monotonic(), current)
+            return CpuTelemetry(usage_percent=usage_from_samples(prior[1], current))
         time.sleep(self._sample_seconds)
         second = _read_cpu_times(self._root)
         if second is None:
             return CpuTelemetry(usage_percent=None)
-        return CpuTelemetry(usage_percent=usage_from_samples(first, second))
+        with self._lock:
+            self._cpu_sample = (time.monotonic(), second)
+        return CpuTelemetry(usage_percent=usage_from_samples(current, second))
 
     def memory(self) -> MemoryTelemetry:
         info = _read_meminfo(self._root)
@@ -119,7 +154,7 @@ class SystemMonitor:
         )
 
     def gpu(self) -> GpuTelemetry:
-        command = shutil.which("nvidia-smi")
+        command = self._nvidia_binary()
         if command is None:
             return GpuTelemetry(available=False)
         try:
@@ -151,6 +186,16 @@ class SystemMonitor:
             vram_used_mb=_optional_float(parts[1]),
             vram_total_mb=_optional_float(parts[2]),
         )
+
+    def _nvidia_binary(self) -> str | None:
+        with self._lock:
+            if self._nvidia_probed:
+                return self._nvidia_command
+        found = shutil.which("nvidia-smi")
+        with self._lock:
+            self._nvidia_probed = True
+            self._nvidia_command = found
+        return found
 
     def disk(self, path: Path) -> DiskTelemetry:
         try:

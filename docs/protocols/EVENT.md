@@ -13,5 +13,6 @@ Emitted types:
 
 `model.loaded` is not emitted. No model weights are loaded.
 
-`GET /events?after=<id>` returns events after that id. The bus keeps the latest 1000 events in
-memory and appends them to `events.jsonl` under the data directory.
+`GET /events?after=<id>` returns events after that id. `list_events(limit=n)` returns the tail. The
+bus keeps the latest 1000 events in memory and appends them to `events.jsonl` under the data
+directory. The append handle stays open and is flushed on each publish.

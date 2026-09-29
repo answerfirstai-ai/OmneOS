@@ -6,6 +6,8 @@ import sqlite3
 import threading
 from pathlib import Path
 
+from core.sqlite import configure_sqlite
+
 
 class MemoryDatabase:
     """Own one SQLite file for memory records."""
@@ -15,6 +17,7 @@ class MemoryDatabase:
         self._lock = threading.Lock()
         self._connection = sqlite3.connect(path, check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
+        configure_sqlite(self._connection)
         self._connection.execute(
             """
             CREATE TABLE IF NOT EXISTS records (

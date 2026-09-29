@@ -16,6 +16,7 @@ from core.compute.monitor import (
     ResourceSnapshot,
 )
 from core.compute.requirements import ResourceRequirements
+from core.models.cache import ResponseCache
 from core.models.providers.local.provider import LocalProvider
 from core.models.providers.mock.provider import MockProvider
 from core.models.providers.xai.provider import XAIProvider
@@ -144,6 +145,18 @@ def test_local_provider_without_url_does_not_connect() -> None:
         asyncio.run(provider.generate(GenerateRequest(model="local", prompt="hi")))
 
     assert caught.value.code == "unavailable"
+
+
+def test_response_cache_returns_the_stored_text() -> None:
+    cache = ResponseCache()
+    request = GenerateRequest(model="mock", prompt="hello")
+    response = asyncio.run(MockProvider().generate(request))
+
+    assert cache.get("mock", request) is None
+    cache.put("mock", request, response)
+
+    assert cache.get("mock", request) == response
+    assert cache.get("mock", GenerateRequest(model="mock", prompt="other")) is None
 
 
 def test_router_prefers_the_mock_provider() -> None:

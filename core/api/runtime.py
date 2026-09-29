@@ -15,6 +15,7 @@ from core.config.settings import Settings, prepare_runtime_directories
 from core.events.bus import EventBus
 from core.memory.database import MemoryDatabase
 from core.memory.store import MemoryStore
+from core.models.cache import ResponseCache
 from core.models.providers.base import ModelProvider
 from core.models.providers.local.provider import LocalProvider
 from core.models.providers.mock.provider import MockProvider
@@ -63,7 +64,7 @@ def build_OMNE(settings: Settings) -> OMNE:
     models.discover(settings.models_dir)
     for model in models.enabled():
         cache.register(model.id, size_bytes=None, requirements=model.requirements)
-    providers, model_names = _providers(settings, models)
+    providers, model_names, provider_labels = _providers(settings, models)
     store = TaskStore(settings.data_dir / "tasks.sqlite")
     executor = TaskExecutor(
         store=store,
@@ -73,6 +74,8 @@ def build_OMNE(settings: Settings) -> OMNE:
         events=events,
         providers=providers,
         model_names=model_names,
+        responses=ResponseCache(),
+        provider_labels=provider_labels,
         environment=settings.environment,
         workspace_root=settings.workspace_root,
         timeout_seconds=settings.tool_timeout_seconds,
@@ -107,7 +110,7 @@ def build_OMNE(settings: Settings) -> OMNE:
 
 def _providers(
     settings: Settings, models: ModelRegistry
-) -> tuple[dict[str, ModelProvider], dict[str, str]]:
+) -> tuple[dict[str, ModelProvider], dict[str, str], dict[str, str]]:
     mock: ModelProvider = MockProvider()
     xai: ModelProvider = XAIProvider(
         api_key=os.environ.get("XAI_API_KEY"),
@@ -122,7 +125,9 @@ def _providers(
     by_provider = {"mock": mock, "xai": xai, "local": local}
     providers: dict[str, ModelProvider] = {}
     names: dict[str, str] = {}
+    labels: dict[str, str] = {}
     for model in models.enabled():
         providers[model.id] = by_provider[model.provider]
         names[model.id] = model.model_name
-    return providers, names
+        labels[model.id] = model.provider
+    return providers, names, labels

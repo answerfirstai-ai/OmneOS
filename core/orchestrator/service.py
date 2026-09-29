@@ -148,11 +148,22 @@ class OMNE:
     def list_tasks(self) -> list[Task]:
         return self._store.list_tasks()
 
+    def desktop_view(self) -> dict[str, object]:
+        """Return the panels the shell paints, without a fresh telemetry sample."""
+
+        return {
+            "tasks": [task_document(task) for task in self._store.roots()],
+            "agents": self.agent_views(),
+            "models": self.model_views(),
+            "events": [event.model_dump(mode="json") for event in self.list_events(limit=8)],
+            "voice": self.voice_status(),
+        }
+
     def get_task(self, task_id: str) -> Task:
         return self._store.get(task_id)
 
-    def list_events(self, *, after: str | None = None) -> list[Event]:
-        return self._events.list_events(after=after)
+    def list_events(self, *, after: str | None = None, limit: int | None = None) -> list[Event]:
+        return self._events.list_events(after=after, limit=limit)
 
     def agent_views(self) -> list[dict[str, object]]:
         views: list[dict[str, object]] = []

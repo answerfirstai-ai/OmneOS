@@ -198,9 +198,7 @@ def _process_environ() -> Mapping[str, str]:
 
 def _reject_unknown_variables(environ: Mapping[str, str]) -> None:
     unknown = sorted(
-        key
-        for key in environ
-        if key.startswith("OMNE_") and key not in KNOWN_ENVIRONMENT_VARIABLES
+        key for key in environ if key.startswith("OMNE_") and key not in KNOWN_ENVIRONMENT_VARIABLES
     )
     if unknown:
         names = ", ".join(unknown)

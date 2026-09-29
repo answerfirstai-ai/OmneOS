@@ -68,6 +68,24 @@ def test_filesystem_round_trip_stays_in_the_workspace(tmp_path: Path) -> None:
     assert (tmp_path / "notes" / "hello.txt").is_file()
 
 
+def test_search_skips_binary_content_and_still_matches_names(tmp_path: Path) -> None:
+    gateway, context = _gateway(tmp_path)
+    (tmp_path / "photo.png").write_bytes(b"alpha-inside-binary")
+    (tmp_path / "alpha.png").write_bytes(b"\x00\x01")
+    (tmp_path / "notes.txt").write_text("alpha", encoding="utf-8")
+
+    found = gateway.invoke(
+        tool_id="filesystem.search",
+        arguments={"query": "alpha"},
+        context=context,
+        grants=_GRANTS,
+        environment="testing",
+    )
+
+    assert found.ok is True
+    assert found.output["matches"] == ["alpha.png", "notes.txt"]
+
+
 def test_filesystem_rejects_parent_escape(tmp_path: Path) -> None:
     gateway, context = _gateway(tmp_path)
     outside = tmp_path.parent / "outside-secret.txt"
