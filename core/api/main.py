@@ -68,6 +68,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_compute(settings)
     if args.command == "display":
         return _run_display(settings)
+    if args.command == "windowing":
+        return _run_windowing(settings)
     return _run_inspection(settings, args)
 
 
@@ -97,6 +99,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     commands.add_parser("compute", help="print one host resource snapshot")
     commands.add_parser("display", help="print display diagnostics without starting a session")
+    commands.add_parser("windowing", help="print window state without commanding the compositor")
     mission = commands.add_parser("mission", help="inspect missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
     mission_commands.add_parser("list", help="list missions")
@@ -204,6 +207,11 @@ def _run_compute(settings: Settings) -> int:
 
 def _run_display(settings: Settings) -> int:
     print(json.dumps(build_OMNE(settings).display_view(), sort_keys=True))
+    return 0
+
+
+def _run_windowing(settings: Settings) -> int:
+    print(json.dumps(build_OMNE(settings).windowing_view(), sort_keys=True))
     return 0
 
 

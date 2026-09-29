@@ -42,6 +42,9 @@ from core.verify.verifier import VerificationResult, verify_observations
 from core.voice.service import VoiceService
 from core.world.state import WorldState, WorldStateService
 from omne.display.select import diagnose_display
+from omne.windowing.model import WindowRequest
+from omne.windowing.select import windowing_service
+from omne.windowing.service import WindowingService
 
 _MODEL_CAPABILITY = {
     "conversation": "reasoning",
@@ -132,6 +135,7 @@ class OMNE:
         self._questions: list[dict[str, object]] = []
         self._verifications: dict[str, VerificationResult] = {}
         self._lock = threading.Lock()
+        self._windowing: WindowingService | None = None
         self._events.subscribe(self._on_event)
         self._world.bind(self.build_world)
 
@@ -316,6 +320,37 @@ class OMNE:
 
     def display_view(self) -> dict[str, object]:
         return diagnose_display(self._environment).model_dump(mode="json")
+
+    def windowing_view(self) -> dict[str, object]:
+        with self._lock:
+            return self._windowing_service().state().model_dump(mode="json")
+
+    def apply_window(
+        self, request: WindowRequest, grants: dict[str, list[str]]
+    ) -> dict[str, object]:
+        with self._lock:
+            return (
+                self._windowing_service()
+                .apply(request, grants, self._environment)
+                .model_dump(mode="json")
+            )
+
+    def _windowing_service(self) -> WindowingService:
+        service = self._windowing
+        if service is not None:
+            return service
+
+        def sink(event_type: str, payload: dict[str, Any], agent_id: str | None) -> None:
+            self._events.publish(
+                event_type,
+                agent_id=agent_id,
+                source="windowing",
+                payload=payload,
+            )
+
+        service = windowing_service(self._environment, sink=sink)
+        self._windowing = service
+        return service
 
     def voice_status(self) -> dict[str, object]:
         return self._voice.status()

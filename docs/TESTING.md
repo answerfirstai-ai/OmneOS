@@ -47,10 +47,13 @@ Python:
   without an image or a boot unless `vm-boot.sh --run` is passed.
 - Display diagnostics. The testing API uses the mock provider and does not invent a monitor. The
   labwc provider reads a fixture filesystem and does not start a compositor.
+- Window records. The testing API uses the mock window provider and starts with no windows. A grant
+  is required to launch or close. The labwc window provider reads a fixture snapshot and does not
+  run a compositor process. `POST /windowing` stays 404.
 
 TypeScript:
 
-- Health parsing and core URL selection.
+- Health parsing, core URL selection, and the windowing state parser.
 - Character states, including a missing asset and mission-driven analyzing, verifying, and waiting.
 - Environment state, lifecycle stages, mission inspection, permission copy, verification evidence,
   error summaries, notifications, graph layout, the current-mission graph, command copy, detail
@@ -66,5 +69,6 @@ TypeScript:
 `scripts/linux/build-base.sh` and `scripts/linux/build-disk.sh` are tested for their plans and for
 refusing to write when not root. The boot checklist is tested against a fixture machine and a local
 core: an unavailable GPU is not a check. Display launch readiness is tested against a fixture DRM
-tree. The default suite does not run `debootstrap`, QEMU, or labwc. Live xAI, a physical GPU
-workload, and hardware installation are outside the default suite.
+tree. Window commands are tested against the in-memory record and a snapshot file. The default suite
+does not run `debootstrap`, QEMU, or labwc. Live xAI, a physical GPU workload, and hardware
+installation are outside the default suite.

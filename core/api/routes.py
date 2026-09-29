@@ -33,6 +33,8 @@ def route_get(
         return HTTPStatus.OK, {"compute": runtime.compute_status().model_dump()}
     if path == "/display":
         return HTTPStatus.OK, {"display": runtime.display_view()}
+    if path == "/windowing":
+        return HTTPStatus.OK, {"windowing": runtime.windowing_view()}
     if path == "/voice":
         return HTTPStatus.OK, {"voice": runtime.voice_status()}
     if path == "/missions":
