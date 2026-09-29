@@ -1,0 +1,8 @@
+environment = "development"
+log_level = "INFO"
+log_format = "text"
+host = "127.0.0.1"
+port = 8787
+workspace_root = "workspace"
+data_dir = "memory"
+cors_origins = ["http://127.0.0.1:4173", "http://localhost:4173"]

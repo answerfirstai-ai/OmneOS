@@ -1,0 +1,130 @@
+"""Command-line entry point for JARVIS Core."""
+
+from __future__ import annotations
+
+import argparse
+import signal
+import sys
+import threading
+from pathlib import Path
+from types import FrameType
+
+from core import __version__
+from core.api.server import CoreServer, ServerError
+from core.config.errors import ConfigurationError
+from core.config.settings import (
+    Settings,
+    load_settings,
+    override_settings,
+    prepare_runtime_directories,
+)
+from core.logging_config import configure_logging, get_logger
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the JARVIS command and return a process status code."""
+
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    if args.version:
+        print(__version__)
+        return 0
+    if args.command is None:
+        parser.print_help()
+        return 0
+
+    try:
+        settings = load_settings(config_path=args.config)
+        if args.command == "serve":
+            settings = _with_bind_overrides(
+                settings,
+                host=getattr(args, "host", None),
+                port=getattr(args, "port", None),
+            )
+    except ConfigurationError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    configure_logging(settings)
+    try:
+        prepare_runtime_directories(settings)
+    except ConfigurationError as exc:
+        get_logger("core").error("%s", exc)
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    if args.command == "check":
+        return _run_check(settings)
+    if args.command == "serve":
+        return _run_serve(settings)
+    print(f"error: unknown command {args.command}", file=sys.stderr)
+    return 2
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="jarvis",
+        description="JARVIS Core foundation commands.",
+    )
+    parser.add_argument("--version", action="store_true", help="print the core version and exit")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="path to a TOML settings file",
+    )
+    commands = parser.add_subparsers(dest="command")
+    commands.add_parser("check", help="load configuration, prepare directories, and exit")
+    serve = commands.add_parser("serve", help="serve the local core health endpoint")
+    serve.add_argument("--host", default=None, help="override the configured bind host")
+    serve.add_argument("--port", type=int, default=None, help="override the configured bind port")
+    return parser
+
+
+def _with_bind_overrides(settings: Settings, *, host: str | None, port: int | None) -> Settings:
+    updates: dict[str, object] = {}
+    if host is not None:
+        updates["host"] = host
+    if port is not None:
+        updates["port"] = port
+    return override_settings(settings, updates)
+
+
+def _run_check(settings: Settings) -> int:
+    logger = get_logger("core")
+    logger.debug(
+        "workspace_root=%s data_dir=%s",
+        settings.workspace_root,
+        settings.data_dir,
+    )
+    logger.info(
+        "JARVIS Core check passed version=%s environment=%s",
+        __version__,
+        settings.environment,
+    )
+    print(f"jarvis-core {__version__} {settings.environment} ok")
+    return 0
+
+
+def _run_serve(settings: Settings) -> int:
+    logger = get_logger("api")
+    server = CoreServer(settings)
+
+    def _request_stop(signum: int, _frame: FrameType | None) -> None:
+        logger.info("shutdown requested signal=%s", signum)
+        threading.Thread(target=server.stop, name="jarvis-shutdown", daemon=True).start()
+
+    signal.signal(signal.SIGINT, _request_stop)
+    signal.signal(signal.SIGTERM, _request_stop)
+    try:
+        server.serve_forever()
+    except ServerError as exc:
+        logger.error("%s", exc)
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    logger.info("JARVIS Core stopped")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

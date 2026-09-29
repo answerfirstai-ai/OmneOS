@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JARVIS OS</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <p class="eyebrow">JARVIS OS</p>
+      <h1>Core</h1>
+      <p class="summary">Local status for the JARVIS Core process.</p>
+      <section class="panel" aria-live="polite">
+        <p id="status" data-state="checking">checking</p>
+        <p id="detail"></p>
+      </section>
+      <button id="refresh" type="button">Check again</button>
+    </main>
+    <script type="module" src="./dist/main.js"></script>
+  </body>
+</html>
