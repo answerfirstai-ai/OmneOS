@@ -185,4 +185,5 @@ Graphics stay on Linux. `omne.display` reports DRM, monitors, and whether labwc 
 does not link a compositor, and the diagnostics do not start one. See
 `docs/GRAPHICS_ARCHITECTURE.md`. `omne.windowing` records windows, focus, workspaces, and monitor
 assignment on top of that choice. Close and move require a grant, and the record is not sent to
-labwc. See `docs/WINDOWING.md`.
+labwc. See `docs/WINDOWING.md`. `omne.hardware` reads CPU, memory, buses, and peripherals from sysfs
+and proc. It does not load drivers or write device configuration. See `docs/HARDWARE.md`.

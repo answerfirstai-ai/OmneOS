@@ -60,5 +60,6 @@ install a kernel. The UEFI disk builder installs Ubuntu's kernel package and sys
 refuses a display manager. Display diagnostics read DRM and input nodes and do not start labwc or
 change the host session. Window mutations are not an HTTP route and are not sent to the host
 compositor. `window: own` covers windows that agent launched. `window: manage` does not apply in
-this revision. The ISO script does not write `OMNE-OS.iso`. No physical disk installation is
-performed.
+this revision. Hardware diagnostics only read sysfs and proc. They do not load drivers or write
+device configuration, and `POST /hardware` is not a route. The ISO script does not write
+`OMNE-OS.iso`. No physical disk installation is performed.
