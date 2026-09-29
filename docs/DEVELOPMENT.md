@@ -19,27 +19,27 @@ npm install
 
 ## Configuration
 
-Export variables yourself when you need to override a file. A starting point is `.env.example`.
-JARVIS does not load that file on startup.
+Export variables yourself when you need to override a file. A starting point is `.env.example`. OMNE
+does not load that file on startup.
 
-`configs/development/jarvis.toml` is the default file in a checkout. `JARVIS_ENVIRONMENT=testing`
-selects `configs/testing/jarvis.toml`. `JARVIS_ENVIRONMENT=production` selects
-`configs/production/jarvis.toml`.
+`configs/development/OMNE.toml` is the default file in a checkout. `OMNE_ENVIRONMENT=testing`
+selects `configs/testing/OMNE.toml`. `OMNE_ENVIRONMENT=production` selects
+`configs/production/OMNE.toml`.
 
 Set `XAI_API_KEY` in the environment only when you intend to call xAI. Leave
-`JARVIS_LOCAL_MODEL_BASE_URL` empty to keep the local provider disconnected. Leave
-`JARVIS_BROWSER_COMMAND` empty to keep browser tools unavailable.
+`OMNE_LOCAL_MODEL_BASE_URL` empty to keep the local provider disconnected. Leave
+`OMNE_BROWSER_COMMAND` empty to keep browser tools unavailable.
 
 ## Run
 
 ```bash
-jarvis check
-jarvis serve
-jarvis execute "write file notes.txt with content hello"
-jarvis compute
+OMNE check
+OMNE serve
+OMNE execute "write file notes.txt with content hello"
+OMNE compute
 ```
 
-`jarvis serve` listens on `http://127.0.0.1:8787` in the development configuration. Stop it with
+`OMNE serve` listens on `http://127.0.0.1:8787` in the development configuration. Stop it with
 Ctrl-C or SIGTERM.
 
 Build the shell and serve it after the core is running:
@@ -63,7 +63,7 @@ bash scripts/linux/install.sh --dry-run --prefix "$HOME/.local"
 bash scripts/testing/run-checks.sh
 ```
 
-The script runs Ruff, mypy, pytest, `jarvis check`, Prettier, ESLint, the TypeScript tests, and the
+The script runs Ruff, mypy, pytest, `OMNE check`, Prettier, ESLint, the TypeScript tests, and the
 shell build. When `.venv` exists, the script activates it.
 
 ## Docker

@@ -1,5 +1,5 @@
-"""Configuration errors for JARVIS Core."""
+"""Configuration errors for OMNE Core."""
 
 
 class ConfigurationError(Exception):
-    """Raised when JARVIS configuration is missing or invalid."""
+    """Raised when OMNE configuration is missing or invalid."""

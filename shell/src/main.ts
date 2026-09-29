@@ -38,16 +38,16 @@ export async function fetchHealth(
     response = await fetchImpl(url);
   } catch (error) {
     const message = error instanceof Error ? error.message : "network request failed";
-    throw new Error(`Unable to reach JARVIS Core: ${message}`);
+    throw new Error(`Unable to reach OMNE Core: ${message}`);
   }
   if (!response.ok) {
-    throw new Error(`JARVIS Core health request failed with status ${response.status}`);
+    throw new Error(`OMNE Core health request failed with status ${response.status}`);
   }
   let payload: unknown;
   try {
     payload = await response.json();
   } catch {
-    throw new Error("JARVIS Core health response was not JSON");
+    throw new Error("OMNE Core health response was not JSON");
   }
   return parseHealth(payload);
 }

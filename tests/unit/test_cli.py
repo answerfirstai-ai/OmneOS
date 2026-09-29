@@ -28,8 +28,8 @@ def test_check_command(
     assert main(["check"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out.strip() == f"jarvis-core {__version__} development ok"
-    assert "JARVIS Core check passed" in captured.err
+    assert captured.out.strip() == f"OMNE-core {__version__} development ok"
+    assert "OMNE Core check passed" in captured.err
     assert (tmp_path / "workspace").is_dir()
     assert (tmp_path / "memory").is_dir()
 
@@ -40,10 +40,10 @@ def test_invalid_configuration_exits_with_code_2(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("JARVIS_PORT", "0")
+    monkeypatch.setenv("OMNE_PORT", "0")
 
     assert main(["check"]) == 2
-    assert "Invalid JARVIS configuration" in capsys.readouterr().err
+    assert "Invalid OMNE configuration" in capsys.readouterr().err
 
 
 def test_unknown_command_exits() -> None:

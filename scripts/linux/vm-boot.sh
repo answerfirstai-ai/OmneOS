@@ -2,7 +2,7 @@
 # Report whether a VM boot can run. This script does not start QEMU.
 set -euo pipefail
 
-image="${1:-JARVIS-OS.iso}"
+image="${1:-OMNE-OS.iso}"
 if [[ ! -f "${image}" ]]; then
   echo "image not found: ${image}; no virtual machine was started" >&2
   exit 2

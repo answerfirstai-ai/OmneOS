@@ -1,4 +1,4 @@
-"""Configuration loading for JARVIS Core."""
+"""Configuration loading for OMNE Core."""
 
 from core.config.errors import ConfigurationError
 from core.config.settings import (

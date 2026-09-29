@@ -1,15 +1,15 @@
 # Security
 
-JARVIS fails closed. A missing grant, an unknown tool, a policy exception, or an invalid decision is
-a denial.
+OMNE fails closed. A missing grant, an unknown tool, a policy exception, or an invalid decision is a
+denial.
 
 ## Secrets
 
 - `XAI_API_KEY` is read from the process environment when the xAI provider is constructed.
-- The key is not a `JARVIS_` setting, is not written to disk by the core, and is not returned by the
+- The key is not a `OMNE_` setting, is not written to disk by the core, and is not returned by the
   HTTP API.
 - `.env` is gitignored. The process does not auto-load it.
-- Unknown `JARVIS_` variables and unknown TOML keys are rejected.
+- Unknown `OMNE_` variables and unknown TOML keys are rejected.
 
 ## Permissions
 
@@ -41,6 +41,6 @@ Terminal and process tools run with `shell=False`. The subprocess environment ke
 
 ## Host changes
 
-`jarvis check` and the installer create directories under the workspace, data directory, or the
+`OMNE check` and the installer create directories under the workspace, data directory, or the
 requested prefix. The installer refuses `/boot` and does not edit boot configuration. The image
-script does not write `JARVIS-OS.iso`. No physical disk installation is performed.
+script does not write `OMNE-OS.iso`. No physical disk installation is performed.

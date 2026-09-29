@@ -1,7 +1,7 @@
-"""Typed JARVIS Core settings.
+"""Typed OMNE Core settings.
 
 Application code should load settings through :func:`load_settings`. That
-function merges a TOML file with ``JARVIS_`` environment variables, validates
+function merges a TOML file with ``OMNE_`` environment variables, validates
 the result, and resolves relative paths against the working directory.
 """
 
@@ -21,32 +21,32 @@ LogLevelName = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 LogFormatName = Literal["text", "json"]
 
 ENV_TO_FIELD: dict[str, str] = {
-    "JARVIS_ENVIRONMENT": "environment",
-    "JARVIS_LOG_LEVEL": "log_level",
-    "JARVIS_LOG_FORMAT": "log_format",
-    "JARVIS_HOST": "host",
-    "JARVIS_PORT": "port",
-    "JARVIS_WORKSPACE_ROOT": "workspace_root",
-    "JARVIS_DATA_DIR": "data_dir",
-    "JARVIS_CORS_ORIGINS": "cors_origins",
-    "JARVIS_MAX_PARALLEL_TASKS": "max_parallel_tasks",
-    "JARVIS_TASK_RETRY_LIMIT": "task_retry_limit",
-    "JARVIS_TOOL_TIMEOUT_SECONDS": "tool_timeout_seconds",
-    "JARVIS_XAI_BASE_URL": "xai_base_url",
-    "JARVIS_XAI_MODEL": "xai_model",
-    "JARVIS_XAI_TIMEOUT_SECONDS": "xai_timeout_seconds",
-    "JARVIS_XAI_MAX_RETRIES": "xai_max_retries",
-    "JARVIS_LOCAL_MODEL_BASE_URL": "local_model_base_url",
-    "JARVIS_BROWSER_COMMAND": "browser_command",
-    "JARVIS_AGENTS_DIR": "agents_dir",
-    "JARVIS_MODELS_DIR": "models_dir",
+    "OMNE_ENVIRONMENT": "environment",
+    "OMNE_LOG_LEVEL": "log_level",
+    "OMNE_LOG_FORMAT": "log_format",
+    "OMNE_HOST": "host",
+    "OMNE_PORT": "port",
+    "OMNE_WORKSPACE_ROOT": "workspace_root",
+    "OMNE_DATA_DIR": "data_dir",
+    "OMNE_CORS_ORIGINS": "cors_origins",
+    "OMNE_MAX_PARALLEL_TASKS": "max_parallel_tasks",
+    "OMNE_TASK_RETRY_LIMIT": "task_retry_limit",
+    "OMNE_TOOL_TIMEOUT_SECONDS": "tool_timeout_seconds",
+    "OMNE_XAI_BASE_URL": "xai_base_url",
+    "OMNE_XAI_MODEL": "xai_model",
+    "OMNE_XAI_TIMEOUT_SECONDS": "xai_timeout_seconds",
+    "OMNE_XAI_MAX_RETRIES": "xai_max_retries",
+    "OMNE_LOCAL_MODEL_BASE_URL": "local_model_base_url",
+    "OMNE_BROWSER_COMMAND": "browser_command",
+    "OMNE_AGENTS_DIR": "agents_dir",
+    "OMNE_MODELS_DIR": "models_dir",
 }
 
-KNOWN_ENVIRONMENT_VARIABLES: frozenset[str] = frozenset(ENV_TO_FIELD) | {"JARVIS_CONFIG"}
+KNOWN_ENVIRONMENT_VARIABLES: frozenset[str] = frozenset(ENV_TO_FIELD) | {"OMNE_CONFIG"}
 
 
 class Settings(BaseModel):
-    """Validated runtime settings for JARVIS Core."""
+    """Validated runtime settings for OMNE Core."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -200,11 +200,11 @@ def _reject_unknown_variables(environ: Mapping[str, str]) -> None:
     unknown = sorted(
         key
         for key in environ
-        if key.startswith("JARVIS_") and key not in KNOWN_ENVIRONMENT_VARIABLES
+        if key.startswith("OMNE_") and key not in KNOWN_ENVIRONMENT_VARIABLES
     )
     if unknown:
         names = ", ".join(unknown)
-        raise ConfigurationError(f"Unknown JARVIS environment variable: {names}")
+        raise ConfigurationError(f"Unknown OMNE environment variable: {names}")
 
 
 def _resolve_config_path(
@@ -218,7 +218,7 @@ def _resolve_config_path(
             raise ConfigurationError(f"Configuration file not found: {path}")
         return path
 
-    configured = environ.get("JARVIS_CONFIG", "").strip()
+    configured = environ.get("OMNE_CONFIG", "").strip()
     if configured:
         path = Path(configured)
         if not path.is_absolute():
@@ -227,8 +227,8 @@ def _resolve_config_path(
             raise ConfigurationError(f"Configuration file not found: {path}")
         return path
 
-    environment = environ.get("JARVIS_ENVIRONMENT", "development").strip() or "development"
-    candidate = cwd / "configs" / environment / "jarvis.toml"
+    environment = environ.get("OMNE_ENVIRONMENT", "development").strip() or "development"
+    candidate = cwd / "configs" / environment / "OMNE.toml"
     if candidate.is_file():
         return candidate
     return None
@@ -254,7 +254,7 @@ def _environment_overrides(environ: Mapping[str, str]) -> dict[str, Any]:
         if env_name not in environ:
             continue
         raw = environ[env_name]
-        if env_name == "JARVIS_CORS_ORIGINS":
+        if env_name == "OMNE_CORS_ORIGINS":
             stripped = raw.strip()
             overrides[field_name] = (
                 [] if stripped == "" else [part.strip() for part in raw.split(",")]
@@ -276,4 +276,4 @@ def _format_validation_error(exc: ValidationError) -> str:
         location = ".".join(str(item) for item in error["loc"]) or "settings"
         parts.append(f"{location}: {error['msg']}")
     details = "; ".join(parts) if parts else str(exc)
-    return f"Invalid JARVIS configuration: {details}"
+    return f"Invalid OMNE configuration: {details}"

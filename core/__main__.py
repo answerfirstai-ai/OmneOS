@@ -1,4 +1,4 @@
-"""Allow `python -m core` to run the JARVIS command."""
+"""Allow `python -m core` to run the OMNE command."""
 
 from core.api.main import main
 

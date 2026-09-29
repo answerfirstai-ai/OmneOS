@@ -23,7 +23,7 @@ jobs:
       - name: Test
         run: python -m pytest
       - name: Check command
-        run: jarvis check
+        run: OMNE check
 
   node:
     runs-on: ubuntu-latest

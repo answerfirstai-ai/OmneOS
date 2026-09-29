@@ -31,7 +31,7 @@ def test_defaults_when_no_file_is_present(tmp_path: Path) -> None:
 
 
 def test_environment_overrides_file(tmp_path: Path) -> None:
-    config = tmp_path / "jarvis.toml"
+    config = tmp_path / "OMNE.toml"
     config.write_text(
         "\n".join(
             [
@@ -46,7 +46,7 @@ def test_environment_overrides_file(tmp_path: Path) -> None:
     )
 
     settings = load_settings(
-        environ={"JARVIS_PORT": "2222", "JARVIS_LOG_LEVEL": "debug"},
+        environ={"OMNE_PORT": "2222", "OMNE_LOG_LEVEL": "debug"},
         config_path=config,
         cwd=tmp_path,
     )
@@ -57,11 +57,11 @@ def test_environment_overrides_file(tmp_path: Path) -> None:
 
 
 def test_discovers_config_for_selected_environment(tmp_path: Path) -> None:
-    path = tmp_path / "configs" / "testing" / "jarvis.toml"
+    path = tmp_path / "configs" / "testing" / "OMNE.toml"
     path.parent.mkdir(parents=True)
     path.write_text('log_level = "ERROR"\n', encoding="utf-8")
 
-    settings = load_settings(environ={"JARVIS_ENVIRONMENT": "testing"}, cwd=tmp_path)
+    settings = load_settings(environ={"OMNE_ENVIRONMENT": "testing"}, cwd=tmp_path)
 
     assert settings.environment == "testing"
     assert settings.log_level == "ERROR"
@@ -73,7 +73,7 @@ def test_missing_explicit_config_is_an_error(tmp_path: Path) -> None:
 
 
 def test_invalid_toml_is_an_error(tmp_path: Path) -> None:
-    config = tmp_path / "jarvis.toml"
+    config = tmp_path / "OMNE.toml"
     config.write_text("port = [\n", encoding="utf-8")
 
     with pytest.raises(ConfigurationError, match="Invalid TOML"):
@@ -81,7 +81,7 @@ def test_invalid_toml_is_an_error(tmp_path: Path) -> None:
 
 
 def test_unknown_file_key_is_rejected(tmp_path: Path) -> None:
-    config = tmp_path / "jarvis.toml"
+    config = tmp_path / "OMNE.toml"
     config.write_text('theme = "blue"\n', encoding="utf-8")
 
     with pytest.raises(ConfigurationError, match="theme"):
@@ -89,21 +89,21 @@ def test_unknown_file_key_is_rejected(tmp_path: Path) -> None:
 
 
 def test_unknown_environment_variable_is_rejected(tmp_path: Path) -> None:
-    with pytest.raises(ConfigurationError, match="JARVIS_NOT_A_SETTING"):
-        load_settings(environ={"JARVIS_NOT_A_SETTING": "1"}, cwd=tmp_path)
+    with pytest.raises(ConfigurationError, match="OMNE_NOT_A_SETTING"):
+        load_settings(environ={"OMNE_NOT_A_SETTING": "1"}, cwd=tmp_path)
 
 
 def test_invalid_port_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(ConfigurationError, match="port"):
-        load_settings(environ={"JARVIS_PORT": "0"}, cwd=tmp_path)
+        load_settings(environ={"OMNE_PORT": "0"}, cwd=tmp_path)
 
 
 def test_empty_cors_override_clears_file_origins(tmp_path: Path) -> None:
-    config = tmp_path / "jarvis.toml"
+    config = tmp_path / "OMNE.toml"
     config.write_text('cors_origins = ["http://127.0.0.1:4173"]\n', encoding="utf-8")
 
     settings = load_settings(
-        environ={"JARVIS_CORS_ORIGINS": ""},
+        environ={"OMNE_CORS_ORIGINS": ""},
         config_path=config,
         cwd=tmp_path,
     )
@@ -114,14 +114,14 @@ def test_empty_cors_override_clears_file_origins(tmp_path: Path) -> None:
 def test_wildcard_cors_cannot_be_combined(tmp_path: Path) -> None:
     with pytest.raises(ConfigurationError, match="CORS"):
         load_settings(
-            environ={"JARVIS_CORS_ORIGINS": "*,http://127.0.0.1:4173"},
+            environ={"OMNE_CORS_ORIGINS": "*,http://127.0.0.1:4173"},
             cwd=tmp_path,
         )
 
 
 def test_absolute_data_dir_is_preserved(tmp_path: Path) -> None:
     target = tmp_path / "state"
-    settings = load_settings(environ={"JARVIS_DATA_DIR": str(target)}, cwd=tmp_path)
+    settings = load_settings(environ={"OMNE_DATA_DIR": str(target)}, cwd=tmp_path)
 
     assert settings.data_dir == target.resolve()
 
@@ -129,8 +129,8 @@ def test_absolute_data_dir_is_preserved(tmp_path: Path) -> None:
 def test_prepare_runtime_directories_creates_paths(tmp_path: Path) -> None:
     settings = load_settings(
         environ={
-            "JARVIS_WORKSPACE_ROOT": "workspace",
-            "JARVIS_DATA_DIR": "memory",
+            "OMNE_WORKSPACE_ROOT": "workspace",
+            "OMNE_DATA_DIR": "memory",
         },
         cwd=tmp_path,
     )
@@ -145,7 +145,7 @@ def test_shipped_configs_load(repo_root: Path) -> None:
     for name in ("development", "testing", "production"):
         settings = load_settings(
             environ={},
-            config_path=repo_root / "configs" / name / "jarvis.toml",
+            config_path=repo_root / "configs" / name / "OMNE.toml",
             cwd=repo_root,
         )
         assert settings.environment == name
@@ -170,8 +170,8 @@ def test_env_example_documents_known_variables() -> None:
         keys.add(stripped.split("=", 1)[0])
 
     assert keys <= KNOWN_ENVIRONMENT_VARIABLES
-    assert "JARVIS_ENVIRONMENT" in keys
-    assert "JARVIS_CONFIG" in KNOWN_ENVIRONMENT_VARIABLES
+    assert "OMNE_ENVIRONMENT" in keys
+    assert "OMNE_CONFIG" in KNOWN_ENVIRONMENT_VARIABLES
 
 
 def test_package_version_matches_project_metadata() -> None:
@@ -180,4 +180,4 @@ def test_package_version_matches_project_metadata() -> None:
 
     from importlib.metadata import version
 
-    assert version("jarvis-os") == __version__
+    assert version("OMNE-os") == __version__

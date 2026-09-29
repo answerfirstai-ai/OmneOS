@@ -1,4 +1,4 @@
-/** Public health document returned by JARVIS Core. */
+/** Public health document returned by OMNE Core. */
 export interface CoreHealth {
   status: "ok";
   service: string;

@@ -11,7 +11,7 @@ python -m ruff format --check core tests
 python -m ruff check core tests
 python -m mypy
 python -m pytest
-jarvis check
+OMNE check
 
 npm run format:check
 npm run lint
@@ -48,5 +48,5 @@ TypeScript:
 ## Not claimed
 
 `scripts/linux/build-iso.sh` and `scripts/linux/vm-boot.sh` are tested for their refusal. They do
-not produce `JARVIS-OS.iso` and do not start a virtual machine. Live xAI, a physical GPU workload,
-and hardware installation are outside the default suite.
+not produce `OMNE-OS.iso` and do not start a virtual machine. Live xAI, a physical GPU workload, and
+hardware installation are outside the default suite.

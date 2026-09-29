@@ -1,4 +1,4 @@
-"""Command-line entry point for JARVIS Core."""
+"""Command-line entry point for OMNE Core."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path
 from types import FrameType
 
 from core import __version__
-from core.api.runtime import build_jarvis
+from core.api.runtime import build_OMNE
 from core.api.server import CoreServer, ServerError
 from core.config.errors import ConfigurationError
 from core.config.settings import (
@@ -25,7 +25,7 @@ from core.orchestrator.task import TaskStatus
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the JARVIS command and return a process status code."""
+    """Run the OMNE command and return a process status code."""
 
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -70,8 +70,8 @@ def main(argv: list[str] | None = None) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="jarvis",
-        description="JARVIS Core commands.",
+        prog="OMNE",
+        description="OMNE Core commands.",
     )
     parser.add_argument("--version", action="store_true", help="print the core version and exit")
     parser.add_argument(
@@ -108,17 +108,17 @@ def _run_check(settings: Settings) -> int:
         settings.data_dir,
     )
     logger.info(
-        "JARVIS Core check passed version=%s environment=%s",
+        "OMNE Core check passed version=%s environment=%s",
         __version__,
         settings.environment,
     )
-    print(f"jarvis-core {__version__} {settings.environment} ok")
+    print(f"OMNE-core {__version__} {settings.environment} ok")
     return 0
 
 
 def _run_execute(settings: Settings, objective: str) -> int:
     try:
-        task = build_jarvis(settings).execute_sync(objective)
+        task = build_OMNE(settings).execute_sync(objective)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -131,7 +131,7 @@ def _run_execute(settings: Settings, objective: str) -> int:
 
 
 def _run_compute(settings: Settings) -> int:
-    snapshot = build_jarvis(settings).compute_status()
+    snapshot = build_OMNE(settings).compute_status()
     print(json.dumps(snapshot.model_dump(), sort_keys=True))
     return 0
 
@@ -139,7 +139,7 @@ def _run_compute(settings: Settings) -> int:
 def _run_serve(settings: Settings) -> int:
     logger = get_logger("api")
     try:
-        runtime = build_jarvis(settings)
+        runtime = build_OMNE(settings)
     except ValueError as exc:
         logger.error("%s", exc)
         print(f"error: {exc}", file=sys.stderr)
@@ -148,7 +148,7 @@ def _run_serve(settings: Settings) -> int:
 
     def _request_stop(signum: int, _frame: FrameType | None) -> None:
         logger.info("shutdown requested signal=%s", signum)
-        threading.Thread(target=server.stop, name="jarvis-shutdown", daemon=True).start()
+        threading.Thread(target=server.stop, name="OMNE-shutdown", daemon=True).start()
 
     signal.signal(signal.SIGINT, _request_stop)
     signal.signal(signal.SIGTERM, _request_stop)
@@ -158,7 +158,7 @@ def _run_serve(settings: Settings) -> int:
         logger.error("%s", exc)
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    logger.info("JARVIS Core stopped")
+    logger.info("OMNE Core stopped")
     return 0
 
 

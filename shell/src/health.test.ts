@@ -5,7 +5,7 @@ import { coreHealthUrl, parseHealth } from "./health.js";
 
 const payload = {
   status: "ok",
-  service: "jarvis-core",
+  service: "OMNE-core",
   version: "0.1.0",
   environment: "testing",
 };
@@ -15,7 +15,7 @@ test("parseHealth accepts the core document", () => {
 });
 
 test("parseHealth rejects a missing field", () => {
-  assert.throws(() => parseHealth({ status: "ok", service: "jarvis-core" }), /version/);
+  assert.throws(() => parseHealth({ status: "ok", service: "OMNE-core" }), /version/);
 });
 
 test("parseHealth rejects an unexpected status", () => {

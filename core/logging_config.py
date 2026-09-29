@@ -1,4 +1,4 @@
-"""Stdlib logging setup for the ``jarvis`` logger hierarchy."""
+"""Stdlib logging setup for the ``OMNE`` logger hierarchy."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import TextIO
 
 from core.config.settings import Settings
 
-LOGGER_NAMESPACE = "jarvis"
+LOGGER_NAMESPACE = "OMNE"
 
 
 class RetainStreamHandler(logging.StreamHandler[TextIO]):
@@ -50,7 +50,7 @@ class TextFormatter(logging.Formatter):
 
 
 def get_logger(suffix: str = "core") -> logging.Logger:
-    """Return a logger under the ``jarvis`` namespace."""
+    """Return a logger under the ``OMNE`` namespace."""
 
     if suffix == "" or suffix == LOGGER_NAMESPACE:
         return logging.getLogger(LOGGER_NAMESPACE)
@@ -60,7 +60,7 @@ def get_logger(suffix: str = "core") -> logging.Logger:
 
 
 def configure_logging(settings: Settings, *, stream: TextIO | None = None) -> logging.Logger:
-    """Configure the ``jarvis`` logger from settings.
+    """Configure the ``OMNE`` logger from settings.
 
     Repeated calls replace the previous handler so logs are not duplicated.
     """

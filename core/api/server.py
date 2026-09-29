@@ -1,4 +1,4 @@
-"""Local HTTP server for JARVIS Core health reporting."""
+"""Local HTTP server for OMNE Core health reporting."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from core import __version__
 from core.api.routes import route_get, route_post
 from core.config.settings import Settings
 from core.logging_config import get_logger
-from core.orchestrator.service import Jarvis
+from core.orchestrator.service import OMNE
 
 logger = get_logger("api")
 
@@ -30,7 +30,7 @@ def health_payload(settings: Settings) -> dict[str, str]:
 
     return {
         "status": "ok",
-        "service": "jarvis-core",
+        "service": "OMNE-core",
         "version": __version__,
         "environment": settings.environment,
     }
@@ -42,9 +42,9 @@ class CoreHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = True
     daemon_threads = True
     settings: Settings
-    runtime: Jarvis | None
+    runtime: OMNE | None
 
-    def __init__(self, settings: Settings, runtime: Jarvis | None = None) -> None:
+    def __init__(self, settings: Settings, runtime: OMNE | None = None) -> None:
         self.settings = settings
         self.runtime = runtime
         super().__init__((settings.host, settings.port), CoreRequestHandler)
@@ -121,7 +121,7 @@ class CoreRequestHandler(BaseHTTPRequestHandler):
             return HTTPStatus.OK, health_payload(self.server.settings)
         if parsed.path == "/":
             return HTTPStatus.OK, {
-                "service": "jarvis-core",
+                "service": "OMNE-core",
                 "version": __version__,
                 "health": "/health",
                 "tasks": "/tasks",
@@ -197,7 +197,7 @@ def _read_json_body(handler: BaseHTTPRequestHandler) -> dict[str, object]:
 class CoreServer:
     """Lifecycle wrapper around :class:`CoreHTTPServer`."""
 
-    def __init__(self, settings: Settings, runtime: Jarvis | None = None) -> None:
+    def __init__(self, settings: Settings, runtime: OMNE | None = None) -> None:
         self.settings = settings
         self.runtime = runtime
         self._httpd: CoreHTTPServer | None = None
@@ -206,12 +206,12 @@ class CoreServer:
     @property
     def port(self) -> int:
         if self._httpd is None:
-            raise RuntimeError("JARVIS Core server is not running")
+            raise RuntimeError("OMNE Core server is not running")
         return int(self._httpd.server_address[1])
 
     def start(self) -> None:
         if self._httpd is not None:
-            raise RuntimeError("JARVIS Core server is already running")
+            raise RuntimeError("OMNE Core server is already running")
         try:
             self._httpd = CoreHTTPServer(self.settings, self.runtime)
         except OSError as exc:
@@ -220,10 +220,10 @@ class CoreServer:
             ) from exc
         if self.settings.host in {"0.0.0.0", "::"}:
             logger.warning(
-                "JARVIS Core is bound to a non-loopback address host=%s",
+                "OMNE Core is bound to a non-loopback address host=%s",
                 self.settings.host,
             )
-        logger.info("JARVIS Core listening host=%s port=%s", self.settings.host, self.port)
+        logger.info("OMNE Core listening host=%s port=%s", self.settings.host, self.port)
 
     def serve_forever(self) -> None:
         self.start()
@@ -232,7 +232,7 @@ class CoreServer:
 
     def start_in_thread(self) -> None:
         self.start()
-        self._thread = threading.Thread(target=self._serve_loop, name="jarvis-core", daemon=True)
+        self._thread = threading.Thread(target=self._serve_loop, name="OMNE-core", daemon=True)
         self._thread.start()
 
     def stop(self) -> None:

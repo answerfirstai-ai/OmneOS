@@ -12,7 +12,7 @@ python -m ruff format --check core tests
 python -m ruff check core tests
 python -m mypy
 python -m pytest
-jarvis check
+OMNE check
 npm run format:check
 npm run lint
 npm run typecheck

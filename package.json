@@ -1,8 +1,8 @@
 {
-  "name": "jarvis-os",
+  "name": "OMNE-os",
   "version": "0.1.0",
   "private": true,
-  "description": "JARVIS OS shell foundation.",
+  "description": "OMNE OS shell foundation.",
   "type": "module",
   "engines": {
     "node": ">=22"

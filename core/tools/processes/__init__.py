@@ -80,7 +80,7 @@ class ProcessStopTool:
         del context
         pid = arguments["pid"]
         if pid == os.getpid():
-            raise ToolError("refusing to stop the JARVIS process", code="denied")
+            raise ToolError("refusing to stop the OMNE process", code="denied")
         try:
             os.kill(pid, signal.SIGTERM)
         except ProcessLookupError as exc:

@@ -1,4 +1,4 @@
-"""Programmatic and command-line entry points for JARVIS Core."""
+"""Programmatic and command-line entry points for OMNE Core."""
 
 from core.api.main import main
 

@@ -5,13 +5,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from http import HTTPStatus
 
-from core.orchestrator.service import Jarvis, task_document
+from core.orchestrator.service import OMNE, task_document
 
 Payload = dict[str, object]
 
 
 def route_get(
-    runtime: Jarvis | None, path: str, query: Mapping[str, list[str]]
+    runtime: OMNE | None, path: str, query: Mapping[str, list[str]]
 ) -> tuple[HTTPStatus, Payload]:
     if runtime is None:
         return HTTPStatus.SERVICE_UNAVAILABLE, {"error": "runtime_unavailable"}
@@ -40,7 +40,7 @@ def route_get(
 
 
 def route_post(
-    runtime: Jarvis | None, path: str, body: dict[str, object]
+    runtime: OMNE | None, path: str, body: dict[str, object]
 ) -> tuple[HTTPStatus, Payload]:
     if path == "/health":
         return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}

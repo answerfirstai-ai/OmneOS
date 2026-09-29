@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install a user-level JARVIS Core unit. This script does not change boot configuration.
+# Install a user-level OMNE Core unit. This script does not change boot configuration.
 set -euo pipefail
 
 prefix="${HOME}/.local"
@@ -35,10 +35,10 @@ case "${prefix}" in
 esac
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-unit_source="${root}/system/linux/jarvis-core.service"
+unit_source="${root}/system/linux/OMNE-core.service"
 unit_dir="${prefix}/share/systemd/user"
 echo "install prefix ${prefix}"
-echo "unit ${unit_dir}/jarvis-core.service"
+echo "unit ${unit_dir}/OMNE-core.service"
 echo "this installer does not modify the bootloader"
 if [[ "${dry_run}" -eq 1 ]]; then
   echo "dry-run: no files were written"
@@ -46,15 +46,15 @@ if [[ "${dry_run}" -eq 1 ]]; then
 fi
 
 mkdir -p "${prefix}/bin" "${unit_dir}"
-cp "${unit_source}" "${unit_dir}/jarvis-core.service"
-cat > "${prefix}/bin/jarvis-core-health" <<'EOF'
+cp "${unit_source}" "${unit_dir}/OMNE-core.service"
+cat > "${prefix}/bin/OMNE-core-health" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-if ! command -v jarvis >/dev/null 2>&1; then
-  echo "jarvis is not on PATH" >&2
+if ! command -v OMNE >/dev/null 2>&1; then
+  echo "OMNE is not on PATH" >&2
   exit 2
 fi
-jarvis check
+OMNE check
 EOF
-chmod 755 "${prefix}/bin/jarvis-core-health"
+chmod 755 "${prefix}/bin/OMNE-core-health"
 echo "installed user unit; boot configuration was not modified"

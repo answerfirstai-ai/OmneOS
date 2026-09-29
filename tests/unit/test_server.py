@@ -29,11 +29,11 @@ def server(tmp_path: Path) -> Iterator[CoreServer]:
     started = CoreServer(
         load_settings(
             environ={
-                "JARVIS_HOST": "127.0.0.1",
-                "JARVIS_PORT": str(_free_port()),
-                "JARVIS_LOG_LEVEL": "ERROR",
-                "JARVIS_CORS_ORIGINS": "http://127.0.0.1:4173",
-                "JARVIS_WORKSPACE_ROOT": str(tmp_path / "secret-workspace"),
+                "OMNE_HOST": "127.0.0.1",
+                "OMNE_PORT": str(_free_port()),
+                "OMNE_LOG_LEVEL": "ERROR",
+                "OMNE_CORS_ORIGINS": "http://127.0.0.1:4173",
+                "OMNE_WORKSPACE_ROOT": str(tmp_path / "secret-workspace"),
             },
             cwd=tmp_path,
         )
@@ -75,7 +75,7 @@ def _request(
 
 def test_health_payload_excludes_local_paths(tmp_path: Path) -> None:
     settings = load_settings(
-        environ={"JARVIS_WORKSPACE_ROOT": str(tmp_path / "secret-workspace")},
+        environ={"OMNE_WORKSPACE_ROOT": str(tmp_path / "secret-workspace")},
         cwd=tmp_path,
     )
 
@@ -90,7 +90,7 @@ def test_health_endpoint(server: CoreServer) -> None:
 
     assert status == 200
     assert body["status"] == "ok"
-    assert body["service"] == "jarvis-core"
+    assert body["service"] == "OMNE-core"
     assert set(body) == _HEALTH_KEYS
 
 

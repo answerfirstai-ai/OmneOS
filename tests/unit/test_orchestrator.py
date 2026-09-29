@@ -12,7 +12,7 @@ from tests.support import runtime_settings
 from core.agents.lifecycle import AgentLifecycle
 from core.agents.registry import AgentRegistry
 from core.agents.runtime import AgentRuntime
-from core.api.runtime import build_jarvis
+from core.api.runtime import build_OMNE
 from core.compute.monitor import SystemMonitor
 from core.compute.requirements import ResourceRequirements
 from core.compute.scheduler import ComputeScheduler
@@ -23,20 +23,20 @@ from core.orchestrator.task import PlannedCall, Task, TaskStatus, TaskStep
 
 
 def test_write_file_objective_completes(tmp_path: Path) -> None:
-    jarvis = build_jarvis(runtime_settings(tmp_path))
+    OMNE = build_OMNE(runtime_settings(tmp_path))
 
-    task = jarvis.execute_sync("write file notes.txt with content hello from jarvis")
+    task = OMNE.execute_sync("write file notes.txt with content hello from OMNE")
 
     assert task.status is TaskStatus.COMPLETED
-    assert (tmp_path / "workspace" / "notes.txt").read_text(encoding="utf-8") == "hello from jarvis"
-    assert all(event.type != "model.loaded" for event in jarvis.list_events())
+    assert (tmp_path / "workspace" / "notes.txt").read_text(encoding="utf-8") == "hello from OMNE"
+    assert all(event.type != "model.loaded" for event in OMNE.list_events())
 
 
 def test_website_steps_run_in_dependency_order(tmp_path: Path) -> None:
-    jarvis = build_jarvis(runtime_settings(tmp_path))
+    OMNE = build_OMNE(runtime_settings(tmp_path))
 
-    task = jarvis.execute_sync("build a small website")
-    children = [child for child in jarvis.list_tasks() if child.parent_task == task.id]
+    task = OMNE.execute_sync("build a small website")
+    children = [child for child in OMNE.list_tasks() if child.parent_task == task.id]
     order = {str(child.metadata.get("key")): child.updated_at for child in children}
 
     assert task.status is TaskStatus.COMPLETED
@@ -54,10 +54,10 @@ def test_website_steps_run_in_dependency_order(tmp_path: Path) -> None:
 
 
 def test_terminal_waits_for_confirmation_and_can_be_denied(tmp_path: Path) -> None:
-    jarvis = build_jarvis(runtime_settings(tmp_path))
+    OMNE = build_OMNE(runtime_settings(tmp_path))
 
-    waiting = jarvis.execute_sync("run terminal command touch proof.txt")
-    denied = jarvis.confirm_sync(waiting.id, approved=False)
+    waiting = OMNE.execute_sync("run terminal command touch proof.txt")
+    denied = OMNE.confirm_sync(waiting.id, approved=False)
 
     assert waiting.status is TaskStatus.WAITING
     assert denied.status is TaskStatus.FAILED
@@ -65,11 +65,11 @@ def test_terminal_waits_for_confirmation_and_can_be_denied(tmp_path: Path) -> No
 
 
 def test_terminal_runs_after_confirmation(tmp_path: Path) -> None:
-    jarvis = build_jarvis(runtime_settings(tmp_path))
+    OMNE = build_OMNE(runtime_settings(tmp_path))
 
-    waiting = jarvis.execute_sync("run terminal command echo confirmed")
-    finished = jarvis.confirm_sync(waiting.id, approved=True)
-    child = next(task for task in jarvis.list_tasks() if task.parent_task == finished.id)
+    waiting = OMNE.execute_sync("run terminal command echo confirmed")
+    finished = OMNE.confirm_sync(waiting.id, approved=True)
+    child = next(task for task in OMNE.list_tasks() if task.parent_task == finished.id)
 
     assert finished.status is TaskStatus.COMPLETED
     assert "confirmed" in str(child.result)
@@ -77,7 +77,7 @@ def test_terminal_runs_after_confirmation(tmp_path: Path) -> None:
 
 def test_retry_then_escalates(tmp_path: Path) -> None:
     settings = runtime_settings(tmp_path)
-    jarvis = build_jarvis(settings)
+    OMNE = build_OMNE(settings)
     now = datetime.now(UTC)
     parent_id = str(uuid4())
     child_id = str(uuid4())
@@ -114,11 +114,11 @@ def test_retry_then_escalates(tmp_path: Path) -> None:
         retry_limit=1,
         metadata={"role": "child", "key": "read", "exclusive": False},
     )
-    jarvis._store.save(parent)
-    jarvis._store.save(child)
+    OMNE._store.save(parent)
+    OMNE._store.save(child)
 
-    finished = asyncio.run(jarvis._scheduler.execute_parent(parent_id))
-    failed = jarvis.get_task(child_id)
+    finished = asyncio.run(OMNE._scheduler.execute_parent(parent_id))
+    failed = OMNE.get_task(child_id)
 
     assert finished.status is TaskStatus.FAILED
     assert failed.status is TaskStatus.FAILED
@@ -203,9 +203,9 @@ def test_independent_tasks_can_overlap_and_shared_agents_cannot(tmp_path: Path) 
 
 
 def test_browser_objective_is_explicitly_unavailable(tmp_path: Path) -> None:
-    jarvis = build_jarvis(runtime_settings(tmp_path))
+    OMNE = build_OMNE(runtime_settings(tmp_path))
 
-    task = jarvis.execute_sync("open https://example.com")
+    task = OMNE.execute_sync("open https://example.com")
 
     assert task.status is TaskStatus.COMPLETED
     rendered = str(task.result)

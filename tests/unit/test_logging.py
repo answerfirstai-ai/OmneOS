@@ -17,7 +17,7 @@ def test_text_log_contains_level_and_message() -> None:
 
     output = buffer.getvalue()
     assert "INFO" in output
-    assert "jarvis.core" in output
+    assert "OMNE.core" in output
     assert "core ready" in output
 
 
@@ -30,7 +30,7 @@ def test_json_log_is_structured() -> None:
     payload = json.loads(buffer.getvalue())
     assert payload["message"] == "listening"
     assert payload["level"] == "WARNING"
-    assert payload["logger"] == "jarvis.api"
+    assert payload["logger"] == "OMNE.api"
     assert isinstance(payload["timestamp"], str)
 
 

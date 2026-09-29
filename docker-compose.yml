@@ -5,8 +5,8 @@ services:
     ports:
       - "8787:8787"
     environment:
-      JARVIS_ENVIRONMENT: development
-      JARVIS_HOST: 0.0.0.0
-      JARVIS_PORT: "8787"
-      JARVIS_LOG_FORMAT: json
+      OMNE_ENVIRONMENT: development
+      OMNE_HOST: 0.0.0.0
+      OMNE_PORT: "8787"
+      OMNE_LOG_FORMAT: json
     restart: "no"

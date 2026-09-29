@@ -1,4 +1,4 @@
-"""The JARVIS execution service."""
+"""The OMNE execution service."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ _CANCELLABLE = {
 }
 
 
-class Jarvis:
+class OMNE:
     """Plan an objective and run it through the scheduler."""
 
     def __init__(

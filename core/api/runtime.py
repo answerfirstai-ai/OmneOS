@@ -1,4 +1,4 @@
-"""Build the in-process JARVIS runtime."""
+"""Build the in-process OMNE runtime."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from core.models.registry import ModelRegistry
 from core.models.router import ModelRouter
 from core.orchestrator.executor.executor import TaskExecutor
 from core.orchestrator.scheduler import TaskScheduler
-from core.orchestrator.service import Jarvis
+from core.orchestrator.service import OMNE
 from core.orchestrator.store import TaskStore
 from core.permissions.audit import AuditLog
 from core.permissions.evaluator import PermissionEvaluator
@@ -32,7 +32,7 @@ from core.tools.gateway import ToolGateway
 from core.voice.service import VoiceService
 
 
-def build_jarvis(settings: Settings) -> Jarvis:
+def build_OMNE(settings: Settings) -> OMNE:
     """Assemble registries, providers, and the scheduler.
 
     Missing agent or model directories produce an empty registry. The xAI
@@ -88,7 +88,7 @@ def build_jarvis(settings: Settings) -> Jarvis:
         lifecycle=lifecycle,
         max_parallel=settings.max_parallel_tasks,
     )
-    return Jarvis(
+    return OMNE(
         store=store,
         scheduler=scheduler,
         events=events,

@@ -1,3 +1,3 @@
-"""JARVIS OS core package."""
+"""OMNE OS core package."""
 
 __version__ = "0.1.0"

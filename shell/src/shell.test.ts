@@ -16,14 +16,14 @@ test("fetchHealth parses a successful payload", async () => {
     return new Response(
       JSON.stringify({
         status: "ok",
-        service: "jarvis-core",
+        service: "OMNE-core",
         version: "0.1.0",
         environment: "testing",
       }),
       { status: 200, headers: { "content-type": "application/json" } },
     );
   });
-  assert.equal(health.service, "jarvis-core");
+  assert.equal(health.service, "OMNE-core");
   assert.equal(health.environment, "testing");
 });
 
@@ -33,7 +33,7 @@ test("fetchHealth reports an unreachable core", async () => {
       fetchHealth("http://127.0.0.1:8787", async () => {
         throw new Error("connect ECONNREFUSED");
       }),
-    /Unable to reach JARVIS Core/,
+    /Unable to reach OMNE Core/,
   );
 });
 

@@ -29,10 +29,10 @@ def test_serve_process_answers_health(tmp_path: Path) -> None:
         "LANG": os.environ.get("LANG", "C.UTF-8"),
         "PYTHONPATH": str(ROOT),
         "PYTHONUNBUFFERED": "1",
-        "JARVIS_LOG_LEVEL": "INFO",
-        "JARVIS_LOG_FORMAT": "text",
-        "JARVIS_HOST": "127.0.0.1",
-        "JARVIS_PORT": str(port),
+        "OMNE_LOG_LEVEL": "INFO",
+        "OMNE_LOG_FORMAT": "text",
+        "OMNE_HOST": "127.0.0.1",
+        "OMNE_PORT": str(port),
     }
     process = subprocess.Popen(
         [sys.executable, "-m", "core", "serve"],
@@ -63,7 +63,7 @@ def test_serve_process_answers_health(tmp_path: Path) -> None:
                 time.sleep(0.05)
         assert body is not None, last_error
         assert body["status"] == "ok"
-        assert body["service"] == "jarvis-core"
+        assert body["service"] == "OMNE-core"
     finally:
         if process.poll() is None:
             process.terminate()
@@ -73,5 +73,5 @@ def test_serve_process_answers_health(tmp_path: Path) -> None:
             process.kill()
             stdout, stderr = process.communicate(timeout=5)
     assert process.returncode == 0, stderr
-    assert "JARVIS Core listening" in stderr
+    assert "OMNE Core listening" in stderr
     assert stdout == ""

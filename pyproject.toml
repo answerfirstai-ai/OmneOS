@@ -3,9 +3,9 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jarvis-os"
+name = "OMNE-os"
 version = "0.1.0"
-description = "JARVIS OS core: tasks, tools, permissions, models, and a local API."
+description = "OMNE OS core: tasks, tools, permissions, models, and a local API."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
@@ -21,7 +21,7 @@ dev = [
 ]
 
 [project.scripts]
-jarvis = "core.api.main:main"
+OMNE = "core.api.main:main"
 
 [tool.setuptools.packages.find]
 include = ["core*"]

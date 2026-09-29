@@ -1,4 +1,4 @@
-"""Structured events for JARVIS Core."""
+"""Structured events for OMNE Core."""
 
 from core.events.bus import Event, EventBus
 

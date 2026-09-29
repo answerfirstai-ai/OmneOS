@@ -39,10 +39,10 @@ def test_install_copies_user_unit_without_touching_boot(tmp_path: Path) -> None:
     result = _run(["bash", "scripts/linux/install.sh", "--prefix", str(prefix)])
 
     assert result.returncode == 0
-    unit = prefix / "share" / "systemd" / "user" / "jarvis-core.service"
+    unit = prefix / "share" / "systemd" / "user" / "OMNE-core.service"
     assert unit.is_file()
     assert "bootloader" in result.stdout
-    assert not Path("/boot/jarvis").exists()
+    assert not Path("/boot/OMNE").exists()
 
 
 def test_iso_script_does_not_create_an_image(tmp_path: Path) -> None:
@@ -50,12 +50,12 @@ def test_iso_script_does_not_create_an_image(tmp_path: Path) -> None:
 
     assert result.returncode == 2
     assert "no image was built" in result.stderr
-    assert not (tmp_path / "JARVIS-OS.iso").exists()
-    assert not (ROOT / "JARVIS-OS.iso").exists()
+    assert not (tmp_path / "OMNE-OS.iso").exists()
+    assert not (ROOT / "OMNE-OS.iso").exists()
 
 
 def test_vm_script_does_not_start_a_machine(tmp_path: Path) -> None:
-    result = _run(["bash", "scripts/linux/vm-boot.sh", str(tmp_path / "JARVIS-OS.iso")])
+    result = _run(["bash", "scripts/linux/vm-boot.sh", str(tmp_path / "OMNE-OS.iso")])
 
     assert result.returncode == 2
     assert "no virtual machine was started" in result.stderr

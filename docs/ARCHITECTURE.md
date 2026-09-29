@@ -1,8 +1,8 @@
 # Architecture
 
-JARVIS OS is an orchestration layer above Linux. Linux owns the kernel, hardware, processes, and
-devices. JARVIS plans work, checks permission, and calls a small set of tools. Models do not receive
-a shell.
+OMNE OS is an orchestration layer above Linux. Linux owns the kernel, hardware, processes, and
+devices. OMNE plans work, checks permission, and calls a small set of tools. Models do not receive a
+shell.
 
 ## Runtime
 
@@ -10,7 +10,7 @@ a shell.
 HUMAN
   |
   v
-SHELL (TypeScript) -- HTTP --> JARVIS CORE (Python)
+SHELL (TypeScript) -- HTTP --> OMNE CORE (Python)
                                  |
                                  +-- planner
                                  +-- scheduler and executor
@@ -20,13 +20,12 @@ SHELL (TypeScript) -- HTTP --> JARVIS CORE (Python)
                                  +-- memory, events, compute
 ```
 
-`jarvis check` validates configuration and creates the workspace and data directories.
-`jarvis serve` exposes the local HTTP API. `jarvis execute` plans one objective and runs it.
-`jarvis compute` prints one resource snapshot from the host.
+`OMNE check` validates configuration and creates the workspace and data directories. `OMNE serve`
+exposes the local HTTP API. `OMNE execute` plans one objective and runs it. `OMNE compute` prints
+one resource snapshot from the host.
 
-The programmatic entry is `core.api.main.main`. `core.api.runtime.build_jarvis` assembles the
-process. Missing agent or model directories leave those registries empty instead of inventing
-entries.
+The programmatic entry is `core.api.main.main`. `core.api.runtime.build_OMNE` assembles the process.
+Missing agent or model directories leave those registries empty instead of inventing entries.
 
 ## Tasks
 

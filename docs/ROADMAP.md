@@ -5,7 +5,7 @@
 | Phase | What is in this revision                                          |
 | ----- | ----------------------------------------------------------------- |
 | 1     | Configuration, logging, health service, shell, CI                 |
-| 2     | Tasks, events, planner, executor, `jarvis execute`                |
+| 2     | Tasks, events, planner, executor, `OMNE execute`                  |
 | 3     | Filesystem, terminal, process, system, git, and browser tools     |
 | 4     | Permission policy, confirmation, audit, fail-closed evaluator     |
 | 5     | Mock, xAI, and local providers, registry, and router              |
@@ -22,9 +22,9 @@
 
 ## Not done
 
-Phase 14 does not write `JARVIS-OS.iso`. The script exits 2 when it is not root or when
-`debootstrap` or `xorriso` is missing, and it still exits 2 when those tools exist because this
-revision does not download a base image.
+Phase 14 does not write `OMNE-OS.iso`. The script exits 2 when it is not root or when `debootstrap`
+or `xorriso` is missing, and it still exits 2 when those tools exist because this revision does not
+download a base image.
 
 Phase 15 does not boot a virtual machine. `scripts/linux/vm-boot.sh` exits 2 when the image or
 `qemu-system-x86_64` is absent.
