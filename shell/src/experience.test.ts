@@ -106,6 +106,16 @@ test("the command story stays free of raw identifiers", () => {
   assert.equal(text.includes("UNDERSTANDING"), true);
   assert.equal(text.includes("Request understood"), true);
   assert.equal(text.includes("4 tasks created"), true);
+  const single = commandStory({
+    lifecycle: [{ id: "planning", label: "PLANNING", mark: "done", detail: "" }],
+    taskCount: 1,
+    workers: [],
+    verification: { status: "NONE", lines: [], passedChecks: 0, totalChecks: 0 },
+  });
+  assert.equal(
+    single.some((beat) => beat.lines.some((line) => line.text === "1 task created")),
+    true,
+  );
   assert.equal(text.includes("Coding Worker #1"), true);
   assert.equal(text.includes("trace"), false);
   assert.equal(text.includes("mock"), false);

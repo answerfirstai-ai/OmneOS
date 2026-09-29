@@ -316,9 +316,13 @@ function understandingLines(mark: StageMark): StoryLine[] {
   return [{ mark: "pending", text: "Waiting" }];
 }
 
+function tasksCreated(taskCount: number): string {
+  return taskCount === 1 ? "1 task created" : `${taskCount} tasks created`;
+}
+
 function planningLines(mark: StageMark, taskCount: number): StoryLine[] {
   if (mark === "done") {
-    return [{ mark, text: taskCount > 0 ? `${taskCount} tasks created` : "Plan ready" }];
+    return [{ mark, text: taskCount > 0 ? tasksCreated(taskCount) : "Plan ready" }];
   }
   if (mark === "active") {
     return [{ mark, text: "Planning" }];
