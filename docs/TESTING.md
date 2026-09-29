@@ -45,6 +45,8 @@ Python:
 - The installer refusing `/boot`, the Ubuntu 24.04 system tree, the three system packages, the
   rootfs and UEFI disk builders refusing to write without root, and the ISO and VM scripts exiting
   without an image or a boot unless `vm-boot.sh --run` is passed.
+- Display diagnostics. The testing API uses the mock provider and does not invent a monitor. The
+  labwc provider reads a fixture filesystem and does not start a compositor.
 
 TypeScript:
 
@@ -63,5 +65,6 @@ TypeScript:
 `scripts/linux/vm-boot.sh` does not start a virtual machine unless `--run` is passed.
 `scripts/linux/build-base.sh` and `scripts/linux/build-disk.sh` are tested for their plans and for
 refusing to write when not root. The boot checklist is tested against a fixture machine and a local
-core: an unavailable GPU is not a check. The default suite does not run `debootstrap` or QEMU. Live
-xAI, a physical GPU workload, and hardware installation are outside the default suite.
+core: an unavailable GPU is not a check. Display launch readiness is tested against a fixture DRM
+tree. The default suite does not run `debootstrap`, QEMU, or labwc. Live xAI, a physical GPU
+workload, and hardware installation are outside the default suite.

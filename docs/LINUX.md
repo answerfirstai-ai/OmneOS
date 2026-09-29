@@ -85,5 +85,5 @@ bash scripts/linux/vm-boot.sh --run /var/tmp/OMNE-OS.img
 ```
 
 `--dry-run` writes nothing and does not start QEMU. `--run` needs `qemu-system-x86_64` and OVMF.
-`scripts/linux/build-iso.sh` still exits 2. A Wayland session and a physical install are later
-layers.
+`scripts/linux/build-iso.sh` still exits 2. The graphical session is labwc, described in
+`docs/GRAPHICS_ARCHITECTURE.md`. This revision does not start it. A physical install is later.

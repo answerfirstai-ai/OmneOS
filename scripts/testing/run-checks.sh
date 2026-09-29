@@ -8,8 +8,8 @@ if [[ -f .venv/bin/activate ]]; then
   source .venv/bin/activate
 fi
 
-python -m ruff format --check core tests
-python -m ruff check core tests
+python -m ruff format --check core omne tests
+python -m ruff check core omne tests
 python -m mypy
 python -m pytest
 OMNE check

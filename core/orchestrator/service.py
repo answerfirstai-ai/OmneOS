@@ -41,6 +41,7 @@ from core.trace import new_trace_id, set_mission_id
 from core.verify.verifier import VerificationResult, verify_observations
 from core.voice.service import VoiceService
 from core.world.state import WorldState, WorldStateService
+from omne.display.select import diagnose_display
 
 _MODEL_CAPABILITY = {
     "conversation": "reasoning",
@@ -312,6 +313,9 @@ class OMNE:
 
     def compute_status(self) -> ResourceSnapshot:
         return self._monitor.snapshot()
+
+    def display_view(self) -> dict[str, object]:
+        return diagnose_display(self._environment).model_dump(mode="json")
 
     def voice_status(self) -> dict[str, object]:
         return self._voice.status()

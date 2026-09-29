@@ -80,7 +80,8 @@ The development base is Ubuntu 24.04. System packages and `omne.target` start OM
 `scripts/linux/build-disk.sh` writes a UEFI disk with systemd-boot and Ubuntu's kernel. The console
 is the OMNE checklist, not a desktop. No `OMNE-OS.iso` is produced. `scripts/linux/build-iso.sh`
 exits 2 and does not write an image. `scripts/linux/vm-boot.sh --run` starts QEMU when the disk and
-OVMF are present. Physical hardware installation is not implemented.
+OVMF are present. `OMNE display` reports DRM and labwc readiness and does not start a compositor.
+Physical hardware installation is not implemented.
 
 ## License
 

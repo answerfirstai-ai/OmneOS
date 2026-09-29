@@ -66,6 +66,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_execute(settings, args.objective, dry_run=bool(args.dry_run))
     if args.command == "compute":
         return _run_compute(settings)
+    if args.command == "display":
+        return _run_display(settings)
     return _run_inspection(settings, args)
 
 
@@ -94,6 +96,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="show the plan without running tools",
     )
     commands.add_parser("compute", help="print one host resource snapshot")
+    commands.add_parser("display", help="print display diagnostics without starting a session")
     mission = commands.add_parser("mission", help="inspect missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
     mission_commands.add_parser("list", help="list missions")
@@ -196,6 +199,11 @@ def _inspection_payload(runtime: OMNE, args: argparse.Namespace) -> object:
 def _run_compute(settings: Settings) -> int:
     snapshot = build_OMNE(settings).compute_status()
     print(json.dumps(snapshot.model_dump(), sort_keys=True))
+    return 0
+
+
+def _run_display(settings: Settings) -> int:
+    print(json.dumps(build_OMNE(settings).display_view(), sort_keys=True))
     return 0
 
 
