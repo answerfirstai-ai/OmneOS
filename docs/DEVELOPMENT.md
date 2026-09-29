@@ -65,6 +65,16 @@ A user-level install that does not touch the bootloader:
 bash scripts/linux/install.sh --dry-run --prefix "$HOME/.local"
 ```
 
+The system layout is separate. It targets Ubuntu 24.04 and does not install a kernel:
+
+```bash
+bash scripts/linux/stage-system.sh --dest /tmp/omne-system
+bash scripts/linux/build-packages.sh --dry-run
+bash scripts/linux/build-base.sh --dry-run
+```
+
+`docs/LINUX.md` describes the packages, the `omne` user, and the rootfs builder.
+
 ## Checks
 
 ```bash

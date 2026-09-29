@@ -1,0 +1,17 @@
+[Unit]
+Description=OMNE Shell
+After=omne-core.service
+Requires=omne-core.service
+PartOf=omne.target
+
+[Service]
+Type=simple
+User=omne
+Group=omne
+ExecStart=/usr/bin/python3 -m http.server --directory /usr/share/omne/shell --bind 127.0.0.1 4173
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+
+[Install]
+WantedBy=omne.target
