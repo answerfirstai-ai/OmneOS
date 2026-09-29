@@ -1,0 +1,5 @@
+[permissions]
+filesystem = ["workspace"]
+terminal = ["workspace"]
+process = ["list", "start", "signal"]
+git = ["read", "commit"]

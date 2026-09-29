@@ -1,0 +1,12 @@
+[Unit]
+Description=OMNE Core
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/OMNE serve
+WorkingDirectory=%h
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

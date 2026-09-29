@@ -1,0 +1,7 @@
+.venv
+node_modules
+shell/dist
+shell/dist-test
+.git
+*.toml
+pyproject.toml

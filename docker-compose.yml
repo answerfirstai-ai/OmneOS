@@ -1,0 +1,12 @@
+services:
+  core:
+    build:
+      context: .
+    ports:
+      - "8787:8787"
+    environment:
+      OMNE_ENVIRONMENT: development
+      OMNE_HOST: 0.0.0.0
+      OMNE_PORT: "8787"
+      OMNE_LOG_FORMAT: json
+    restart: "no"
