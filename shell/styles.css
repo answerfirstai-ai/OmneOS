@@ -140,15 +140,16 @@ input:focus-visible {
 }
 
 #window-launcher {
-  top: 78px;
-  left: 168px;
-  width: min(460px, calc(100vw - 120px));
+  top: 72px;
+  left: 108px;
+  width: min(380px, 34vw);
 }
 
 #window-tasks {
-  top: 48px;
-  left: clamp(300px, 48vw, 640px);
-  width: min(400px, calc(100vw - 120px));
+  top: 72px;
+  right: 16px;
+  left: auto;
+  width: min(380px, 34vw);
 }
 
 #window-agents {
@@ -471,16 +472,16 @@ input {
 .presence {
   position: absolute;
   z-index: 1;
-  top: 42%;
+  top: 50%;
   left: 50%;
-  width: min(280px, 46vw);
-  transform: translate(-50%, -58%);
+  width: min(240px, 28vw);
+  transform: translate(-50%, -54%);
   pointer-events: none;
   text-align: center;
 }
 
 .core-mark svg {
-  width: min(168px, 28vw);
+  width: min(148px, 22vw);
   height: auto;
 }
 

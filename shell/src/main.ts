@@ -1206,6 +1206,7 @@ function bootstrap(): void {
     paintHud();
     const coreUrl = readCoreUrl(window.location.search);
     void refresh(status, detail);
+    void refreshCompute(coreUrl);
     window.setInterval(() => {
       void refresh(status, detail);
       void refreshGraph(coreUrl);
