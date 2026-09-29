@@ -149,14 +149,23 @@ telemetry are not cached. The cache emits hit, miss, bypass, and invalidation re
 ## API and shell
 
 Existing routes stay in place. Added routes: missions, world, capabilities, workers, traces, memory,
-verification, graph, and questions. `GET /desktop` still returns tasks, agents, models, events, and
-voice, and also returns missions and workers. The shell opens Missions and Workers windows from that
-document. Character state still follows task status when no mission status is present. When mission
-statuses are present, analyzing, planning, verifying, and waiting come from those statuses. No
-character asset is shipped. Listen stays disabled.
+verification, graph, and questions. `GET /desktop` returns tasks, agents, models, events, voice,
+missions, and workers. It also returns child activity, pending confirmations, questions, and project
+identity. It does not include a compute sample. The shell polls `GET /compute` on its own.
 
-`GET /graph` lists nodes and edges that exist in the current stores. It does not invent a galaxy
-animation.
+The desktop is a windowed environment. A core mark shows idle, listening, understanding, planning,
+routing, working, waiting, verifying, success, and error from health, voice, mission status, and a
+real `decision.selected` event. Routing is not shown unless that event is present. No character
+asset is shipped. A later renderer can replace the mark without a backend change. Listen stays
+disabled.
+
+Command input posts an objective. The launcher then shows the mission lifecycle from recorded
+status, assignments, and verification. Allow and deny post to the existing confirm route. The shell
+does not run tools itself. Notifications are sentences derived from event types and open the related
+mission. The system graph lays out `GET /graph` nodes only while that window is open. Unknown
+resource values stay unknown, and an unavailable GPU stays unavailable.
+
+`GET /graph` lists nodes and edges that exist in the current stores. It does not invent nodes.
 
 ## Linux integration
 

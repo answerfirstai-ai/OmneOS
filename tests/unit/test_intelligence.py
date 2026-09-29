@@ -425,6 +425,35 @@ def test_new_api_routes_and_rejects_malformed_input(tmp_path: Path) -> None:
     assert route_get(None, "/world", {})[0].value == 503
 
 
+def test_desktop_reports_activity_confirmation_and_project(tmp_path: Path) -> None:
+    omne = build_OMNE(runtime_settings(tmp_path))
+
+    omne.execute_sync("write file notes.txt with content hello from OMNE")
+    waiting = omne.execute_sync("run terminal command echo hello")
+    omne.execute_sync("delete the project")
+    view = omne.desktop_view()
+
+    assert "compute" not in view
+    assert isinstance(view["project"], dict)
+    assert view["project"]["name"] == "workspace"
+    assert view["project"]["type"] == "files"
+    activity = view["activity"]
+    assert isinstance(activity, list)
+    assert any(
+        item["verification"]["status"] == "PASS" for item in activity if item["verification"]
+    )
+    assert all(item["parent_task"] for item in activity)
+    confirmations = view["confirmations"]
+    assert confirmations[0]["tool_id"] == "terminal.execute"
+    assert confirmations[0]["command"] == "echo hello"
+    assert confirmations[0]["task_id"]
+    assert waiting.status is TaskStatus.WAITING
+    assert view["questions"][0]["question"]
+    mock = next(model for model in view["models"] if model["id"] == "mock-default")
+    assert mock["loaded"] is False
+    assert mock["lifecycle"] == "AVAILABLE"
+
+
 def test_event_replay_does_not_execute_tools() -> None:
     bus = EventBus()
     bus.publish("mission.created", mission_id="m1", payload={"objective": "write file secret.txt"})

@@ -8,6 +8,19 @@
   </head>
   <body>
     <div class="desktop" id="desktop">
+      <div class="presence" id="presence" data-state="IDLE" data-motion="still">
+        <div class="core-mark" aria-hidden="true">
+          <svg viewBox="0 0 120 120">
+            <circle class="ring outer" cx="60" cy="60" r="46"></circle>
+            <circle class="ring mid" cx="60" cy="60" r="30"></circle>
+            <circle class="ring core" cx="60" cy="60" r="8"></circle>
+          </svg>
+        </div>
+        <p id="presence-label" data-presence-label>IDLE</p>
+        <p id="presence-objective" class="presence-objective">No active mission</p>
+        <p id="presence-attention" class="presence-attention"></p>
+      </div>
+
       <nav class="icons" aria-label="Desktop">
         <button type="button" class="icon" data-launch="core" aria-pressed="false">
           <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -20,38 +33,14 @@
           <svg viewBox="0 0 32 32" aria-hidden="true">
             <path d="M8 9h16M8 16h10M8 23h16"></path>
           </svg>
-          <span>Launcher</span>
+          <span>Command</span>
         </button>
         <button type="button" class="icon" data-launch="tasks" aria-pressed="true">
           <svg viewBox="0 0 32 32" aria-hidden="true">
-            <rect x="7" y="6" width="18" height="20" rx="2"></rect>
+            <rect x="7" y="6" width="18" height="20"></rect>
             <path d="M12 13h8M12 18h8"></path>
           </svg>
           <span>Tasks</span>
-        </button>
-        <button type="button" class="icon" data-launch="agents" aria-pressed="false">
-          <svg viewBox="0 0 32 32" aria-hidden="true">
-            <circle cx="12" cy="12" r="3"></circle>
-            <circle cx="21" cy="13" r="2.5"></circle>
-            <path
-              d="M6 23c1.2-3 3.4-4.5 6-4.5s4.8 1.5 6 4.5M18 21c.8-2 2.2-3 4-3 1.6 0 2.8.8 3.6 2.4"
-            ></path>
-          </svg>
-          <span>Agents</span>
-        </button>
-        <button type="button" class="icon" data-launch="models" aria-pressed="false">
-          <svg viewBox="0 0 32 32" aria-hidden="true">
-            <rect x="8" y="8" width="16" height="16" rx="3"></rect>
-            <path d="M13 16h6M16 13v6"></path>
-          </svg>
-          <span>Models</span>
-        </button>
-        <button type="button" class="icon" data-launch="notifications" aria-pressed="false">
-          <svg viewBox="0 0 32 32" aria-hidden="true">
-            <path d="M10 22h12l-1.4-2.2V14a4.6 4.6 0 0 0-9.2 0v5.8z"></path>
-            <path d="M14 24a2 2 0 0 0 4 0"></path>
-          </svg>
-          <span>Notices</span>
         </button>
         <button type="button" class="icon" data-launch="missions" aria-pressed="false">
           <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -62,11 +51,46 @@
         </button>
         <button type="button" class="icon" data-launch="workers" aria-pressed="false">
           <svg viewBox="0 0 32 32" aria-hidden="true">
-            <rect x="6" y="8" width="8" height="8" rx="1"></rect>
-            <rect x="18" y="8" width="8" height="8" rx="1"></rect>
-            <rect x="12" y="18" width="8" height="8" rx="1"></rect>
+            <rect x="6" y="8" width="8" height="8"></rect>
+            <rect x="18" y="8" width="8" height="8"></rect>
+            <rect x="12" y="18" width="8" height="8"></rect>
           </svg>
           <span>Workers</span>
+        </button>
+        <button type="button" class="icon" data-launch="agents" aria-pressed="false">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <circle cx="21" cy="13" r="2.5"></circle>
+            <path d="M6 23c1.2-3 3.4-4.5 6-4.5s4.8 1.5 6 4.5"></path>
+          </svg>
+          <span>Agents</span>
+        </button>
+        <button type="button" class="icon" data-launch="models" aria-pressed="false">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <rect x="8" y="8" width="16" height="16"></rect>
+            <path d="M13 16h6M16 13v6"></path>
+          </svg>
+          <span>Models</span>
+        </button>
+        <button type="button" class="icon" data-launch="graph" aria-pressed="false">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <circle cx="8" cy="16" r="2"></circle>
+            <circle cx="16" cy="8" r="2"></circle>
+            <circle cx="24" cy="18" r="2"></circle>
+            <path d="M10 15l4-6M18 9l5 7"></path>
+          </svg>
+          <span>Graph</span>
+        </button>
+        <button type="button" class="icon" data-launch="projects" aria-pressed="false">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 10h8l2 2h10v12H6z"></path></svg>
+          <span>Project</span>
+        </button>
+        <button type="button" class="icon" data-launch="notifications" aria-pressed="false">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M10 22h12l-1.4-2.2V14a4.6 4.6 0 0 0-9.2 0v5.8z"></path>
+            <path d="M14 24a2 2 0 0 0 4 0"></path>
+          </svg>
+          <span>Notices</span>
         </button>
         <button type="button" class="icon" data-launch="voice" aria-pressed="false">
           <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -87,13 +111,24 @@
         >
           <header class="titlebar">
             <h2 id="core-title">Core</h2>
-            <button type="button" class="close" data-close="core" aria-label="Close Core">×</button>
+            <div class="chrome">
+              <button type="button" class="frame" data-minimize="core" aria-label="Minimize Core">
+                −
+              </button>
+              <button type="button" class="frame" data-maximize="core" aria-label="Maximize Core">
+                □
+              </button>
+              <button type="button" class="frame close" data-close="core" aria-label="Close Core">
+                ×
+              </button>
+            </div>
           </header>
           <div class="window-body">
             <p id="status" data-state="checking">checking</p>
             <p id="detail"></p>
             <button id="refresh" type="button">Check again</button>
           </div>
+          <span class="resize" data-resize="core"></span>
         </article>
 
         <article
@@ -103,22 +138,47 @@
           aria-labelledby="launcher-title"
         >
           <header class="titlebar">
-            <h2 id="launcher-title">Launcher</h2>
-            <button type="button" class="close" data-close="launcher" aria-label="Close Launcher">
-              ×
-            </button>
+            <h2 id="launcher-title">Command</h2>
+            <div class="chrome">
+              <button
+                type="button"
+                class="frame"
+                data-minimize="launcher"
+                aria-label="Minimize Command"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                class="frame"
+                data-maximize="launcher"
+                aria-label="Maximize Command"
+              >
+                □
+              </button>
+              <button
+                type="button"
+                class="frame close"
+                data-close="launcher"
+                aria-label="Close Command"
+              >
+                ×
+              </button>
+            </div>
           </header>
           <form id="launcher" class="window-body">
-            <label for="objective">Objective</label>
+            <label for="objective">Command</label>
             <input
               id="objective"
               name="objective"
               type="text"
               placeholder="write file notes.txt with content hello"
             />
-            <button type="submit">Run</button>
-            <p id="launch-result"></p>
+            <button type="submit">Send</button>
+            <ol id="launch-lifecycle" class="lifecycle"></ol>
+            <p id="launch-result" aria-live="polite"></p>
           </form>
+          <span class="resize" data-resize="launcher"></span>
         </article>
 
         <article
@@ -129,13 +189,23 @@
         >
           <header class="titlebar">
             <h2 id="tasks-title">Tasks</h2>
-            <button type="button" class="close" data-close="tasks" aria-label="Close Tasks">
-              ×
-            </button>
+            <div class="chrome">
+              <button type="button" class="frame" data-minimize="tasks" aria-label="Minimize Tasks">
+                −
+              </button>
+              <button type="button" class="frame" data-maximize="tasks" aria-label="Maximize Tasks">
+                □
+              </button>
+              <button type="button" class="frame close" data-close="tasks" aria-label="Close Tasks">
+                ×
+              </button>
+            </div>
           </header>
           <div class="window-body">
+            <div id="permissions"></div>
             <ul id="tasks"></ul>
           </div>
+          <span class="resize" data-resize="tasks"></span>
         </article>
 
         <article
@@ -147,13 +217,35 @@
         >
           <header class="titlebar">
             <h2 id="agents-title">Agents</h2>
-            <button type="button" class="close" data-close="agents" aria-label="Close Agents">
-              ×
-            </button>
+            <div class="chrome">
+              <button
+                type="button"
+                class="frame"
+                data-minimize="agents"
+                aria-label="Minimize Agents"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                class="frame"
+                data-maximize="agents"
+                aria-label="Maximize Agents"
+              >
+                □
+              </button>
+              <button
+                type="button"
+                class="frame close"
+                data-close="agents"
+                aria-label="Close Agents"
+              >
+                ×
+              </button>
+            </div>
           </header>
-          <div class="window-body">
-            <ul id="agents"></ul>
-          </div>
+          <div class="window-body"><ul id="agents"></ul></div>
+          <span class="resize" data-resize="agents"></span>
         </article>
 
         <article
@@ -165,13 +257,35 @@
         >
           <header class="titlebar">
             <h2 id="models-title">Models</h2>
-            <button type="button" class="close" data-close="models" aria-label="Close Models">
-              ×
-            </button>
+            <div class="chrome">
+              <button
+                type="button"
+                class="frame"
+                data-minimize="models"
+                aria-label="Minimize Models"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                class="frame"
+                data-maximize="models"
+                aria-label="Maximize Models"
+              >
+                □
+              </button>
+              <button
+                type="button"
+                class="frame close"
+                data-close="models"
+                aria-label="Close Models"
+              >
+                ×
+              </button>
+            </div>
           </header>
-          <div class="window-body">
-            <ul id="models"></ul>
-          </div>
+          <div class="window-body"><ul id="models"></ul></div>
+          <span class="resize" data-resize="models"></span>
         </article>
 
         <article
@@ -183,18 +297,35 @@
         >
           <header class="titlebar">
             <h2 id="notifications-title">Notifications</h2>
-            <button
-              type="button"
-              class="close"
-              data-close="notifications"
-              aria-label="Close Notifications"
-            >
-              ×
-            </button>
+            <div class="chrome">
+              <button
+                type="button"
+                class="frame"
+                data-minimize="notifications"
+                aria-label="Minimize Notifications"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                class="frame"
+                data-maximize="notifications"
+                aria-label="Maximize Notifications"
+              >
+                □
+              </button>
+              <button
+                type="button"
+                class="frame close"
+                data-close="notifications"
+                aria-label="Close Notifications"
+              >
+                ×
+              </button>
+            </div>
           </header>
-          <div class="window-body">
-            <ul id="notifications"></ul>
-          </div>
+          <div class="window-body"><ul id="notifications" aria-live="polite"></ul></div>
+          <span class="resize" data-resize="notifications"></span>
         </article>
 
         <article
@@ -206,13 +337,38 @@
         >
           <header class="titlebar">
             <h2 id="missions-title">Missions</h2>
-            <button type="button" class="close" data-close="missions" aria-label="Close Missions">
-              ×
-            </button>
+            <div class="chrome">
+              <button
+                type="button"
+                class="frame"
+                data-minimize="missions"
+                aria-label="Minimize Missions"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                class="frame"
+                data-maximize="missions"
+                aria-label="Maximize Missions"
+              >
+                □
+              </button>
+              <button
+                type="button"
+                class="frame close"
+                data-close="missions"
+                aria-label="Close Missions"
+              >
+                ×
+              </button>
+            </div>
           </header>
-          <div class="window-body">
+          <div class="window-body split">
             <ul id="missions"></ul>
+            <div id="mission-detail"></div>
           </div>
+          <span class="resize" data-resize="missions"></span>
         </article>
 
         <article
@@ -224,13 +380,119 @@
         >
           <header class="titlebar">
             <h2 id="workers-title">Workers</h2>
-            <button type="button" class="close" data-close="workers" aria-label="Close Workers">
-              ×
-            </button>
+            <div class="chrome">
+              <button
+                type="button"
+                class="frame"
+                data-minimize="workers"
+                aria-label="Minimize Workers"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                class="frame"
+                data-maximize="workers"
+                aria-label="Maximize Workers"
+              >
+                □
+              </button>
+              <button
+                type="button"
+                class="frame close"
+                data-close="workers"
+                aria-label="Close Workers"
+              >
+                ×
+              </button>
+            </div>
+          </header>
+          <div class="window-body" id="workers"></div>
+          <span class="resize" data-resize="workers"></span>
+        </article>
+
+        <article
+          class="window"
+          id="window-graph"
+          data-window="graph"
+          hidden
+          aria-labelledby="graph-title"
+        >
+          <header class="titlebar">
+            <h2 id="graph-title">System</h2>
+            <div class="chrome">
+              <button
+                type="button"
+                class="frame"
+                data-minimize="graph"
+                aria-label="Minimize System"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                class="frame"
+                data-maximize="graph"
+                aria-label="Maximize System"
+              >
+                □
+              </button>
+              <button
+                type="button"
+                class="frame close"
+                data-close="graph"
+                aria-label="Close System"
+              >
+                ×
+              </button>
+            </div>
           </header>
           <div class="window-body">
-            <ul id="workers"></ul>
+            <div id="graph-view" class="graph-view" tabindex="0" aria-label="System graph"></div>
+            <p id="graph-pressure" class="pressure"></p>
+            <button id="graph-focus" type="button">Focus mission</button>
           </div>
+          <span class="resize" data-resize="graph"></span>
+        </article>
+
+        <article
+          class="window"
+          id="window-projects"
+          data-window="projects"
+          hidden
+          aria-labelledby="projects-title"
+        >
+          <header class="titlebar">
+            <h2 id="projects-title">Project</h2>
+            <div class="chrome">
+              <button
+                type="button"
+                class="frame"
+                data-minimize="projects"
+                aria-label="Minimize Project"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                class="frame"
+                data-maximize="projects"
+                aria-label="Maximize Project"
+              >
+                □
+              </button>
+              <button
+                type="button"
+                class="frame close"
+                data-close="projects"
+                aria-label="Close Project"
+              >
+                ×
+              </button>
+            </div>
+          </header>
+          <div class="window-body" id="project-facts"></div>
+          <span class="resize" data-resize="projects"></span>
         </article>
 
         <article
@@ -242,38 +504,55 @@
         >
           <header class="titlebar">
             <h2 id="voice-title">Voice</h2>
-            <button type="button" class="close" data-close="voice" aria-label="Close Voice">
-              ×
-            </button>
+            <div class="chrome">
+              <button type="button" class="frame" data-minimize="voice" aria-label="Minimize Voice">
+                −
+              </button>
+              <button type="button" class="frame" data-maximize="voice" aria-label="Maximize Voice">
+                □
+              </button>
+              <button type="button" class="frame close" data-close="voice" aria-label="Close Voice">
+                ×
+              </button>
+            </div>
           </header>
           <div class="window-body">
             <p id="voice-status">unavailable</p>
             <button id="voice-listen" type="button" disabled>Listen</button>
           </div>
+          <span class="resize" data-resize="voice"></span>
         </article>
       </div>
     </div>
 
     <div id="start-menu" class="start-menu" hidden>
       <p class="menu-brand">OMNE OS</p>
-      <button type="button" data-launch="core">Core</button>
-      <button type="button" data-launch="launcher">Launcher</button>
-      <button type="button" data-launch="tasks">Tasks</button>
-      <button type="button" data-launch="agents">Agents</button>
-      <button type="button" data-launch="models">Models</button>
-      <button type="button" data-launch="notifications">Notifications</button>
-      <button type="button" data-launch="voice">Voice</button>
+      <button type="button" data-launch="launcher">Command</button>
       <button type="button" data-launch="missions">Missions</button>
       <button type="button" data-launch="workers">Workers</button>
+      <button type="button" data-launch="agents">Agents</button>
+      <button type="button" data-launch="models">Models</button>
+      <button type="button" data-launch="graph">System</button>
+      <button type="button" data-launch="projects">Project</button>
+      <button type="button" data-launch="notifications">Notifications</button>
+      <button type="button" data-launch="tasks">Tasks</button>
+      <button type="button" data-launch="core">Core</button>
+      <button type="button" data-launch="voice">Voice</button>
     </div>
 
     <footer class="taskbar">
-      <button type="button" id="start" aria-controls="start-menu" aria-expanded="false">
+      <button
+        type="button"
+        id="start"
+        aria-controls="start-menu"
+        aria-expanded="false"
+        title="Command palette: Ctrl or Command + Space"
+      >
         OMNE
       </button>
       <div class="dock" role="toolbar" aria-label="Open windows">
         <button type="button" data-task="core" hidden>Core</button>
-        <button type="button" data-task="launcher" aria-pressed="false">Launcher</button>
+        <button type="button" data-task="launcher" aria-pressed="false">Command</button>
         <button type="button" data-task="tasks" aria-pressed="true">Tasks</button>
         <button type="button" data-task="agents" hidden>Agents</button>
         <button type="button" data-task="models" hidden>Models</button>
@@ -281,9 +560,13 @@
         <button type="button" data-task="voice" hidden>Voice</button>
         <button type="button" data-task="missions" hidden>Missions</button>
         <button type="button" data-task="workers" hidden>Workers</button>
+        <button type="button" data-task="graph" hidden>System</button>
+        <button type="button" data-task="projects" hidden>Project</button>
       </div>
+      <div id="hud" class="hud" aria-label="System resources"></div>
       <div class="tray">
-        <p id="character" data-state="idle">idle</p>
+        <p id="sync-note" class="sync-note" aria-live="polite"></p>
+        <p id="character" data-state="IDLE">IDLE</p>
         <p id="tray-status" data-state="checking">checking</p>
         <time id="clock"></time>
       </div>

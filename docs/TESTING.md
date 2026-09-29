@@ -34,7 +34,8 @@ Python:
   connect.
 - Routing to the mock model, live host telemetry, a reused snapshot, allocator decisions, and a
   model cache that does not load weights.
-- `GET /desktop` returns the shell panels and does not include a compute sample.
+- `GET /desktop` returns the shell panels, including activity, confirmations, questions, and
+  project, and does not include a compute sample.
 - The same model prompt and cache context reuse one response. A later mission changes the world
   revision, so the same sentence is fetched again. Tool calls are not cached.
 - Memory scope checks, provenance columns on older databases, agent manifests, and lifecycle edges.
@@ -47,9 +48,11 @@ TypeScript:
 
 - Health parsing and core URL selection.
 - Character states, including a missing asset and mission-driven analyzing, verifying, and waiting.
+- Environment state, lifecycle stages, mission inspection, permission copy, verification evidence,
+  error summaries, notifications, graph layout, resource lines, and keyboard shortcuts.
 - Voice control staying disabled unless permission, provider, and hardware are all available.
 - Task, agent, model, and notification lines, and one `/desktop` document.
-- Desktop windows open, come to the front, and hide again.
+- Desktop windows open, come to the front, hide, minimize, maximize, and stay within resize bounds.
 
 ## Not claimed
 

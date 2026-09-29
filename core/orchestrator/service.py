@@ -248,6 +248,10 @@ class OMNE:
     def desktop_view(self) -> dict[str, object]:
         """Return the panels the shell paints, without a fresh telemetry sample."""
 
+        tasks = self.list_tasks()
+        confirmations = [
+            document for task in tasks if (document := confirmation_document(task)) is not None
+        ]
         return {
             "tasks": [task_document(task) for task in self._store.roots()],
             "agents": self.agent_views(),
@@ -258,6 +262,10 @@ class OMNE:
             "workers": [
                 worker.model_dump(mode="json") for worker in self._runtime.pool.list_workers()
             ],
+            "activity": [activity_document(task) for task in tasks if task.parent_task],
+            "confirmations": confirmations,
+            "questions": [dict(question) for question in self._questions],
+            "project": project_document(self._project),
         }
 
     def get_task(self, task_id: str) -> Task:
@@ -878,6 +886,85 @@ def task_document(task: Task) -> dict[str, Any]:
     """Serialize a task for the HTTP API."""
 
     return task.model_dump(mode="json")
+
+
+def activity_document(task: Task) -> dict[str, Any]:
+    """Serialize one child task for the live mission view."""
+
+    mission_id = task.metadata.get("mission_id")
+    return {
+        "id": task.id,
+        "parent_task": task.parent_task,
+        "objective": task.objective,
+        "status": task.status.value,
+        "assigned_agent": task.assigned_agent,
+        "assigned_model": task.assigned_model,
+        "mission_id": mission_id if isinstance(mission_id, str) else None,
+        "verification": _verification_brief(task.result),
+        "errors": [{"code": error.code, "message": error.message} for error in task.errors],
+    }
+
+
+def confirmation_document(task: Task) -> dict[str, Any] | None:
+    """Describe a confirmation the gateway is still waiting on."""
+
+    pending = task.pending_confirmation or {}
+    if task.status is not TaskStatus.WAITING or not pending or pending.get("approved") is True:
+        return None
+    mission_id = task.metadata.get("mission_id")
+    return {
+        "task_id": task.id,
+        "objective": task.objective,
+        "tool_id": str(pending.get("tool_id", "")),
+        "command": _confirmation_command(pending, task.objective),
+        "agent_id": task.assigned_agent,
+        "mission_id": mission_id if isinstance(mission_id, str) else None,
+    }
+
+
+def project_document(project: ProjectContext) -> dict[str, Any]:
+    """Return project identity without paths that are only useful to the host."""
+
+    return {
+        "name": project.name,
+        "type": project.type,
+        "git_branch": project.git_branch,
+        "languages": list(project.languages),
+    }
+
+
+def _verification_brief(result: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(result, dict):
+        return None
+    verification = result.get("verification")
+    if not isinstance(verification, dict):
+        return None
+    status = verification.get("status")
+    if not isinstance(status, str):
+        return None
+    return {
+        "status": status,
+        "evidence": _string_list(verification.get("evidence")),
+        "checks": _string_list(verification.get("checks")),
+        "errors": _string_list(verification.get("errors")),
+    }
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def _confirmation_command(pending: dict[str, Any], objective: str) -> str:
+    for key in ("arguments", "requested"):
+        arguments = pending.get(key)
+        if not isinstance(arguments, dict):
+            continue
+        argv = arguments.get("argv")
+        if isinstance(argv, list) and argv and all(isinstance(item, str) for item in argv):
+            return " ".join(argv)
+    return objective
 
 
 def mission_document(mission: Mission) -> dict[str, Any]:
