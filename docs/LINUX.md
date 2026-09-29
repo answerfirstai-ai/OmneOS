@@ -51,7 +51,39 @@ sudo bash scripts/linux/build-base.sh --dest /var/tmp/omne-rootfs --packages bui
 `--dry-run` prints the plan and writes nothing. `scripts/linux/stage-system.sh --dest DIR` writes
 the same tree without packing it. Both refuse `/boot`.
 
-## Later
+## Boot
 
-A kernel, a bootloader, an ISO, a virtual machine, Wayland, and physical installation are later
-layers. `scripts/linux/build-iso.sh` and `scripts/linux/vm-boot.sh` still exit 2.
+The machine firmware is UEFI. OMNE does not build a kernel. `scripts/linux/build-disk.sh` installs
+Ubuntu's `linux-image-generic` and the initramfs that package generates, then writes a GPT disk:
+
+```text
+UEFI
+    → systemd-boot
+    → Ubuntu kernel
+    → initramfs
+    → systemd
+    → omne-boot, OMNE Core, OMNE Shell
+```
+
+The disk installs `systemd-sysv`, so `/sbin/init` is systemd. `systemd-boot` is Ubuntu's
+`systemd-boot-efi` package from universe. When the build machine cannot mount FAT, `mtools` writes
+that EFI system partition. The bootloader waits zero seconds and loads one entry, titled OMNE. The
+default target is `multi-user.target`. `ubuntu-desktop`, `gdm3`, `lightdm`, and `plymouth` are
+refused, and `getty@tty1` and `serial-getty@ttyS0` are masked on the disk so a login prompt does not
+replace the console. Ethernet matches `en*` and `eth*` and requests DHCP through systemd-networkd. A
+link that stays down is reported as network down.
+
+`omne-boot` is the tty1 program. It prints Hardware, Storage, Network, GPU, Core, and Models from
+the live machine and from `GET /health` and `GET /models`. A check is printed only when that probe
+succeeds. An unavailable GPU stays unavailable. `OMNE READY` requires hardware, storage, and the
+core. Network, GPU, and models are shown either way.
+
+```bash
+sudo bash scripts/linux/build-disk.sh --rootfs /var/tmp/omne-rootfs --dest /var/tmp/OMNE-OS.img
+bash scripts/linux/vm-boot.sh --dry-run /var/tmp/OMNE-OS.img
+bash scripts/linux/vm-boot.sh --run /var/tmp/OMNE-OS.img
+```
+
+`--dry-run` writes nothing and does not start QEMU. `--run` needs `qemu-system-x86_64` and OVMF.
+`scripts/linux/build-iso.sh` still exits 2. A Wayland session and a physical install are later
+layers.

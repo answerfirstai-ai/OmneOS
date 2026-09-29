@@ -76,10 +76,11 @@ system/linux/         User unit, system units, and the Ubuntu 24.04 base pin
 ## Limits
 
 The development base is Ubuntu 24.04. System packages and `omne.target` start OMNE with the machine.
-`scripts/linux/build-base.sh` can write a rootfs and does not install a kernel or a bootloader. No
-`OMNE-OS.iso` is produced. `scripts/linux/build-iso.sh` exits 2 and does not write an image.
-`scripts/linux/vm-boot.sh` does not start a virtual machine. Physical hardware installation is not
-implemented.
+`scripts/linux/build-base.sh` can write a rootfs and does not install a kernel or a bootloader.
+`scripts/linux/build-disk.sh` writes a UEFI disk with systemd-boot and Ubuntu's kernel. The console
+is the OMNE checklist, not a desktop. No `OMNE-OS.iso` is produced. `scripts/linux/build-iso.sh`
+exits 2 and does not write an image. `scripts/linux/vm-boot.sh --run` starts QEMU when the disk and
+OVMF are present. Physical hardware installation is not implemented.
 
 ## License
 

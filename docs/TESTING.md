@@ -43,8 +43,8 @@ Python:
   dry-run, command classes, and the new HTTP routes.
 - Objective execution, dependency order, retry escalation, parallel work, and voice silence.
 - The installer refusing `/boot`, the Ubuntu 24.04 system tree, the three system packages, the
-  rootfs builder refusing to write without root, and the image and VM scripts exiting without an ISO
-  or a boot.
+  rootfs and UEFI disk builders refusing to write without root, and the ISO and VM scripts exiting
+  without an image or a boot unless `vm-boot.sh --run` is passed.
 
 TypeScript:
 
@@ -59,8 +59,9 @@ TypeScript:
 
 ## Not claimed
 
-`scripts/linux/build-iso.sh` and `scripts/linux/vm-boot.sh` are tested for their refusal. They do
-not produce `OMNE-OS.iso` and do not start a virtual machine. `scripts/linux/build-base.sh` is
-tested for its Ubuntu 24.04 plan and for refusing to write a rootfs when it is not root. The default
-suite does not run `debootstrap`. Live xAI, a physical GPU workload, and hardware installation are
-outside the default suite.
+`scripts/linux/build-iso.sh` is tested for its refusal. It does not produce `OMNE-OS.iso`.
+`scripts/linux/vm-boot.sh` does not start a virtual machine unless `--run` is passed.
+`scripts/linux/build-base.sh` and `scripts/linux/build-disk.sh` are tested for their plans and for
+refusing to write when not root. The boot checklist is tested against a fixture machine and a local
+core: an unavailable GPU is not a check. The default suite does not run `debootstrap` or QEMU. Live
+xAI, a physical GPU workload, and hardware installation are outside the default suite.

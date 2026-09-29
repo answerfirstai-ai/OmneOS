@@ -176,5 +176,7 @@ Ubuntu 24.04 LTS is the development base. OMNE packages and systemd units sit on
 
 `scripts/linux/install.sh` remains the user-level unit for a checkout and still refuses `/boot`. It
 does not change the bootloader. The system tree, packages, and rootfs builder are described in
-`docs/LINUX.md`. They do not install a kernel. The ISO and VM scripts exit 2 and do not create an
-ISO or start QEMU.
+`docs/LINUX.md`. The base rootfs does not install a kernel. `scripts/linux/build-disk.sh` adds
+Ubuntu's kernel, an initramfs, and systemd-boot on a UEFI disk, and the console is `omne-boot`
+rather than a display manager. `scripts/linux/build-iso.sh` still exits 2. `vm-boot.sh` starts QEMU
+only when `--run` is passed and OVMF is installed.
