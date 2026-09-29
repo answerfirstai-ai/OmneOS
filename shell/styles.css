@@ -481,7 +481,7 @@ input {
 }
 
 .core-mark svg {
-  width: min(148px, 22vw);
+  width: min(196px, 26vw);
   height: auto;
 }
 
@@ -511,6 +511,75 @@ input {
 
 .presence[data-motion="steady"] .ring.mid {
   animation: core-pulse 2.8s ease-in-out infinite;
+}
+
+.orbit {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.orbit span {
+  position: absolute;
+  max-width: 140px;
+  overflow: hidden;
+  color: var(--muted);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
+.command-mark {
+  margin: 0 0 0.35rem;
+  letter-spacing: 0.22em;
+  font-size: 0.78rem;
+}
+
+.command-surface label {
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.command-request {
+  margin: 0.9rem 0 0.2rem;
+}
+
+.command-surface details {
+  margin-top: 0.8rem;
+}
+
+.command-surface summary {
+  color: var(--muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.mission-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+#detail-level {
+  border: 0;
+  background: transparent;
+  padding: 0.2rem 0.35rem;
+  color: var(--muted);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.graph-node[data-status="COMPLETED"] circle,
+.graph-node[data-status="COMPLETE"] circle {
+  stroke: var(--ok);
+}
+
+.graph-node[data-status="FAILED"] circle,
+.graph-node[data-status="failed"] circle {
+  stroke: var(--unavailable);
 }
 
 #presence-label {

@@ -5,16 +5,32 @@ import {
   attentionLine,
   chooseMission,
   describeModel,
-  missionLine,
   parentTasks,
   readDesktop,
   retainDesktop,
   shouldRepaint,
-  taskLine,
   type DesktopView,
   type MissionDocument,
 } from "./desktop.js";
+import { cycleDetail, detailLabel, type DetailLevel } from "./detail.js";
+import { focusGraph } from "./graph-context.js";
 import { stageLine } from "./lifecycle.js";
+import {
+  agentBoard,
+  commandStory,
+  desktopOrbit,
+  displayName,
+  markGlyph,
+  missionListLabel,
+  modelCards,
+  modelLines,
+  nameWorkers,
+  orbitPoint,
+  statusWord,
+  taskSurface,
+  verificationLine,
+  workerName,
+} from "./present.js";
 import {
   cameraForNode,
   graphKey,
@@ -29,7 +45,7 @@ import {
 } from "./graph-layout.js";
 import { hudText, readCompute, resourcePressure, type HudLine } from "./hud.js";
 import { coreHealthUrl, parseHealth, type CoreHealth } from "./health.js";
-import { groupWorkers, inspectMission } from "./mission-view.js";
+import { inspectMission } from "./mission-view.js";
 import { noticesFromEvents } from "./notify.js";
 import { permissionPrompt } from "./permission-view.js";
 import { coreRenderer, presenceView } from "./presence.js";
@@ -64,6 +80,7 @@ let selectedMissionId: string | null = null;
 let graphCamera: GraphCamera = initialCamera();
 let graphLayout: GraphLayout | null = null;
 let resourceLines: HudLine[] = readCompute({});
+let detailLevel: DetailLevel = "normal";
 let desktopFlight = false;
 let desktopAgain = false;
 let computeFlight = false;
@@ -198,6 +215,7 @@ function paintPresence(coreOk: boolean): void {
   if (attention !== null) {
     attention.textContent = attentionLine(desktopView.questions, desktopView.confirmations) ?? "";
   }
+  paintOrbit();
 }
 
 function paintDesktop(coreOk: boolean): void {
@@ -205,10 +223,9 @@ function paintDesktop(coreOk: boolean): void {
     paintPresence(coreOk);
     return;
   }
-  const tasks = parentTasks(desktopView.tasks);
-  renderList("tasks", tasks.map(taskLine), "no tasks");
-  renderList("agents", desktopView.agents.map(agentLine), "no agents");
-  renderList("models", desktopView.models.map(describeModel), "no models");
+  paintTasks();
+  paintAgents();
+  paintModels();
   paintNotifications();
   paintMissions();
   paintWorkers();
@@ -222,13 +239,176 @@ function paintDesktop(coreOk: boolean): void {
   }
 }
 
+function paintTasks(): void {
+  const element = listElement("tasks");
+  if (element === null || desktopView === null) {
+    return;
+  }
+  const lines = taskSurface(desktopView.tasks, detailLevel);
+  renderList("tasks", lines, "Nothing running");
+}
+
+function paintAgents(): void {
+  const element = listElement("agents");
+  if (element === null || desktopView === null) {
+    return;
+  }
+  const board = agentBoard(desktopView.agents, desktopView.workers);
+  const rendered = `${detailLevel}\n${board.definitions.map((agent) => agent.id).join(",")}\n${board.active
+    .map((worker) => worker.id + worker.status)
+    .join(",")}\n${board.idle.map((worker) => worker.id).join(",")}`;
+  if (!shouldRepaint(element.dataset["rendered"] ?? null, rendered)) {
+    return;
+  }
+  element.dataset["rendered"] = rendered;
+  element.replaceChildren();
+  element.append(heading("Agents"));
+  element.append(
+    linesOrEmpty(
+      board.definitions.map((agent) => agentDefinition(agent)),
+      "no agents",
+    ),
+  );
+  element.append(heading("Active workers"));
+  element.append(
+    linesOrEmpty(
+      board.active.map((worker) => workerBoardLine(worker)),
+      "No active workers",
+    ),
+  );
+  if (detailLevel !== "normal") {
+    element.append(heading("Idle workers"));
+    element.append(
+      linesOrEmpty(
+        board.idle.map((worker) => workerBoardLine(worker)),
+        "No idle workers",
+      ),
+    );
+  }
+}
+
+function agentDefinition(agent: {
+  id: string;
+  name: string;
+  state: string;
+  enabled: boolean;
+}): string {
+  if (detailLevel === "debug") {
+    return agentLine({ id: agent.id, state: agent.state, enabled: agent.enabled });
+  }
+  if (detailLevel === "inspect") {
+    return `${agent.name} ${agent.state}`;
+  }
+  return agent.name;
+}
+
+function workerBoardLine(worker: { id: string; name: string; status: string }): string {
+  const status = statusWord(worker.status);
+  if (detailLevel === "debug") {
+    return `${worker.name} ${worker.id} ${status}`;
+  }
+  return `${worker.name} ${status}`;
+}
+
+function paintModels(): void {
+  const element = listElement("models");
+  if (element === null || desktopView === null) {
+    return;
+  }
+  const cards = modelCards(desktopView.models, desktopView.activity);
+  const rendered = `${detailLevel}\n${cards.local
+    .concat(cards.cloud)
+    .map((card) => `${card.id}:${card.state}:${card.work ?? ""}`)
+    .join(",")}`;
+  if (!shouldRepaint(element.dataset["rendered"] ?? null, rendered)) {
+    return;
+  }
+  element.dataset["rendered"] = rendered;
+  element.replaceChildren();
+  element.append(heading("Local"));
+  element.append(
+    linesOrEmpty(
+      cards.local.flatMap((card) => modelLines(card, detailLevel)),
+      "none",
+    ),
+  );
+  element.append(heading("Cloud"));
+  element.append(
+    linesOrEmpty(
+      cards.cloud.flatMap((card) => modelLines(card, detailLevel)),
+      "none",
+    ),
+  );
+  element.append(heading("Active"));
+  if (cards.active.length === 0) {
+    element.append(linesOrEmpty([], "none"));
+  } else {
+    for (const card of cards.active) {
+      const block = document.createElement("p");
+      block.textContent = card.work === null ? card.name : `${card.name} Working on: ${card.work}`;
+      if (detailLevel === "debug") {
+        block.textContent = `${describeModelLine(card.id)} ${block.textContent}`;
+      }
+      element.append(block);
+    }
+  }
+}
+
+function describeModelLine(id: string): string {
+  const model = desktopView?.models.find((item) => item.id === id);
+  return model === undefined ? id : describeModel(model);
+}
+
+function paintOrbit(): void {
+  const host = listElement("orbit");
+  if (host === null || desktopView === null) {
+    host?.replaceChildren();
+    return;
+  }
+  const mission = activeMission(desktopView.missions);
+  const named = nameWorkers(desktopView.workers);
+  const tasks =
+    mission === null
+      ? []
+      : desktopView.activity
+          .filter((item) => item.mission_id === mission.id || item.parent_task === mission.task_id)
+          .map((item) => ({ id: item.id, label: item.objective, status: item.status }));
+  const workers =
+    mission === null
+      ? []
+      : desktopView.workers
+          .filter((worker) => worker.current_mission === mission.id)
+          .map((worker) => ({
+            id: worker.worker_id,
+            name: workerName(named, worker.worker_id, worker.agent_id),
+            status: worker.status,
+          }));
+  const items = desktopOrbit({ mission, tasks, workers });
+  const rendered = items.map((item) => `${item.id}:${item.status}:${item.label}`).join("\n");
+  if (!shouldRepaint(host.dataset["rendered"] ?? null, rendered)) {
+    return;
+  }
+  host.dataset["rendered"] = rendered;
+  host.replaceChildren();
+  items.forEach((item, index) => {
+    const point = orbitPoint(index, items.length, 118);
+    const label = document.createElement("span");
+    label.textContent = `${statusWord(item.status)} ${item.label}`.slice(0, 42);
+    label.style.left = `calc(50% + ${point.x}px)`;
+    label.style.top = `calc(46% + ${point.y}px)`;
+    host.append(label);
+  });
+}
+
 function paintNotifications(): void {
   const element = listElement("notifications");
   if (element === null || desktopView === null) {
     return;
   }
   const notices = noticesFromEvents(desktopView.events);
-  const rendered = notices.map((notice) => `${notice.id}:${notice.text}`).join("\n");
+  const rendered = `${detailLevel}\n${notices
+    .map((notice) => `${notice.id}:${notice.text}`)
+    .join("\n")}`;
   if (!shouldRepaint(element.dataset["rendered"] ?? null, rendered)) {
     return;
   }
@@ -245,7 +425,7 @@ function paintNotifications(): void {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "linkish";
-    button.textContent = notice.text;
+    button.textContent = detailLevel === "debug" ? `${notice.text} ${notice.id}` : notice.text;
     if (notice.missionId !== null) {
       button.addEventListener("click", () => {
         inspectNotice(notice.missionId);
@@ -272,7 +452,7 @@ function paintMissions(): void {
     return;
   }
   const missions = desktopView.missions;
-  const rendered = missions.map((mission) => `${mission.id}:${mission.status}`).join("\n");
+  const rendered = `${detailLevel}\n${missions.map((mission) => `${mission.id}:${mission.status}`).join("\n")}`;
   if (shouldRepaint(list.dataset["rendered"] ?? null, rendered || "empty")) {
     list.dataset["rendered"] = rendered || "empty";
     list.replaceChildren();
@@ -286,7 +466,7 @@ function paintMissions(): void {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "linkish";
-        button.textContent = missionLine(mission);
+        button.textContent = missionListLabel(mission, detailLevel);
         button.addEventListener("click", () => {
           selectedMissionId = mission.id;
           paintMissionDetail();
@@ -322,40 +502,47 @@ function paintMissionDetail(): void {
     questions: desktopView.questions,
     resources: resourceLines,
   });
-  const rendered = JSON.stringify(inspection);
+  const rendered = `${detailLevel}\n${JSON.stringify(inspection)}`;
   if (!shouldRepaint(detail.dataset["rendered"] ?? null, rendered)) {
     return;
   }
   detail.dataset["rendered"] = rendered;
+  const named = nameWorkers(desktopView.workers);
   detail.replaceChildren();
-  detail.append(fact("Status", inspection.status));
-  detail.append(fact("Objective", inspection.objective));
-  detail.append(heading("Lifecycle"));
-  detail.append(stageList(inspection.lifecycle.map(stageLine)));
+  const title = document.createElement("p");
+  title.className = "mission-title";
+  title.textContent = inspection.objective;
+  detail.append(title);
+  detail.append(
+    linesOrEmpty(
+      inspection.tasks.map((task) => `${markGlyph(task.mark)} ${task.label}`),
+      "No tasks yet",
+    ),
+  );
   detail.append(heading("Workers"));
   detail.append(
     linesOrEmpty(
-      inspection.workers.map((worker) => `${worker.agentId} ${worker.workerId} ${worker.status}`),
-      "no workers on this mission",
+      inspection.workers.map((worker) => {
+        const name = workerName(named, worker.workerId, worker.agentId);
+        const line = `${name} ${statusWord(worker.status)}`;
+        return detailLevel === "debug" ? `${line} ${worker.workerId}` : line;
+      }),
+      "No workers on this mission",
     ),
   );
-  detail.append(heading("Models"));
-  detail.append(
-    linesOrEmpty(
-      inspection.models.map(
-        (model) =>
-          `${model.id} ${model.provider} ${model.local ? "local" : "cloud"} ${model.lifecycle} ${model.loaded ? "loaded" : "not loaded"}`,
+  if (detailLevel !== "normal") {
+    detail.append(heading("Models"));
+    detail.append(
+      linesOrEmpty(
+        inspection.models.map((model) =>
+          detailLevel === "debug"
+            ? `${model.id} ${model.provider} ${model.lifecycle}`
+            : `${model.id} ${model.lifecycle}`,
+        ),
+        "No model assigned",
       ),
-      "no model assigned",
-    ),
-  );
-  detail.append(heading("Tasks"));
-  detail.append(
-    linesOrEmpty(
-      inspection.tasks.map((task) => `${task.mark} ${task.label}`),
-      "no task activity",
-    ),
-  );
+    );
+  }
   detail.append(heading("Resources"));
   detail.append(
     linesOrEmpty(
@@ -365,12 +552,9 @@ function paintMissionDetail(): void {
   );
   detail.append(heading("Verification"));
   const verification = document.createElement("p");
-  verification.textContent =
-    inspection.verification.totalChecks > 0
-      ? `${inspection.verification.status} ${inspection.verification.passedChecks}/${inspection.verification.totalChecks} checks`
-      : inspection.verification.status;
+  verification.textContent = verificationLine(inspection.verification);
   detail.append(verification);
-  if (inspection.verification.lines.length > 0) {
+  if (detailLevel !== "normal" && inspection.verification.lines.length > 0) {
     detail.append(linesOrEmpty(inspection.verification.lines, ""));
   }
   if (inspection.question !== null) {
@@ -379,6 +563,15 @@ function paintMissionDetail(): void {
     question.textContent = inspection.question;
     detail.append(question);
   }
+  const lifecycleDetails = document.createElement("details");
+  const lifecycleSummary = document.createElement("summary");
+  lifecycleSummary.textContent = "Technical details";
+  lifecycleDetails.append(lifecycleSummary, stageList(inspection.lifecycle.map(stageLine)));
+  if (detailLevel === "debug") {
+    lifecycleDetails.append(fact("Mission", inspection.id));
+    lifecycleDetails.append(fact("Status", inspection.status));
+  }
+  detail.append(lifecycleDetails);
   if (inspection.error !== null) {
     detail.append(heading(inspection.error.what));
     detail.append(fact("Why", inspection.error.why));
@@ -396,6 +589,16 @@ function paintMissionDetail(): void {
   }
 }
 
+function commandMission(): MissionDocument | null {
+  if (desktopView === null) {
+    return null;
+  }
+  if (submittedObjective !== null) {
+    return chooseMission(desktopView.missions, submittedObjective);
+  }
+  return activeMission(desktopView.missions);
+}
+
 function selectedMission(missions: readonly MissionDocument[]): MissionDocument | null {
   if (selectedMissionId !== null) {
     const chosen = missions.find((mission) => mission.id === selectedMissionId);
@@ -411,36 +614,32 @@ function paintWorkers(): void {
   if (element === null || desktopView === null) {
     return;
   }
-  const groups = groupWorkers(desktopView.workers);
-  const rendered = groups
-    .map(
-      (group) =>
-        `${group.agentId}:${group.workers.map((worker) => worker.workerId + worker.status).join(",")}`,
-    )
-    .join("\n");
+  const named = nameWorkers(desktopView.workers);
+  const rendered = `${detailLevel}\n${named.map((worker) => `${worker.id}:${worker.status}`).join(",")}`;
   if (!shouldRepaint(element.dataset["rendered"] ?? null, rendered || "empty")) {
     return;
   }
   element.dataset["rendered"] = rendered || "empty";
   element.replaceChildren();
-  if (groups.length === 0) {
-    const empty = document.createElement("p");
-    empty.textContent = "no workers";
-    element.append(empty);
-    return;
+  const board = agentBoard(desktopView.agents, desktopView.workers);
+  element.append(heading("Active workers"));
+  element.append(
+    linesOrEmpty(
+      board.active.map((worker) => workerBoardLine(worker)),
+      "No active workers",
+    ),
+  );
+  if (detailLevel === "normal" && board.idle.length > 0) {
+    element.append(linesOrEmpty([`${board.idle.length} idle`], "none"));
   }
-  for (const group of groups) {
-    const section = document.createElement("section");
-    const title = document.createElement("h3");
-    title.textContent = group.agentId;
-    const list = document.createElement("ul");
-    for (const worker of group.workers) {
-      const item = document.createElement("li");
-      item.textContent = `${worker.workerId} ${worker.status}`;
-      list.append(item);
-    }
-    section.append(title, list);
-    element.append(section);
+  if (detailLevel !== "normal") {
+    element.append(heading("Idle workers"));
+    element.append(
+      linesOrEmpty(
+        board.idle.map((worker) => workerBoardLine(worker)),
+        "No idle workers",
+      ),
+    );
   }
 }
 
@@ -474,7 +673,12 @@ function paintPermissions(): void {
     block.append(fact("Command", prompt.command));
     block.append(fact("Reason", prompt.reason));
     block.append(fact("Impact", prompt.impact));
-    block.append(fact("Requested by", prompt.requester));
+    block.append(
+      fact(
+        "Requested by",
+        detailLevel === "debug" ? prompt.requester : displayName(prompt.requester),
+      ),
+    );
     block.append(fact("Mission", prompt.mission));
     const actions = document.createElement("div");
     actions.className = "actions";
@@ -498,16 +702,21 @@ function paintPermissions(): void {
 }
 
 function paintLauncher(): void {
+  const story = listElement("command-story");
   const list = listElement("launch-lifecycle");
   const result = listElement("launch-result");
-  if (list === null || desktopView === null) {
+  if (story === null || list === null || desktopView === null) {
     return;
   }
-  const mission = chooseMission(desktopView.missions, submittedObjective);
+  const mission = commandMission();
   if (mission === null) {
-    if (shouldRepaint(list.dataset["rendered"] ?? null, "empty")) {
-      list.dataset["rendered"] = "empty";
+    if (shouldRepaint(story.dataset["rendered"] ?? null, "empty")) {
+      story.dataset["rendered"] = "empty";
+      story.replaceChildren();
       list.replaceChildren();
+      if (result !== null) {
+        result.textContent = "";
+      }
     }
     return;
   }
@@ -518,24 +727,51 @@ function paintLauncher(): void {
     questions: desktopView.questions,
     resources: resourceLines,
   });
-  const lines = inspection.lifecycle.map(stageLine);
-  const rendered = lines.join("\n");
-  if (shouldRepaint(list.dataset["rendered"] ?? null, rendered)) {
-    list.dataset["rendered"] = rendered;
+  const named = nameWorkers(desktopView.workers);
+  const beats = commandStory({
+    lifecycle: inspection.lifecycle,
+    taskCount: inspection.tasks.length,
+    workers: inspection.workers.map((worker) => ({
+      name: workerName(named, worker.workerId, worker.agentId),
+      status: worker.status,
+    })),
+    verification: inspection.verification,
+  });
+  const rendered = `${detailLevel}\n${JSON.stringify(beats)}`;
+  if (shouldRepaint(story.dataset["rendered"] ?? null, rendered)) {
+    story.dataset["rendered"] = rendered;
+    story.replaceChildren();
+    const request = document.createElement("p");
+    request.className = "command-request";
+    request.textContent = inspection.objective;
+    story.append(request);
+    for (const beat of beats) {
+      const block = document.createElement("section");
+      const title = document.createElement("h3");
+      title.textContent = beat.title;
+      const items = document.createElement("ul");
+      for (const line of beat.lines) {
+        const item = document.createElement("li");
+        item.textContent = `${markGlyph(line.mark)} ${line.text}`;
+        items.append(item);
+      }
+      block.append(title, items);
+      story.append(block);
+    }
+    const lines = inspection.lifecycle.map(stageLine);
     list.replaceChildren();
     for (const line of lines) {
       const item = document.createElement("li");
       item.textContent = line;
       list.append(item);
     }
-  }
-  if (result !== null) {
-    const evidence = inspection.verification.lines[0];
-    const summary =
-      inspection.verification.status === "NONE"
-        ? mission.status
-        : `${mission.status} ${inspection.verification.status}${evidence === undefined ? "" : ` ${evidence}`}`;
-    result.textContent = summary;
+    if (result !== null) {
+      const evidence = inspection.verification.lines[0];
+      result.textContent =
+        detailLevel === "normal" || evidence === undefined
+          ? verificationLine(inspection.verification)
+          : `${verificationLine(inspection.verification)} ${evidence}`;
+    }
   }
 }
 
@@ -601,7 +837,9 @@ function paintGraph(): void {
     activity: desktopView.activity,
     workers: desktopView.workers,
   });
-  const key = graphKey(graphLayout, statuses);
+  const missionId = graphMissionId();
+  const shown = focusGraph(graphLayout, missionId);
+  const key = `${detailLevel}:${missionId ?? "core"}:${graphKey(shown, statuses)}`;
   if (shouldRepaint(host.dataset["rendered"] ?? null, key)) {
     host.dataset["rendered"] = key;
     host.replaceChildren();
@@ -611,8 +849,8 @@ function paintGraph(): void {
     scene.setAttribute("aria-label", "OMNE system graph");
     const group = document.createElementNS(SVG_NS, "g");
     group.id = "graph-scene";
-    const byId = new Map(graphLayout.nodes.map((node) => [node.id, node]));
-    for (const edge of graphLayout.edges) {
+    const byId = new Map(shown.nodes.map((node) => [node.id, node]));
+    for (const edge of shown.edges) {
       const from = byId.get(edge.from);
       const to = byId.get(edge.to);
       if (from === undefined || to === undefined) {
@@ -626,7 +864,7 @@ function paintGraph(): void {
       line.setAttribute("class", "graph-edge");
       group.append(line);
     }
-    for (const node of graphLayout.nodes) {
+    for (const node of shown.nodes) {
       const item = document.createElementNS(SVG_NS, "g");
       item.setAttribute("class", "graph-node");
       item.dataset["id"] = node.id;
@@ -644,7 +882,7 @@ function paintGraph(): void {
       const text = document.createElementNS(SVG_NS, "text");
       text.setAttribute("x", String(node.x + 12));
       text.setAttribute("y", String(node.y + 4));
-      text.textContent = node.label.slice(0, 32);
+      text.textContent = graphNodeLabel(node).slice(0, 32);
       item.append(circle, text);
       item.addEventListener("click", () => {
         graphCamera = selectGraphNode(graphCamera, node.id);
@@ -710,17 +948,46 @@ function applyGraphCamera(): void {
   });
 }
 
+function graphMissionId(): string | null {
+  if (desktopView === null) {
+    return null;
+  }
+  const active = activeMission(desktopView.missions);
+  if (active !== null) {
+    return active.id;
+  }
+  if (detailLevel === "normal") {
+    return null;
+  }
+  return selectedMission(desktopView.missions)?.id ?? null;
+}
+
+function graphNodeLabel(node: { id: string; type: string; label: string }): string {
+  if (desktopView !== null && node.type === "worker") {
+    const named = nameWorkers(desktopView.workers);
+    const worker = desktopView.workers.find((item) => item.worker_id === node.id);
+    if (worker !== undefined) {
+      return workerName(named, worker.worker_id, worker.agent_id);
+    }
+  }
+  if (detailLevel !== "debug" && (node.type === "agent" || node.type === "model")) {
+    return displayName(node.label);
+  }
+  return node.label;
+}
+
 function focusActiveMission(): void {
   const host = listElement("graph-view");
   if (host === null || graphLayout === null || desktopView === null) {
     return;
   }
-  const mission = activeMission(desktopView.missions);
-  if (mission === null) {
+  const missionId = graphMissionId();
+  if (missionId === null) {
     return;
   }
-  const node = graphLayout.nodes.find((item) => item.id === mission.id) ?? null;
-  graphCamera = cameraForNode(selectGraphNode(graphCamera, mission.id), node, {
+  const node =
+    focusGraph(graphLayout, missionId).nodes.find((item) => item.id === missionId) ?? null;
+  graphCamera = cameraForNode(selectGraphNode(graphCamera, missionId), node, {
     width: host.clientWidth || 320,
     height: host.clientHeight || 240,
   });
@@ -1093,6 +1360,12 @@ function bindDesktop(): void {
       }
     });
   });
+  const detailButton = document.getElementById("detail-level");
+  if (detailButton instanceof HTMLButtonElement) {
+    detailButton.addEventListener("click", () => {
+      setDetailLevel(cycleDetail(detailLevel));
+    });
+  }
   const focusGraph = document.getElementById("graph-focus");
   if (focusGraph instanceof HTMLButtonElement) {
     focusGraph.addEventListener("click", () => {
@@ -1126,6 +1399,10 @@ function bindDesktop(): void {
       }
       return;
     }
+    if (shortcut.target === "detail") {
+      setDetailLevel(cycleDetail(detailLevel));
+      return;
+    }
     applyWindows(openWindow(windowState, shortcut.target));
   });
   document.getElementById("desktop")?.addEventListener("pointerdown", (event) => {
@@ -1143,6 +1420,20 @@ function bindDesktop(): void {
     };
     paintClock();
     window.setInterval(paintClock, 1000);
+  }
+}
+
+function setDetailLevel(level: DetailLevel): void {
+  detailLevel = level;
+  const button = document.getElementById("detail-level");
+  if (button instanceof HTMLButtonElement) {
+    button.textContent = detailLabel(level);
+    button.setAttribute("aria-pressed", level === "normal" ? "false" : "true");
+  }
+  const coreOk = listElement("tray-status")?.dataset["state"] === "ok";
+  paintDesktop(coreOk);
+  if (graphLayout !== null) {
+    paintGraph();
   }
 }
 

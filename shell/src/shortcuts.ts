@@ -2,7 +2,7 @@
 
 import type { WindowId } from "./windows.js";
 
-export type ShortcutTarget = WindowId | "palette";
+export type ShortcutTarget = WindowId | "palette" | "detail";
 
 export interface Shortcut {
   target: ShortcutTarget;
@@ -28,6 +28,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { target: "graph", key: "g", shift: true },
   { target: "core", key: "s", shift: true },
   { target: "projects", key: "p", shift: true },
+  { target: "detail", key: ".", shift: true },
 ];
 
 /** Match Ctrl/Command shortcuts. Plain typing does not open a window. */

@@ -9,6 +9,7 @@
   <body>
     <div class="desktop" id="desktop">
       <div class="presence" id="presence" data-state="IDLE" data-motion="still">
+        <div class="orbit" id="orbit" aria-hidden="true"></div>
         <div class="core-mark" aria-hidden="true">
           <svg viewBox="0 0 120 120">
             <circle class="ring outer" cx="60" cy="60" r="46"></circle>
@@ -166,17 +167,17 @@
               </button>
             </div>
           </header>
-          <form id="launcher" class="window-body">
-            <label for="objective">Command</label>
-            <input
-              id="objective"
-              name="objective"
-              type="text"
-              placeholder="write file notes.txt with content hello"
-            />
+          <form id="launcher" class="window-body command-surface">
+            <p class="command-mark">OMNE</p>
+            <label for="objective">What do you want me to do?</label>
+            <input id="objective" name="objective" type="text" placeholder="Build me a website" />
             <button type="submit">Send</button>
-            <ol id="launch-lifecycle" class="lifecycle"></ol>
-            <p id="launch-result" aria-live="polite"></p>
+            <div id="command-story" aria-live="polite"></div>
+            <details id="command-technical">
+              <summary>Technical details</summary>
+              <ol id="launch-lifecycle" class="lifecycle"></ol>
+              <p id="launch-result"></p>
+            </details>
           </form>
           <span class="resize" data-resize="launcher"></span>
         </article>
@@ -244,7 +245,7 @@
               </button>
             </div>
           </header>
-          <div class="window-body"><ul id="agents"></ul></div>
+          <div class="window-body" id="agents"></div>
           <span class="resize" data-resize="agents"></span>
         </article>
 
@@ -284,7 +285,7 @@
               </button>
             </div>
           </header>
-          <div class="window-body"><ul id="models"></ul></div>
+          <div class="window-body" id="models"></div>
           <span class="resize" data-resize="models"></span>
         </article>
 
@@ -565,6 +566,7 @@
       </div>
       <div id="hud" class="hud" aria-label="System resources"></div>
       <div class="tray">
+        <button type="button" id="detail-level" aria-pressed="false">Normal</button>
         <p id="sync-note" class="sync-note" aria-live="polite"></p>
         <p id="character" data-state="IDLE">IDLE</p>
         <p id="tray-status" data-state="checking">checking</p>

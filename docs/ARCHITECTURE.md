@@ -159,11 +159,12 @@ real `decision.selected` event. Routing is not shown unless that event is presen
 asset is shipped. A later renderer can replace the mark without a backend change. Listen stays
 disabled.
 
-Command input posts an objective. The launcher then shows the mission lifecycle from recorded
-status, assignments, and verification. Allow and deny post to the existing confirm route. The shell
-does not run tools itself. Notifications are sentences derived from event types and open the related
-mission. The system graph lays out `GET /graph` nodes only while that window is open. Unknown
-resource values stay unknown, and an unavailable GPU stays unavailable.
+Command input posts an objective. The command window then shows understanding, planning, working,
+and verification in plain language. The recorded lifecycle stays under technical details. Allow and
+deny post to the existing confirm route. The shell does not run tools itself. Notifications stay in
+the notices window. The system graph, while open, shows the active mission neighborhood, or only the
+core when nothing is active. Inspect and debug reveal provider names, idle workers, and identifiers.
+Unknown resource values stay unknown, and an unavailable GPU stays unavailable.
 
 `GET /graph` lists nodes and edges that exist in the current stores. It does not invent nodes.
 

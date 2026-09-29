@@ -49,7 +49,8 @@ TypeScript:
 - Health parsing and core URL selection.
 - Character states, including a missing asset and mission-driven analyzing, verifying, and waiting.
 - Environment state, lifecycle stages, mission inspection, permission copy, verification evidence,
-  error summaries, notifications, graph layout, resource lines, and keyboard shortcuts.
+  error summaries, notifications, graph layout, the current-mission graph, command copy, detail
+  levels, resource lines, and keyboard shortcuts.
 - Voice control staying disabled unless permission, provider, and hardware are all available.
 - Task, agent, model, and notification lines, and one `/desktop` document.
 - Desktop windows open, come to the front, hide, minimize, maximize, and stay within resize bounds.
