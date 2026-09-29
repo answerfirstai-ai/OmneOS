@@ -50,6 +50,9 @@ Python:
 - Window records. The testing API uses the mock window provider and starts with no windows. A grant
   is required to launch or close. The labwc window provider reads a fixture snapshot and does not
   run a compositor process. `POST /windowing` stays 404.
+- Hardware discovery. The testing API uses an empty mock inventory. A Linux fixture supplies CPU,
+  memory, GPU, VRAM, monitors, input, USB, PCI, storage, Ethernet, Wi-Fi, Bluetooth, audio, a
+  camera, and power. Missing VRAM and unrelated thermal zones stay null. `POST /hardware` stays 404.
 
 TypeScript:
 
@@ -69,6 +72,7 @@ TypeScript:
 `scripts/linux/build-base.sh` and `scripts/linux/build-disk.sh` are tested for their plans and for
 refusing to write when not root. The boot checklist is tested against a fixture machine and a local
 core: an unavailable GPU is not a check. Display launch readiness is tested against a fixture DRM
-tree. Window commands are tested against the in-memory record and a snapshot file. The default suite
-does not run `debootstrap`, QEMU, or labwc. Live xAI, a physical GPU workload, and hardware
-installation are outside the default suite.
+tree. Window commands are tested against the in-memory record and a snapshot file. Hardware
+discovery is tested against a fixture sysfs tree. The default suite does not run `debootstrap`,
+QEMU, or labwc. Live xAI, a physical GPU workload, and hardware installation are outside the default
+suite.

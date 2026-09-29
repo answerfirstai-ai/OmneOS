@@ -42,6 +42,8 @@ from core.verify.verifier import VerificationResult, verify_observations
 from core.voice.service import VoiceService
 from core.world.state import WorldState, WorldStateService
 from omne.display.select import diagnose_display
+from omne.hardware.select import hardware_service
+from omne.hardware.service import HardwareService
 from omne.windowing.model import WindowRequest
 from omne.windowing.select import windowing_service
 from omne.windowing.service import WindowingService
@@ -136,6 +138,7 @@ class OMNE:
         self._verifications: dict[str, VerificationResult] = {}
         self._lock = threading.Lock()
         self._windowing: WindowingService | None = None
+        self._hardware: HardwareService | None = None
         self._events.subscribe(self._on_event)
         self._world.bind(self.build_world)
 
@@ -350,6 +353,22 @@ class OMNE:
 
         service = windowing_service(self._environment, sink=sink)
         self._windowing = service
+        return service
+
+    def hardware_view(self) -> dict[str, object]:
+        with self._lock:
+            return self._hardware_service().inventory().model_dump(mode="json")
+
+    def _hardware_service(self) -> HardwareService:
+        service = self._hardware
+        if service is not None:
+            return service
+
+        def sink(event_type: str, payload: dict[str, Any]) -> None:
+            self._events.publish(event_type, source="hardware", payload=payload)
+
+        service = hardware_service(self._environment, sink=sink)
+        self._hardware = service
         return service
 
     def voice_status(self) -> dict[str, object]:
