@@ -183,4 +183,6 @@ only when `--run` is passed and OVMF is installed.
 
 Graphics stay on Linux. `omne.display` reports DRM, monitors, and whether labwc can launch. Core
 does not link a compositor, and the diagnostics do not start one. See
-`docs/GRAPHICS_ARCHITECTURE.md`.
+`docs/GRAPHICS_ARCHITECTURE.md`. `omne.windowing` records windows, focus, workspaces, and monitor
+assignment on top of that choice. Close and move require a grant, and the record is not sent to
+labwc. See `docs/WINDOWING.md`.

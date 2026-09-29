@@ -74,7 +74,8 @@ bash scripts/linux/build-base.sh --dry-run
 ```
 
 `docs/LINUX.md` describes the packages, the `omne` user, the rootfs builder, and the UEFI disk.
-`docs/GRAPHICS_ARCHITECTURE.md` describes the labwc display provider.
+`docs/GRAPHICS_ARCHITECTURE.md` describes the labwc display provider. `docs/WINDOWING.md` describes
+the window record above it.
 
 ## Checks
 

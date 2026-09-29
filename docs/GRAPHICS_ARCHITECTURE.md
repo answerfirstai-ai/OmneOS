@@ -96,3 +96,7 @@ revision does not start that unit. All of the following have to exist first:
 
 Until those are true, the console checklist remains the boot screen. `OMNE display` prints the
 missing items and leaves the host session untouched.
+
+Window records live in `omne.windowing` and are described in `docs/WINDOWING.md`. labwc still owns
+placement. OMNE stores focus, geometry, workspace, and monitor assignment, and a grant is required
+before that record changes. The change is not sent to the compositor.
