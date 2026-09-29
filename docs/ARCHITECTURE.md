@@ -64,6 +64,13 @@ and otherwise reports `available: false`. Unknown values stay null. A full snaps
 one second. A later CPU read can use the previous sample when it is already old enough, so
 allocation does not sleep on every batch. `system.cpu` still reads the host.
 
+## Shell
+
+The shell is a desktop. Icons and the OMNE menu open windows for the core, launcher, tasks, agents,
+models, notifications, and voice. The taskbar shows the clock, the character state, and the windows
+that are open. Clicking the front taskbar button hides that window. The page talks to the core over
+HTTP and does not open a microphone.
+
 ## Linux integration
 
 `scripts/linux/install.sh` installs a user systemd unit under the chosen prefix. It refuses `/boot`

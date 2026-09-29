@@ -10,6 +10,19 @@ import {
 } from "./desktop.js";
 import { coreHealthUrl, parseHealth, type CoreHealth } from "./health.js";
 import { voiceControlEnabled, voiceSummary, type VoiceStatus } from "./voice.js";
+import {
+  activateWindow,
+  closeWindow,
+  focusedWindow,
+  focusWindow,
+  initialWindowState,
+  isWindowId,
+  openWindow,
+  windowZ,
+  WINDOW_IDS,
+  type WindowId,
+  type WindowState,
+} from "./windows.js";
 
 const DEFAULT_CORE_URL = "http://127.0.0.1:8787";
 
@@ -148,27 +161,209 @@ async function submitObjective(coreUrl: string, objective: string): Promise<void
   }
 }
 
+function showCoreStatus(
+  status: HTMLElement,
+  detail: HTMLElement,
+  state: string,
+  text: string,
+  detailText: string,
+): void {
+  status.dataset["state"] = state;
+  status.textContent = text;
+  detail.textContent = detailText;
+  const tray = listElement("tray-status");
+  if (tray !== null) {
+    tray.dataset["state"] = state;
+    tray.textContent = text;
+  }
+}
+
 async function refresh(status: HTMLElement, detail: HTMLElement): Promise<void> {
   const coreUrl = readCoreUrl(window.location.search);
   const alreadyOk = status.dataset["state"] === "ok";
   if (!alreadyOk) {
-    status.dataset["state"] = "checking";
-    status.textContent = "checking";
-    detail.textContent = coreHealthUrl(coreUrl);
+    showCoreStatus(status, detail, "checking", "checking", coreHealthUrl(coreUrl));
   }
   let coreOk = false;
   try {
     const health = await fetchHealth(coreUrl);
     coreOk = true;
-    status.dataset["state"] = "ok";
-    status.textContent = health.status;
-    detail.textContent = `${health.service} ${health.version} · ${health.environment}`;
+    showCoreStatus(
+      status,
+      detail,
+      "ok",
+      health.status,
+      `${health.service} ${health.version} · ${health.environment}`,
+    );
   } catch (error) {
-    status.dataset["state"] = "unavailable";
-    status.textContent = "unavailable";
-    detail.textContent = error instanceof Error ? error.message : "Unknown error";
+    showCoreStatus(
+      status,
+      detail,
+      "unavailable",
+      "unavailable",
+      error instanceof Error ? error.message : "Unknown error",
+    );
   }
   await refreshDesktop(coreUrl, coreOk);
+}
+
+function paintWindows(state: WindowState): void {
+  const focus = focusedWindow(state);
+  for (const id of WINDOW_IDS) {
+    const frame = document.querySelector(`[data-window="${id}"]`);
+    if (frame instanceof HTMLElement) {
+      const open = state.open.includes(id);
+      frame.hidden = !open;
+      frame.style.zIndex = String(windowZ(state, id));
+      frame.classList.toggle("is-focused", id === focus);
+    }
+    const task = document.querySelector(`[data-task="${id}"]`);
+    if (task instanceof HTMLButtonElement) {
+      task.hidden = !state.open.includes(id);
+      task.setAttribute("aria-pressed", id === focus ? "true" : "false");
+    }
+    const icon = document.querySelector(`[data-launch="${id}"]`);
+    if (icon instanceof HTMLButtonElement) {
+      icon.setAttribute("aria-pressed", state.open.includes(id) ? "true" : "false");
+    }
+  }
+}
+
+function bindWindow(id: WindowId, onFocus: (id: WindowId) => void): void {
+  const frame = document.querySelector(`[data-window="${id}"]`);
+  if (!(frame instanceof HTMLElement)) {
+    return;
+  }
+  frame.addEventListener("pointerdown", () => {
+    onFocus(id);
+  });
+  const titlebar = frame.querySelector(".titlebar");
+  if (!(titlebar instanceof HTMLElement)) {
+    return;
+  }
+  titlebar.addEventListener("pointerdown", (event) => {
+    if (!(event instanceof PointerEvent)) {
+      return;
+    }
+    if (event.target instanceof Element && event.target.closest("button") !== null) {
+      return;
+    }
+    const bounds = frame.getBoundingClientRect();
+    const originX = event.clientX;
+    const originY = event.clientY;
+    const startLeft = bounds.left;
+    const startTop = bounds.top;
+    titlebar.setPointerCapture(event.pointerId);
+    const move = (moveEvent: PointerEvent): void => {
+      const nextLeft = Math.min(
+        window.innerWidth - 72,
+        Math.max(-bounds.width + 72, startLeft + moveEvent.clientX - originX),
+      );
+      const nextTop = Math.min(
+        window.innerHeight - 92,
+        Math.max(0, startTop + moveEvent.clientY - originY),
+      );
+      frame.style.left = `${nextLeft}px`;
+      frame.style.top = `${nextTop}px`;
+    };
+    const stop = (stopEvent: PointerEvent): void => {
+      titlebar.removeEventListener("pointermove", move);
+      titlebar.removeEventListener("pointerup", stop);
+      titlebar.removeEventListener("pointercancel", stop);
+      if (titlebar.hasPointerCapture(stopEvent.pointerId)) {
+        titlebar.releasePointerCapture(stopEvent.pointerId);
+      }
+    };
+    titlebar.addEventListener("pointermove", move);
+    titlebar.addEventListener("pointerup", stop);
+    titlebar.addEventListener("pointercancel", stop);
+  });
+}
+
+function bindDesktop(): void {
+  if (document.getElementById("desktop") === null) {
+    return;
+  }
+  let state = initialWindowState();
+  const apply = (next: WindowState): void => {
+    state = next;
+    paintWindows(state);
+  };
+  apply(state);
+  for (const id of WINDOW_IDS) {
+    bindWindow(id, (windowId) => {
+      apply(focusWindow(state, windowId));
+    });
+  }
+  document.querySelectorAll("[data-launch]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const id = node.getAttribute("data-launch");
+      if (id !== null && isWindowId(id)) {
+        apply(openWindow(state, id));
+        hideStartMenu();
+      }
+    });
+  });
+  document.querySelectorAll("[data-task]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const id = node.getAttribute("data-task");
+      if (id !== null && isWindowId(id)) {
+        apply(activateWindow(state, id));
+      }
+    });
+  });
+  document.querySelectorAll("[data-close]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const id = node.getAttribute("data-close");
+      if (id !== null && isWindowId(id)) {
+        apply(closeWindow(state, id));
+      }
+    });
+  });
+  const start = document.getElementById("start");
+  const menu = document.getElementById("start-menu");
+  if (start instanceof HTMLButtonElement && menu instanceof HTMLElement) {
+    start.addEventListener("click", () => {
+      const open = menu.hidden;
+      menu.hidden = !open;
+      start.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      hideStartMenu();
+    }
+  });
+  document.getElementById("desktop")?.addEventListener("pointerdown", (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+    if (event.target.closest(".window, .icons") !== null) {
+      return;
+    }
+    hideStartMenu();
+  });
+  const clock = document.getElementById("clock");
+  if (clock instanceof HTMLTimeElement) {
+    const paintClock = (): void => {
+      const now = new Date();
+      clock.dateTime = now.toISOString();
+      clock.textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    };
+    paintClock();
+    window.setInterval(paintClock, 1000);
+  }
+}
+
+function hideStartMenu(): void {
+  const menu = document.getElementById("start-menu");
+  const start = document.getElementById("start");
+  if (menu instanceof HTMLElement) {
+    menu.hidden = true;
+  }
+  if (start instanceof HTMLButtonElement) {
+    start.setAttribute("aria-expanded", "false");
+  }
 }
 
 function bootstrap(): void {
@@ -216,6 +411,7 @@ function bootstrap(): void {
     if (listen instanceof HTMLButtonElement) {
       listen.disabled = true;
     }
+    bindDesktop();
     void refresh(status, detail);
   } catch (error) {
     console.error(error);

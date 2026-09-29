@@ -46,6 +46,7 @@ TypeScript:
 - Character states, including a missing asset.
 - Voice control staying disabled unless permission, provider, and hardware are all available.
 - Task, agent, model, and notification lines, and one `/desktop` document.
+- Desktop windows open, come to the front, and hide again.
 
 ## Not claimed
 
