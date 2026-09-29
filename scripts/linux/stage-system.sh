@@ -117,8 +117,14 @@ if [[ "${want_shell}" -eq 1 ]]; then
 fi
 
 if [[ "${want_system}" -eq 1 ]]; then
-  mkdir -p "${dest}/etc/systemd/system" "${dest}/usr/share/doc/omne-system"
+  mkdir -p \
+    "${dest}/etc/systemd/system" \
+    "${dest}/usr/bin" \
+    "${dest}/usr/share/doc/omne-system"
   cp "${root}/system/linux/omne.target" "${dest}/etc/systemd/system/omne.target"
+  cp "${root}/system/linux/omne-boot.service" "${dest}/etc/systemd/system/omne-boot.service"
+  cp "${root}/system/linux/omne-boot" "${dest}/usr/bin/omne-boot"
+  chmod 755 "${dest}/usr/bin/omne-boot"
   cp "${root}/LICENSE" "${dest}/usr/share/doc/omne-system/copyright"
 fi
 

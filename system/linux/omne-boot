@@ -1,0 +1,233 @@
+#!/usr/bin/env python3
+"""Print the OMNE boot checklist from the machine and the local core.
+
+A line is marked ready only when its probe succeeds. An unavailable GPU or an
+unavailable model stays unavailable. This program does not start a desktop.
+"""
+
+from __future__ import annotations
+
+import json
+import signal
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Literal
+from urllib.parse import urlsplit
+
+Status = Literal["pass", "fail", "unavailable"]
+USABLE_MODELS = frozenset({"AVAILABLE", "LOADED", "BUSY", "IDLE"})
+
+
+class Line:
+    def __init__(self, status: Status, text: str) -> None:
+        self.status = status
+        self.text = text
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    once = "--once" in args
+    root = Path(_setting("OMNE_BOOT_ROOT", "/"))
+    core = _setting("OMNE_BOOT_CORE", "http://127.0.0.1:8787").rstrip("/")
+    lines = _collect(root, core, attempts=1 if once else _attempts())
+    ready = all(line.status == "pass" for line in (lines[0], lines[1], lines[4]))
+    text = render(lines, ready=ready)
+    sys.stdout.write(text)
+    sys.stdout.flush()
+    if not once:
+        _write_devices(text)
+        _hold()
+    return 0 if ready else 1
+
+
+def _collect(root: Path, core: str, *, attempts: int) -> tuple[Line, ...]:
+    lines = _lines(root, core)
+    pause = _pause_seconds()
+    while lines[4].status != "pass" and attempts > 1:
+        attempts -= 1
+        if pause:
+            time.sleep(pause)
+        lines = _lines(root, core)
+    return lines
+
+
+def _lines(root: Path, core: str) -> tuple[Line, ...]:
+    return (
+        hardware(root),
+        storage(root),
+        network(root),
+        gpu(root),
+        core_line(core),
+        models(core),
+    )
+
+
+def render(lines: tuple[Line, ...], *, ready: bool) -> str:
+    body = ["OMNE", "Initializing...", *(f"{_mark(line.status)} {line.text}" for line in lines)]
+    body.append("")
+    body.append("OMNE READY" if ready else "OMNE NOT READY")
+    body.append("")
+    return "\n".join(body)
+
+
+def hardware(root: Path) -> Line:
+    cpuinfo = root / "proc" / "cpuinfo"
+    try:
+        present = cpuinfo.is_file() and "processor" in cpuinfo.read_text(encoding="utf-8")
+    except OSError:
+        present = False
+    if present:
+        return Line("pass", "Hardware")
+    return Line("fail", "Hardware")
+
+
+def storage(root: Path) -> Line:
+    mounts = root / "proc" / "mounts"
+    try:
+        text = mounts.read_text(encoding="utf-8") if mounts.is_file() else ""
+    except OSError:
+        text = ""
+    for raw in text.splitlines():
+        fields = raw.split()
+        if len(fields) >= 2 and fields[1] == "/":
+            return Line("pass", "Storage")
+    return Line("fail", "Storage")
+
+
+def network(root: Path) -> Line:
+    net = root / "sys" / "class" / "net"
+    try:
+        names = [path.name for path in net.iterdir()] if net.is_dir() else []
+    except OSError:
+        names = []
+    interfaces = [name for name in names if name != "lo"]
+    if not interfaces:
+        return Line("unavailable", "Network unavailable")
+    for name in interfaces:
+        state = _read_text(net / name / "operstate")
+        if state == "up":
+            return Line("pass", "Network")
+    return Line("unavailable", "Network down")
+
+
+def gpu(root: Path) -> Line:
+    drm = root / "sys" / "class" / "drm"
+    nvidia = root / "proc" / "driver" / "nvidia" / "gpus"
+    try:
+        cards = [
+            path.name
+            for path in drm.iterdir()
+            if path.name.startswith("card") and "-" not in path.name
+        ] if drm.is_dir() else []
+        nvidia_present = nvidia.is_dir() and any(nvidia.iterdir())
+    except OSError:
+        cards = []
+        nvidia_present = False
+    if cards or nvidia_present:
+        return Line("pass", "GPU")
+    return Line("unavailable", "GPU unavailable")
+
+
+def core_line(core: str) -> Line:
+    payload = _fetch_json(f"{core}/health")
+    healthy = (
+        payload is not None
+        and payload.get("status") == "ok"
+        and payload.get("service") == "OMNE-core"
+    )
+    if healthy:
+        return Line("pass", "Core")
+    return Line("fail", "Core")
+
+
+def models(core: str) -> Line:
+    payload = _fetch_json(f"{core}/models")
+    listed = payload.get("models") if payload is not None else None
+    if not isinstance(listed, list) or not listed:
+        return Line("unavailable", "Models unavailable")
+    for item in listed:
+        if isinstance(item, dict) and item.get("lifecycle") in USABLE_MODELS:
+            return Line("pass", "Models")
+    return Line("unavailable", "Models unavailable")
+
+
+def _mark(status: Status) -> str:
+    if status == "pass":
+        return "✓"
+    if status == "fail":
+        return "×"  # noqa: RUF001
+    return "·"
+
+
+def _fetch_json(url: str) -> dict[str, object] | None:
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    request = urllib.request.Request(url, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=3) as response:
+            if getattr(response, "status", 200) != 200:
+                return None
+            loaded = json.loads(response.read().decode("utf-8"))
+    except (OSError, urllib.error.URLError, json.JSONDecodeError, UnicodeError, ValueError):
+        return None
+    if not isinstance(loaded, dict):
+        return None
+    return loaded
+
+
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def _setting(name: str, default: str) -> str:
+    import os
+
+    value = os.environ.get(name, "").strip()
+    return value or default
+
+
+def _attempts() -> int:
+    try:
+        return max(1, int(_setting("OMNE_BOOT_ATTEMPTS", "30")))
+    except ValueError:
+        return 30
+
+
+def _pause_seconds() -> float:
+    try:
+        return max(0.0, float(_setting("OMNE_BOOT_PAUSE", "1")))
+    except ValueError:
+        return 1.0
+
+
+def _write_devices(text: str) -> None:
+    for path in ("/dev/tty1", "/dev/console"):
+        try:
+            with open(path, "w", encoding="utf-8", errors="replace") as device:
+                device.write(text)
+                device.flush()
+        except OSError:
+            continue
+
+
+def _hold() -> None:
+    if _setting("OMNE_BOOT_HOLD", "1") == "0":
+        return
+
+    def _stop(_signum: int, _frame: object) -> None:
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, _stop)
+    signal.signal(signal.SIGINT, _stop)
+    signal.pause()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

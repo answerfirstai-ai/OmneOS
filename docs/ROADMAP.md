@@ -21,25 +21,26 @@
 | 15    | VM script that exits when no image is present                     |
 | —     | Missions, world state, intent, decisions, workers, verification   |
 | —     | Ubuntu 24.04 base, system packages, and `omne.target`             |
+| —     | UEFI systemd-boot disk, Ubuntu kernel, and the OMNE console       |
 
 ## Not done
 
 The Linux base is Ubuntu 24.04 LTS. `omne-core`, `omne-shell`, and `omne-system` are Debian
 packages, and `omne.target` starts them from `multi-user.target`. `scripts/linux/build-base.sh`
-builds a minbase rootfs and does not install a kernel or a bootloader. Run it as root when
-`debootstrap` is installed. This revision does not claim that rootfs was booted.
+builds a minbase rootfs and does not install a kernel or a bootloader. `scripts/linux/build-disk.sh`
+adds Ubuntu's kernel, initramfs, and systemd-boot. The console program is `omne-boot`. No display
+manager is installed.
 
-Phase 14 does not write `OMNE-OS.iso`. The script exits 2 when it is not root or when `debootstrap`
-or `xorriso` is missing, and it still exits 2 when those tools exist because an ISO needs a kernel
-and a bootloader.
+Phase 14 does not write `OMNE-OS.iso`. The script exits 2. The bootable artifact is the UEFI disk
+from `scripts/linux/build-disk.sh`.
 
-Phase 15 does not boot a virtual machine. `scripts/linux/vm-boot.sh` exits 2 when the image or
-`qemu-system-x86_64` is absent.
+Phase 15 starts a virtual machine only with `scripts/linux/vm-boot.sh --run` when the disk, QEMU,
+and OVMF are all present. Without them it exits 2 and does not start QEMU.
 
 Phase 16, physical hardware installation, has not been started. Wayland and a custom session are not
 part of this base.
 
 The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
 capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,
-and event replay described in `docs/ARCHITECTURE.md`. Model weight loading, a galaxy animation, and
-a bootable image are not implemented.
+and event replay described in `docs/ARCHITECTURE.md`. Model weight loading and a galaxy animation
+are not implemented. An ISO is not produced.

@@ -150,6 +150,11 @@ def test_stage_places_services_on_the_ubuntu_base(tmp_path: Path) -> None:
     assert "--bind 127.0.0.1 4173" in shell
     assert "Requires=omne-core.service" in shell
     assert "WantedBy=multi-user.target" in target
+    assert "omne-boot.service" in target
+    boot = (dest / "etc/systemd/system/omne-boot.service").read_text(encoding="utf-8")
+    assert "Conflicts=getty@tty1.service" in boot
+    assert "TTYPath=/dev/tty1" in boot
+    assert (dest / "usr/bin/omne-boot").is_file()
     assert (dest / "usr/lib/omne/agents/coding/agent.toml").is_file()
     assert (dest / "usr/lib/omne/models/manifests/mock-default.toml").is_file()
     assert (dest / "usr/share/omne/shell/dist/main.js").is_file()
@@ -202,6 +207,8 @@ def test_packages_are_services_without_a_kernel(tmp_path: Path) -> None:
     assert "./usr/share/omne/shell/dist/main.js" in shell
     assert "./etc/systemd/system/omne-shell.service" in shell
     assert "./etc/systemd/system/omne.target" in system
+    assert "./usr/bin/omne-boot" in system
+    assert "./etc/systemd/system/omne-boot.service" in system
     info = _run(["dpkg-deb", "-I", str(dest / names[2])]).stdout
     assert "omne-core (= 0.1.0)" in info
     assert "omne-shell (= 0.1.0)" in info
@@ -235,6 +242,92 @@ def test_base_refuses_without_root(tmp_path: Path) -> None:
     assert result.returncode == 2
     assert "no rootfs was written" in result.stderr
     assert not dest.exists()
+
+
+def test_kernel_dry_run_does_not_install(tmp_path: Path) -> None:
+    rootfs = tmp_path / "rootfs"
+    result = _run(["bash", "scripts/linux/install-kernel.sh", "--dry-run", "--rootfs", str(rootfs)])
+
+    assert result.returncode == 0
+    assert "kernel package: linux-image-generic" in result.stdout
+    assert "initramfs: initramfs-tools" in result.stdout
+    assert "bootloader: not installed" in result.stdout
+    assert "desktop: not installed" in result.stdout
+    assert "no kernel was installed" in result.stdout
+    assert not rootfs.exists()
+
+
+def test_kernel_refuses_without_root(tmp_path: Path) -> None:
+    rootfs = tmp_path / "rootfs"
+    rootfs.mkdir()
+    result = _run(["bash", "scripts/linux/install-kernel.sh", "--rootfs", str(rootfs)])
+
+    assert result.returncode == 2
+    assert "no kernel was installed" in result.stderr
+
+
+def test_disk_dry_run_writes_nothing(tmp_path: Path) -> None:
+    dest = tmp_path / "OMNE-OS.img"
+    result = _run(
+        [
+            "bash",
+            "scripts/linux/build-disk.sh",
+            "--dry-run",
+            "--dest",
+            str(dest),
+            "--rootfs",
+            str(tmp_path),
+        ]
+    )
+
+    assert result.returncode == 0
+    assert "firmware: UEFI" in result.stdout
+    assert "bootloader: systemd-boot" in result.stdout
+    assert "kernel: linux-image-generic" in result.stdout
+    assert "initramfs: initramfs-tools" in result.stdout
+    assert "init: systemd" in result.stdout
+    assert "default target: multi-user.target" in result.stdout
+    assert "desktop: not installed" in result.stdout
+    assert "no disk was written" in result.stdout
+    assert not dest.exists()
+
+
+def test_disk_script_installs_systemd_boot_and_init() -> None:
+    text = (ROOT / "scripts/linux/build-disk.sh").read_text(encoding="utf-8")
+    assert "systemd-sysv" in text
+    assert "systemd-boot-efi" in text
+    assert "universe" in text
+
+
+def test_disk_refuses_without_root(tmp_path: Path) -> None:
+    dest = tmp_path / "OMNE-OS.img"
+    result = _run(
+        ["bash", "scripts/linux/build-disk.sh", "--dest", str(dest), "--rootfs", str(tmp_path)]
+    )
+
+    assert result.returncode == 2
+    assert "no disk was written" in result.stderr
+    assert not dest.exists()
+
+
+def test_disk_refuses_boot_directory() -> None:
+    result = _run(["bash", "scripts/linux/build-disk.sh", "--dry-run", "--dest", "/boot/omne.img"])
+
+    assert result.returncode == 2
+    assert "refusing" in result.stderr
+    assert not Path("/boot/omne.img").exists()
+
+
+def test_vm_dry_run_does_not_start(tmp_path: Path) -> None:
+    image = tmp_path / "OMNE-OS.img"
+    image.write_bytes(b"not a disk")
+    result = _run(["bash", "scripts/linux/vm-boot.sh", "--dry-run", str(image)])
+
+    assert result.returncode == 0
+    assert "firmware: UEFI" in result.stdout
+    assert "bootloader: systemd-boot" in result.stdout
+    assert "desktop: not started" in result.stdout
+    assert "no virtual machine was started" in result.stdout
 
 
 def test_base_refuses_boot() -> None:

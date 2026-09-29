@@ -73,7 +73,7 @@ bash scripts/linux/build-packages.sh --dry-run
 bash scripts/linux/build-base.sh --dry-run
 ```
 
-`docs/LINUX.md` describes the packages, the `omne` user, and the rootfs builder.
+`docs/LINUX.md` describes the packages, the `omne` user, the rootfs builder, and the UEFI disk.
 
 ## Checks
 
