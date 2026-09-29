@@ -22,6 +22,7 @@
 | —     | Missions, world state, intent, decisions, workers, verification   |
 | —     | Ubuntu 24.04 base, system packages, and `omne.target`             |
 | —     | UEFI systemd-boot disk, Ubuntu kernel, and the OMNE console       |
+| —     | Display providers: mock, and labwc diagnostics on Linux           |
 
 ## Not done
 
@@ -37,8 +38,10 @@ from `scripts/linux/build-disk.sh`.
 Phase 15 starts a virtual machine only with `scripts/linux/vm-boot.sh --run` when the disk, QEMU,
 and OVMF are all present. Without them it exits 2 and does not start QEMU.
 
-Phase 16, physical hardware installation, has not been started. Wayland and a custom session are not
-part of this base.
+Phase 16, physical hardware installation, has not been started. `omne.display` can report whether
+labwc, DRM, a render node, a connected monitor, and an input device are present. It does not start a
+Wayland session. The shell is still the web desktop. `docs/GRAPHICS_ARCHITECTURE.md` lists what a VM
+needs before that session can launch.
 
 The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
 capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,

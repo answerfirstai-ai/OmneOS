@@ -57,5 +57,6 @@ Terminal and process tools run with `shell=False`. The subprocess environment ke
 requested prefix. The user installer and the system stager refuse `/boot` and do not edit boot
 configuration. System packages add an `omne` user and units under `/etc/systemd/system`. They do not
 install a kernel. The UEFI disk builder installs Ubuntu's kernel package and systemd-boot, and it
-refuses a display manager. The ISO script does not write `OMNE-OS.iso`. No physical disk
-installation is performed.
+refuses a display manager. Display diagnostics read DRM and input nodes and do not start labwc or
+change the host session. The ISO script does not write `OMNE-OS.iso`. No physical disk installation
+is performed.
