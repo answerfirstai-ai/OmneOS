@@ -12,11 +12,20 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from core.config.errors import ConfigurationError
 
 EnvironmentName = Literal["development", "testing", "production"]
+ExecutionMode = Literal[
+    "development",
+    "testing",
+    "offline",
+    "local",
+    "online",
+    "hybrid",
+    "production",
+]
 LogLevelName = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 LogFormatName = Literal["text", "json"]
 
@@ -40,6 +49,13 @@ ENV_TO_FIELD: dict[str, str] = {
     "OMNE_BROWSER_COMMAND": "browser_command",
     "OMNE_AGENTS_DIR": "agents_dir",
     "OMNE_MODELS_DIR": "models_dir",
+    "OMNE_EXECUTION_MODE": "execution_mode",
+    "OMNE_WORLD_STATE_TTL_SECONDS": "world_state_ttl_seconds",
+    "OMNE_CONTEXT_ITEM_LIMIT": "context_item_limit",
+    "OMNE_CONTEXT_CHAR_LIMIT": "context_char_limit",
+    "OMNE_MEMORY_RETRIEVE_LIMIT": "memory_retrieve_limit",
+    "OMNE_CACHE_TTL_SECONDS": "cache_ttl_seconds",
+    "OMNE_VERIFICATION_REQUIRED": "verification_required",
 }
 
 KNOWN_ENVIRONMENT_VARIABLES: frozenset[str] = frozenset(ENV_TO_FIELD) | {"OMNE_CONFIG"}
@@ -69,6 +85,28 @@ class Settings(BaseModel):
     browser_command: str = ""
     agents_dir: Path = Path("agents")
     models_dir: Path = Path("models/manifests")
+    execution_mode: ExecutionMode = "development"
+    world_state_ttl_seconds: float = Field(default=5.0, ge=0.1, le=3600)
+    context_item_limit: int = Field(default=8, ge=1, le=64)
+    context_char_limit: int = Field(default=4000, ge=200, le=32000)
+    memory_retrieve_limit: int = Field(default=20, ge=1, le=200)
+    cache_ttl_seconds: float = Field(default=0, ge=0, le=86400)
+    verification_required: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _default_execution_mode(cls, value: object) -> object:
+        if not isinstance(value, dict) or value.get("execution_mode"):
+            return value
+        data = dict(value)
+        environment = str(data.get("environment", "development"))
+        mapped = {
+            "development": "development",
+            "testing": "testing",
+            "production": "production",
+        }
+        data["execution_mode"] = mapped.get(environment, "development")
+        return data
 
     @field_validator("log_level", mode="before")
     @classmethod

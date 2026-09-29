@@ -1,11 +1,23 @@
 /** Visual states the shell can show. Assets are optional. */
 
-export type CharacterState = "idle" | "listening" | "thinking" | "working" | "success" | "error";
+export type CharacterState =
+  | "idle"
+  | "listening"
+  | "thinking"
+  | "working"
+  | "success"
+  | "error"
+  | "analyzing"
+  | "planning"
+  | "routing"
+  | "verifying"
+  | "waiting";
 
 export interface CharacterInput {
   coreOk: boolean;
   voiceListening: boolean;
   statuses: readonly string[];
+  missionStatuses?: readonly string[];
 }
 
 const ASSETS: Record<CharacterState, string | null> = {
@@ -15,6 +27,11 @@ const ASSETS: Record<CharacterState, string | null> = {
   working: null,
   success: null,
   error: null,
+  analyzing: null,
+  planning: null,
+  routing: null,
+  verifying: null,
+  waiting: null,
 };
 
 /** Choose a character state from core health, voice, and task statuses. */
@@ -24,6 +41,30 @@ export function characterState(input: CharacterInput): CharacterState {
   }
   if (input.voiceListening) {
     return "listening";
+  }
+  const missions = input.missionStatuses;
+  if (missions !== undefined && missions.length > 0) {
+    if (missions.includes("FAILED")) {
+      return "error";
+    }
+    if (missions.includes("ANALYZING")) {
+      return "analyzing";
+    }
+    if (missions.includes("PLANNING")) {
+      return "planning";
+    }
+    if (missions.includes("VERIFYING")) {
+      return "verifying";
+    }
+    if (missions.includes("WAITING")) {
+      return "waiting";
+    }
+    if (missions.some((status) => status === "RUNNING" || status === "RECOVERING")) {
+      return "working";
+    }
+    if (missions.includes("COMPLETED")) {
+      return "success";
+    }
   }
   if (input.statuses.includes("FAILED")) {
     return "error";

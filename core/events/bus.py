@@ -12,6 +12,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.trace import current_mission_id, current_trace_id
+
 Subscriber = Callable[["Event"], None]
 
 
@@ -27,6 +29,11 @@ class Event(BaseModel):
     agent_id: str | None = None
     model_id: str | None = None
     tool_id: str | None = None
+    trace_id: str | None = None
+    mission_id: str | None = None
+    worker_id: str | None = None
+    source: str = "OMNE"
+    schema_version: int = 1
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -60,6 +67,10 @@ class EventBus:
         agent_id: str | None = None,
         model_id: str | None = None,
         tool_id: str | None = None,
+        trace_id: str | None = None,
+        mission_id: str | None = None,
+        worker_id: str | None = None,
+        source: str = "OMNE",
         payload: dict[str, Any] | None = None,
     ) -> Event:
         event = Event(
@@ -70,6 +81,10 @@ class EventBus:
             agent_id=agent_id,
             model_id=model_id,
             tool_id=tool_id,
+            trace_id=current_trace_id() if trace_id is None else trace_id,
+            mission_id=current_mission_id() if mission_id is None else mission_id,
+            worker_id=worker_id,
+            source=source,
             payload=dict(payload or {}),
         )
         with self._lock:

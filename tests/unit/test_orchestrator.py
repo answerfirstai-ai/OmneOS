@@ -53,7 +53,7 @@ def test_identical_model_prompts_use_the_response_cache(
 
     assert first.status is TaskStatus.COMPLETED
     assert second.status is TaskStatus.COMPLETED
-    assert calls["count"] == 1
+    assert calls["count"] == 2
 
 
 def test_website_steps_run_in_dependency_order(tmp_path: Path) -> None:

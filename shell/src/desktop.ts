@@ -26,12 +26,26 @@ export interface EventDocument {
   type: string;
 }
 
+export interface MissionDocument {
+  id: string;
+  objective: string;
+  status: string;
+}
+
+export interface WorkerDocument {
+  worker_id: string;
+  agent_id: string;
+  status: string;
+}
+
 export interface DesktopView {
   tasks: TaskDocument[];
   agents: AgentDocument[];
   models: ModelDocument[];
   events: EventDocument[];
   voice: VoiceStatus;
+  missions: MissionDocument[];
+  workers: WorkerDocument[];
 }
 
 export function parentTasks(tasks: readonly TaskDocument[]): TaskDocument[] {
@@ -56,6 +70,14 @@ export function notificationLine(event: EventDocument): string {
   return `${event.type}`;
 }
 
+export function missionLine(mission: MissionDocument): string {
+  return `${mission.status} ${mission.objective}`;
+}
+
+export function workerLine(worker: WorkerDocument): string {
+  return `${worker.agent_id} ${worker.status}`;
+}
+
 /** Read one `/desktop` document. Missing fields stay empty. */
 export function readDesktop(payload: unknown): DesktopView {
   const record = isRecord(payload) ? payload : {};
@@ -65,6 +87,8 @@ export function readDesktop(payload: unknown): DesktopView {
     models: arrayOf(record["models"], isModel),
     events: arrayOf(record["events"], isEvent).slice(-8),
     voice: readVoice(record["voice"]),
+    missions: arrayOf(record["missions"], isMission),
+    workers: arrayOf(record["workers"], isWorker),
   };
 }
 
@@ -109,6 +133,28 @@ function isModel(value: unknown): value is ModelDocument {
     typeof value["id"] === "string" &&
     typeof value["provider"] === "string" &&
     typeof value["local"] === "boolean"
+  );
+}
+
+function isMission(value: unknown): value is MissionDocument {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    typeof value["id"] === "string" &&
+    typeof value["objective"] === "string" &&
+    typeof value["status"] === "string"
+  );
+}
+
+function isWorker(value: unknown): value is WorkerDocument {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    typeof value["worker_id"] === "string" &&
+    typeof value["agent_id"] === "string" &&
+    typeof value["status"] === "string"
   );
 }
 

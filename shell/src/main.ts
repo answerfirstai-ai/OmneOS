@@ -4,9 +4,11 @@ import {
   agentLine,
   modelLine,
   notificationLine,
+  missionLine,
   parentTasks,
   readDesktop,
   taskLine,
+  workerLine,
 } from "./desktop.js";
 import { coreHealthUrl, parseHealth, type CoreHealth } from "./health.js";
 import { voiceControlEnabled, voiceSummary, type VoiceStatus } from "./voice.js";
@@ -98,12 +100,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function showCharacter(statuses: string[], coreOk: boolean, listening: boolean): void {
+function showCharacter(
+  statuses: string[],
+  coreOk: boolean,
+  listening: boolean,
+  missionStatuses?: readonly string[],
+): void {
   const element = listElement("character");
   if (element === null) {
     return;
   }
-  const state = characterState({ coreOk, voiceListening: listening, statuses });
+  const state = characterState({
+    coreOk,
+    voiceListening: listening,
+    statuses,
+    ...(missionStatuses === undefined ? {} : { missionStatuses }),
+  });
   element.dataset["state"] = state;
   element.textContent = characterAsset(state) === null ? state : state;
 }
@@ -131,10 +143,14 @@ async function refreshDesktop(coreUrl: string, coreOk: boolean): Promise<void> {
     renderList("agents", desktop.agents.map(agentLine), "no agents");
     renderList("models", desktop.models.map(modelLine), "no models");
     renderList("notifications", desktop.events.map(notificationLine), "no notifications");
+    renderList("missions", desktop.missions.map(missionLine), "no missions");
+    renderList("workers", desktop.workers.map(workerLine), "no workers");
+    const missionStatuses = desktop.missions.map((mission) => mission.status);
     showCharacter(
       tasks.map((task) => task.status),
       coreOk,
       voice.listening,
+      missionStatuses.length > 0 ? missionStatuses : undefined,
     );
     showVoice(voice);
   } catch (error) {

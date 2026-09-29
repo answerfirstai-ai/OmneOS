@@ -172,6 +172,16 @@ input:focus-visible {
   left: 700px;
 }
 
+#window-missions {
+  top: 96px;
+  left: 460px;
+}
+
+#window-workers {
+  top: 250px;
+  left: 480px;
+}
+
 .window.is-focused {
   border-color: rgba(228, 194, 122, 0.45);
 }

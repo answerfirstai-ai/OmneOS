@@ -6,7 +6,7 @@ import sqlite3
 import threading
 from pathlib import Path
 
-from core.sqlite import configure_sqlite
+from core.sqlite import configure_sqlite, ensure_column
 
 
 class MemoryDatabase:
@@ -33,6 +33,8 @@ class MemoryDatabase:
         self._connection.execute(
             "CREATE INDEX IF NOT EXISTS records_scope ON records (scope, scope_key, created_at, id)"
         )
+        ensure_column(self._connection, "records", "trace_id", "TEXT NOT NULL DEFAULT ''")
+        ensure_column(self._connection, "records", "source", "TEXT NOT NULL DEFAULT ''")
         self._connection.commit()
 
     def lock(self) -> threading.Lock:

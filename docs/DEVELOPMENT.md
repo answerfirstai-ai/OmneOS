@@ -36,8 +36,16 @@ Set `XAI_API_KEY` in the environment only when you intend to call xAI. Leave
 OMNE check
 OMNE serve
 OMNE execute "write file notes.txt with content hello"
+OMNE execute --dry-run "write file dry.txt with content planned"
 OMNE compute
+OMNE world
+OMNE mission list
+OMNE capabilities
 ```
+
+`OMNE_EXECUTION_MODE` selects development, testing, offline, local, online, hybrid, or production.
+When it is unset, the mode follows `OMNE_ENVIRONMENT`. Limits for world-state TTL, context size,
+memory retrieval, cache TTL, and verification are settings in `.env.example`.
 
 `OMNE serve` listens on `http://127.0.0.1:8787` in the development configuration. Stop it with
 Ctrl-C or SIGTERM.

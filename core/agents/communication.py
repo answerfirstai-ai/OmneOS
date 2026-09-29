@@ -9,6 +9,20 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from core.events.bus import EventBus
 
+_MESSAGE_TYPES = frozenset(
+    {
+        "REQUEST",
+        "RESPONSE",
+        "ARTIFACT_READY",
+        "BLOCKED",
+        "QUESTION",
+        "HANDOFF",
+        "ERROR",
+        "STATUS",
+        "VERIFICATION",
+    }
+)
+
 
 class AgentMessage(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -19,6 +33,11 @@ class AgentMessage(BaseModel):
     task_id: str | None = None
     content: dict[str, object] = Field(default_factory=dict)
     timestamp: datetime
+    type: str = "STATUS"
+    trace_id: str | None = None
+    mission_id: str | None = None
+    requires_response: bool = False
+    priority: int = 0
 
 
 class AgentMailbox:
@@ -35,7 +54,14 @@ class AgentMailbox:
         recipient: str,
         content: dict[str, object],
         task_id: str | None = None,
+        message_type: str = "STATUS",
+        trace_id: str | None = None,
+        mission_id: str | None = None,
+        requires_response: bool = False,
+        priority: int = 0,
     ) -> AgentMessage:
+        if message_type not in _MESSAGE_TYPES:
+            raise ValueError(f"unknown agent message type: {message_type}")
         message = AgentMessage(
             id=str(uuid4()),
             sender=sender,
@@ -43,13 +69,26 @@ class AgentMailbox:
             task_id=task_id,
             content=dict(content),
             timestamp=datetime.now(UTC),
+            type=message_type,
+            trace_id=trace_id,
+            mission_id=mission_id,
+            requires_response=requires_response,
+            priority=priority,
         )
         self._messages.append(message)
         self._events.publish(
             "agent.message",
             task_id=task_id,
             agent_id=sender,
-            payload={"recipient": recipient, "id": message.id},
+            mission_id=mission_id,
+            trace_id=trace_id,
+            payload={
+                "recipient": recipient,
+                "id": message.id,
+                "type": message.type,
+                "requires_response": requires_response,
+                "priority": priority,
+            },
         )
         return message
 

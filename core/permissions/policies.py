@@ -12,6 +12,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.security.commands import classify_command
+
 TOOL_GRANTS: dict[str, tuple[str, str]] = {
     "filesystem.read": ("filesystem", "workspace"),
     "filesystem.write": ("filesystem", "workspace"),
@@ -99,11 +101,17 @@ class PermissionResult(BaseModel):
     decision: PermissionDecision
     reason: str
     policy_id: str
+    capability_classes: list[str] = Field(default_factory=list)
 
 
 def decide(request: PermissionRequest) -> PermissionResult:
     """Evaluate one request. Callers should use the evaluator, which fails closed."""
 
+    result = _decide(request)
+    return result.model_copy(update={"capability_classes": _capability_classes(request)})
+
+
+def _decide(request: PermissionRequest) -> PermissionResult:
     grant = TOOL_GRANTS.get(request.tool_id)
     if grant is None:
         return _deny(f"tool is not registered for permissions: {request.tool_id}")
@@ -140,6 +148,13 @@ def decide(request: PermissionRequest) -> PermissionResult:
     return PermissionResult(
         decision=PermissionDecision.ALLOW, reason="granted by policy", policy_id="default"
     )
+
+
+def _capability_classes(request: PermissionRequest) -> list[str]:
+    if request.tool_id not in {"terminal.execute", "process.start"}:
+        return []
+    classes = classify_command(request.arguments.get("argv"))
+    return sorted(item.value for item in classes)
 
 
 def dangerous_command(argv: object) -> str | None:

@@ -10,13 +10,14 @@ from core.agents.manifest import AgentManifest
 from core.agents.registry import AgentRegistry
 from core.agents.runtime import AgentRuntime
 from core.events.bus import EventBus
-from core.models.cache import ResponseCache
+from core.models.cache import CacheContext, ResponseCache
 from core.models.providers.base import ModelProvider
 from core.models.types import GenerateRequest, ToolCallRequest
 from core.orchestrator.store import TaskStore
 from core.orchestrator.task import PlannedCall, Task, TaskStatus
 from core.tools.base import ToolContext, ToolResult
 from core.tools.gateway import ToolGateway
+from core.verify.verifier import verify_observations
 
 
 class ExecutionFailure(Exception):
@@ -45,6 +46,8 @@ class TaskExecutor:
         timeout_seconds: int,
         responses: ResponseCache | None = None,
         provider_labels: dict[str, str] | None = None,
+        context_text: Any | None = None,
+        verification_required: bool = True,
     ) -> None:
         self._store = store
         self._gateway = gateway
@@ -55,6 +58,8 @@ class TaskExecutor:
         self._model_names = model_names
         self._responses = responses or ResponseCache()
         self._provider_labels = provider_labels or {}
+        self._context_text = context_text
+        self._verification_required = verification_required
         self._environment = environment
         self._workspace = workspace_root
         self._timeout = timeout_seconds
@@ -72,11 +77,11 @@ class TaskExecutor:
                 model_id=task.assigned_model,
             )
             if manifest is not None:
-                self._runtime.begin(manifest)
+                self._begin_worker(manifest, task)
         elif task.status is TaskStatus.WAITING:
             task = self._store.transition(task, TaskStatus.RUNNING)
             if manifest is not None:
-                self._runtime.begin(manifest)
+                self._begin_worker(manifest, task)
         observations = list(task.observations)
         try:
             for call in task.calls[len(observations) :]:
@@ -106,9 +111,26 @@ class TaskExecutor:
                         update={"observations": observations, "pending_confirmation": None}
                     )
                 )
+            verdict = verify_observations(task.id, observations, workspace=self._workspace)
+            self._events.publish(
+                "verification.recorded",
+                task_id=task.id,
+                agent_id=task.assigned_agent,
+                payload={"status": verdict.status, "id": verdict.id},
+            )
+            if self._verification_required and verdict.status == "FAIL":
+                raise ExecutionFailure(
+                    verdict.errors[0] if verdict.errors else "verification failed",
+                    code="verification_failed",
+                )
             task = self._store.transition(task, TaskStatus.VERIFYING, observations=observations)
             task = self._store.transition(
-                task, TaskStatus.COMPLETED, result={"observations": observations}
+                task,
+                TaskStatus.COMPLETED,
+                result={
+                    "observations": observations,
+                    "verification": verdict.model_dump(mode="json"),
+                },
             )
         except ExecutionFailure:
             raise
@@ -227,14 +249,40 @@ class TaskExecutor:
 
     async def _generate(self, task: Task, prompt: str) -> str:
         provider = self._provider(task)
-        request = GenerateRequest(model=self._external_model_name(task), prompt=prompt)
+        context_note = ""
+        if self._context_text is not None:
+            context_note = str(self._context_text(task))
+        full_prompt = f"{context_note}\n\n{prompt}" if context_note else prompt
+        request = GenerateRequest(model=self._external_model_name(task), prompt=full_prompt)
         label = self._provider_labels.get(task.assigned_model or "", task.assigned_model or "")
-        cached = self._responses.get(label, request)
+        revision = task.metadata.get("world_revision", 0)
+        context = CacheContext(
+            world_revision=int(revision) if isinstance(revision, int) else 0,
+            context_revision=len(context_note),
+        )
+        if task.metadata.get("cache") == "bypass":
+            self._responses.bypass(reason="task requested a fresh model call")
+            response = await provider.generate(request)
+            return response.text
+        cached = self._responses.get(label, request, context=context)
         if cached is not None:
+            self._events.publish("cache.hit", task_id=task.id, model_id=task.assigned_model)
             return cached.text
+        self._events.publish("cache.miss", task_id=task.id, model_id=task.assigned_model)
         response = await provider.generate(request)
-        self._responses.put(label, request, response)
+        self._responses.put(label, request, response, context=context)
         return response.text
+
+    def _begin_worker(self, manifest: AgentManifest, task: Task) -> None:
+        mission = task.metadata.get("mission_id")
+        trace = task.metadata.get("trace_id")
+        self._runtime.begin(
+            manifest,
+            task_id=task.id,
+            mission_id=mission if isinstance(mission, str) else None,
+            model_id=task.assigned_model,
+            trace_id=trace if isinstance(trace, str) else None,
+        )
 
     def _provider(self, task: Task) -> ModelProvider:
         model_id = task.assigned_model or ""

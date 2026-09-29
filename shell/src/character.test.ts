@@ -30,3 +30,33 @@ test("character reports an unreachable core and missing assets", () => {
   assert.equal(characterState({ coreOk: false, voiceListening: true, statuses: [] }), "error");
   assert.equal(characterAsset("idle"), null);
 });
+
+test("mission status drives the character when the core reports one", () => {
+  assert.equal(
+    characterState({
+      coreOk: true,
+      voiceListening: false,
+      statuses: ["COMPLETED"],
+      missionStatuses: ["ANALYZING"],
+    }),
+    "analyzing",
+  );
+  assert.equal(
+    characterState({
+      coreOk: true,
+      voiceListening: false,
+      statuses: [],
+      missionStatuses: ["VERIFYING"],
+    }),
+    "verifying",
+  );
+  assert.equal(
+    characterState({
+      coreOk: true,
+      voiceListening: false,
+      statuses: ["WAITING"],
+      missionStatuses: ["WAITING"],
+    }),
+    "waiting",
+  );
+});

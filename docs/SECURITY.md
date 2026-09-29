@@ -25,8 +25,20 @@ Every tool call goes through `ToolGateway`. The default policy:
 - Denies `voice.transmit`.
 - Denies signaling pid 1. The process tool also rejects pid 1 before a signal is sent.
 
+Terminal and process-start decisions also record a command class: READ_ONLY, MUTATING, PRIVILEGED,
+DESTRUCTIVE, NETWORK, PACKAGE_INSTALL, PROCESS_CONTROL, or SYSTEM_CONFIGURATION. The class does not
+replace the deny list. Privileged and destructive commands are denied by the decision engine before
+the planner runs, and the gateway still denies them if a caller reaches the tool.
+
+A worker uses the grants on its agent manifest for that call. It does not inherit a broader mission
+grant. An agent package that only drops `tools.toml` or `permissions.toml` into `agents/` is not
+loaded as a manifest and gains no permissions.
+
+`OMNE execute --dry-run` stores the plan and does not call tools.
+
 Decisions are appended to the audit log. The evaluator turns policy exceptions into DENY with policy
-id `fail-closed`.
+id `fail-closed`. The HTTP API does not return `XAI_API_KEY` or other secrets. `GET /memory`
+requires an explicit scope and scope key and rejects unknown scopes.
 
 ## Network and process
 

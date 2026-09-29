@@ -163,7 +163,9 @@ def test_desktop_returns_shell_panels(tmp_path: Path) -> None:
         started.stop()
 
     assert status == 200
-    assert set(body) == {"agents", "events", "models", "tasks", "voice"}
+    assert set(body) >= {"agents", "events", "models", "tasks", "voice"}
+    assert "missions" in body
+    assert "workers" in body
     assert "compute" not in body
 
 

@@ -35,15 +35,18 @@ Python:
 - Routing to the mock model, live host telemetry, a reused snapshot, allocator decisions, and a
   model cache that does not load weights.
 - `GET /desktop` returns the shell panels and does not include a compute sample.
-- Identical model prompts reuse the response cache. Tool calls are not cached.
-- Memory scope checks, agent manifests, and lifecycle edges.
+- The same model prompt and cache context reuse one response. A later mission changes the world
+  revision, so the same sentence is fetched again. Tool calls are not cached.
+- Memory scope checks, provenance columns on older databases, agent manifests, and lifecycle edges.
+- Missions, world-state revisions, intent, decisions, capabilities, workers, verification, traces,
+  dry-run, command classes, and the new HTTP routes.
 - Objective execution, dependency order, retry escalation, parallel work, and voice silence.
 - The installer refusing `/boot`, and the image and VM scripts exiting without an ISO or a boot.
 
 TypeScript:
 
 - Health parsing and core URL selection.
-- Character states, including a missing asset.
+- Character states, including a missing asset and mission-driven analyzing, verifying, and waiting.
 - Voice control staying disabled unless permission, provider, and hardware are all available.
 - Task, agent, model, and notification lines, and one `/desktop` document.
 - Desktop windows open, come to the front, and hide again.

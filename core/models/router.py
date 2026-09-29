@@ -19,6 +19,19 @@ class Route(BaseModel):
     reason: str
 
 
+class RouteChoice(BaseModel):
+    """A capability-aware route, including the models that were not selected."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: ModelMetadata | None = None
+    reason: str
+    fallbacks: list[str] = []
+    estimated_resources: dict[str, str] = {}
+    estimated_cost: str = "unknown"
+    decision: str
+
+
 class RoutingError(Exception):
     """No registered model can serve the request."""
 
@@ -64,6 +77,84 @@ class ModelRouter:
                 "no model provides the required capabilities: " + ", ".join(capabilities)
             )
         raise RoutingError("no model can be allocated: " + "; ".join(notes))
+
+    def choose(
+        self,
+        capabilities: list[str],
+        snapshot: ResourceSnapshot,
+        *,
+        mode: str,
+        available: set[str] | None = None,
+    ) -> RouteChoice:
+        """Select a model for ``mode``.
+
+        ``select`` stays priority-first so existing callers keep the mock route.
+        This method applies the execution mode and skips models that are not
+        actually available. Mock does not win in production. A missing local
+        model is not reported as loaded.
+        """
+
+        required = set(capabilities)
+        candidates = [
+            model for model in self._registry.enabled() if required <= set(model.capabilities)
+        ]
+        if available is not None:
+            candidates = [model for model in candidates if model.id in available]
+        if mode == "production":
+            candidates = [model for model in candidates if model.provider != "mock"]
+        if mode in {"offline", "local"}:
+            candidates = [model for model in candidates if model.local]
+        candidates.sort(key=lambda model: (0 if model.local else 1, model.priority, model.id))
+        if mode == "local":
+            candidates.sort(key=lambda model: (model.priority, model.id))
+        if not candidates:
+            return RouteChoice(
+                reason=f"no available model satisfies {mode}",
+                decision="DEFER",
+            )
+        cloud_available = any(not model.local for model in candidates)
+        notes: list[str] = []
+        for model in candidates:
+            decision, reason = allocate(
+                snapshot,
+                AllocationRequest(
+                    requirements=model.requirements,
+                    local=model.local,
+                    cloud_available=cloud_available and model.local,
+                ),
+            )
+            fallbacks = [item.id for item in candidates if item.id != model.id]
+            if decision is AllocationDecision.ALLOW:
+                return _choice(model, decision.value, reason, fallbacks)
+            if decision is AllocationDecision.USE_CLOUD:
+                cloud = _first_cloud(candidates)
+                if cloud is not None and mode not in {"offline", "local"}:
+                    others = [item.id for item in candidates if item.id != cloud.id]
+                    return _choice(cloud, decision.value, reason, others)
+            notes.append(f"{model.id}: {decision.value}")
+        return RouteChoice(
+            reason="; ".join(notes) if notes else "no model can be allocated",
+            fallbacks=[model.id for model in candidates],
+            decision="WAIT" if notes and all("WAIT" in note for note in notes) else "DENY",
+        )
+
+
+def _choice(
+    model: ModelMetadata,
+    decision: str,
+    reason: str,
+    fallbacks: list[str],
+) -> RouteChoice:
+    ram = str(model.requirements.ram_mb) if model.requirements.ram_known else "unknown"
+    vram = str(model.requirements.vram_mb) if model.requirements.vram_known else "unknown"
+    return RouteChoice(
+        model=model,
+        reason=reason,
+        fallbacks=fallbacks,
+        estimated_resources={"ram_mb": ram, "vram_mb": vram},
+        estimated_cost=model.cost_input,
+        decision=decision,
+    )
 
 
 def _first_cloud(candidates: list[ModelMetadata]) -> ModelMetadata | None:

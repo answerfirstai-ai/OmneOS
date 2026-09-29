@@ -33,6 +33,7 @@ class AgentManifest(BaseModel):
     resources: ResourceRequirements = Field(default_factory=ResourceRequirements)
     permissions: dict[str, list[str]]
     lifecycle: LifecycleSpec
+    max_workers: int = Field(default=1, ge=1, le=32)
 
     @model_validator(mode="after")
     def _consistent_lifecycle(self) -> AgentManifest:

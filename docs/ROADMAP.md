@@ -19,6 +19,7 @@
 | 13    | User systemd unit, installer, and health command                  |
 | 14    | Image script that exits when it cannot build                      |
 | 15    | VM script that exits when no image is present                     |
+| —     | Missions, world state, intent, decisions, workers, verification   |
 
 ## Not done
 
@@ -30,3 +31,8 @@ Phase 15 does not boot a virtual machine. `scripts/linux/vm-boot.sh` exits 2 whe
 `qemu-system-x86_64` is absent.
 
 Phase 16, physical hardware installation, has not been started.
+
+The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
+capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,
+and event replay described in `docs/ARCHITECTURE.md`. Model weight loading, a galaxy animation, and
+a bootable image are not implemented.

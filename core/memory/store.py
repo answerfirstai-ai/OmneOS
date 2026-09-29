@@ -22,6 +22,8 @@ class MemoryRecord(BaseModel):
     content: str
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
+    trace_id: str = ""
+    source: str = ""
 
 
 class MemoryStore:
@@ -38,6 +40,8 @@ class MemoryStore:
         scope_key: str,
         content: str,
         metadata: dict[str, Any] | None = None,
+        trace_id: str = "",
+        source: str = "",
     ) -> MemoryRecord:
         grant.require(scope)
         if not scope_key:
@@ -49,12 +53,16 @@ class MemoryStore:
             content=content,
             metadata=dict(metadata or {}),
             created_at=datetime.now(UTC),
+            trace_id=trace_id,
+            source=source,
         )
         with self._database.lock():
             self._database.connection.execute(
                 """
-                INSERT INTO records (id, scope, scope_key, content, metadata_json, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO records (
+                    id, scope, scope_key, content, metadata_json, created_at, trace_id, source
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.id,
@@ -63,6 +71,8 @@ class MemoryStore:
                     record.content,
                     json.dumps(record.metadata, sort_keys=True),
                     record.created_at.isoformat(),
+                    record.trace_id,
+                    record.source,
                 ),
             )
             self._database.connection.commit()
@@ -84,7 +94,7 @@ class MemoryStore:
         with self._database.lock():
             rows = self._database.connection.execute(
                 """
-                SELECT id, scope, scope_key, content, metadata_json, created_at
+                SELECT id, scope, scope_key, content, metadata_json, created_at, trace_id, source
                 FROM records
                 WHERE scope = ? AND scope_key = ?
                   AND (? = '' OR content LIKE ? ESCAPE '\\')
@@ -101,6 +111,8 @@ class MemoryStore:
                 content=row["content"],
                 metadata=json.loads(row["metadata_json"]),
                 created_at=datetime.fromisoformat(row["created_at"]),
+                trace_id=str(row["trace_id"] or ""),
+                source=str(row["source"] or ""),
             )
             for row in rows
         ]

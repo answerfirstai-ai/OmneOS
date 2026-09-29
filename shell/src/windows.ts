@@ -8,6 +8,8 @@ export const WINDOW_IDS = [
   "models",
   "notifications",
   "voice",
+  "missions",
+  "workers",
 ] as const;
 
 export type WindowId = (typeof WINDOW_IDS)[number];

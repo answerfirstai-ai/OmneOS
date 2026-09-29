@@ -27,6 +27,10 @@ class ModelMetadata(BaseModel):
     cost_input: str = "unknown"
     cost_output: str = "unknown"
     latency: str = "unknown"
+    reliability: str = "unknown"
+    privacy: str = "unknown"
+    context_window: int | None = None
+    modalities: list[str] = Field(default_factory=lambda: ["text"])
     priority: int = 100
 
     @field_validator("cost_input", "cost_output", "latency")

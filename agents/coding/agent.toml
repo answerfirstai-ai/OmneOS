@@ -17,6 +17,7 @@ tools = [
   "git.branch",
   "git.commit",
 ]
+max_workers = 2
 
 [permissions]
 filesystem = ["workspace"]

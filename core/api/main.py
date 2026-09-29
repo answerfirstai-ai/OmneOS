@@ -21,6 +21,8 @@ from core.config.settings import (
     prepare_runtime_directories,
 )
 from core.logging_config import configure_logging, get_logger
+from core.memory.retrieval import MemoryAccessError
+from core.orchestrator.service import OMNE
 from core.orchestrator.task import TaskStatus
 
 
@@ -61,11 +63,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "serve":
         return _run_serve(settings)
     if args.command == "execute":
-        return _run_execute(settings, args.objective)
+        return _run_execute(settings, args.objective, dry_run=bool(args.dry_run))
     if args.command == "compute":
         return _run_compute(settings)
-    print(f"error: unknown command {args.command}", file=sys.stderr)
-    return 2
+    return _run_inspection(settings, args)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -87,7 +88,28 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=None, help="override the configured bind port")
     execute = commands.add_parser("execute", help="plan and run one objective")
     execute.add_argument("objective", help="objective text")
+    execute.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="show the plan without running tools",
+    )
     commands.add_parser("compute", help="print one host resource snapshot")
+    mission = commands.add_parser("mission", help="inspect missions")
+    mission_commands = mission.add_subparsers(dest="mission_command", required=True)
+    mission_commands.add_parser("list", help="list missions")
+    show = mission_commands.add_parser("show", help="show one mission")
+    show.add_argument("mission_id")
+    commands.add_parser("world", help="print the current world state")
+    commands.add_parser("agents", help="list agents")
+    commands.add_parser("workers", help="list workers")
+    commands.add_parser("models", help="list models")
+    commands.add_parser("capabilities", help="list capabilities")
+    trace = commands.add_parser("trace", help="show one trace")
+    trace.add_argument("trace_id")
+    commands.add_parser("events", help="list recent events")
+    memory = commands.add_parser("memory", help="list one memory scope")
+    memory.add_argument("--scope", required=True)
+    memory.add_argument("--scope-key", required=True)
     return parser
 
 
@@ -116,9 +138,9 @@ def _run_check(settings: Settings) -> int:
     return 0
 
 
-def _run_execute(settings: Settings, objective: str) -> int:
+def _run_execute(settings: Settings, objective: str, *, dry_run: bool) -> int:
     try:
-        task = build_OMNE(settings).execute_sync(objective)
+        task = build_OMNE(settings).execute_sync(objective, dry_run=dry_run)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -128,6 +150,47 @@ def _run_execute(settings: Settings, objective: str) -> int:
     if task.status is TaskStatus.WAITING:
         return 3
     return 1
+
+
+def _run_inspection(settings: Settings, args: argparse.Namespace) -> int:
+    try:
+        runtime = build_OMNE(settings)
+        payload = _inspection_payload(runtime, args)
+    except (KeyError, ValueError, MemoryAccessError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(payload, sort_keys=True, default=str))
+    return 0
+
+
+def _inspection_payload(runtime: OMNE, args: argparse.Namespace) -> object:
+    if args.command == "mission" and args.mission_command == "list":
+        return {
+            "missions": [mission.model_dump(mode="json") for mission in runtime.list_missions()]
+        }
+    if args.command == "mission" and args.mission_command == "show":
+        return {"mission": runtime.get_mission(args.mission_id).model_dump(mode="json")}
+    if args.command == "world":
+        return {"world": runtime.world_view()}
+    if args.command == "agents":
+        return {"agents": runtime.agent_views()}
+    if args.command == "workers":
+        return {"workers": runtime.worker_views()}
+    if args.command == "models":
+        return {"models": runtime.model_views()}
+    if args.command == "capabilities":
+        return {"capabilities": runtime.capability_views()}
+    if args.command == "trace":
+        return runtime.trace_view(args.trace_id)
+    if args.command == "events":
+        return {
+            "events": [event.model_dump(mode="json") for event in runtime.list_events(limit=50)]
+        }
+    if args.command == "memory":
+        return {
+            "records": runtime.list_memory(scope=args.scope, scope_key=args.scope_key, limit=20)
+        }
+    raise ValueError(f"unknown command {args.command}")
 
 
 def _run_compute(settings: Settings) -> int:

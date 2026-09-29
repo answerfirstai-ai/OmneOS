@@ -1,78 +1,164 @@
 # Architecture
 
-OMNE OS is an orchestration layer above Linux. Linux owns the kernel, hardware, processes, and
-devices. OMNE plans work, checks permission, and calls a small set of tools. Models do not receive a
-shell.
-
-## Runtime
+OMNE OS is a user-space runtime on Linux. Linux owns the kernel, hardware, processes, and devices.
+OMNE plans work, checks permission, and calls a small set of tools. It is not a bootable operating
+system in this revision. Models do not receive a shell.
 
 ```text
-HUMAN
+USER
   |
   v
-SHELL (TypeScript) -- HTTP --> OMNE CORE (Python)
-                                 |
-                                 +-- planner
-                                 +-- scheduler and executor
-                                 +-- permission evaluator and audit
-                                 +-- tool gateway
-                                 +-- model router
-                                 +-- memory, events, compute
+INTENT ENGINE ---- WORLD STATE ---- CONTEXT BUILDER
+  |                      |                  |
+  +----------------------+------------------+
+                         |
+                         v
+                  DECISION ENGINE
+                         |
+                         v
+                      MISSION
+                         |
+                         v
+                     OBJECTIVE
+                         |
+                         v
+                       PLAN
+                         |
+                         v
+                    TASK GRAPH
+                         |
+                         v
+                 RESOURCE MANAGER
+                         |
+            +------------+------------+
+            v            v            v
+         WORKER       WORKER       WORKER
+            |            |            |
+          AGENT        AGENT        AGENT
+            |            |            |
+          MODEL        MODEL        MODEL
+            |            |            |
+          TOOLS        TOOLS        TOOLS
+            |            |            |
+       PERMISSIONS  PERMISSIONS  PERMISSIONS
+            +------------+------------+
+                         v
+                     VERIFIER
+                         |
+                         v
+                    WORLD STATE
+                         |
+                         v
+                      MEMORY
+                         |
+                         v
+                      RESULT
 ```
 
-`OMNE check` validates configuration and creates the workspace and data directories. `OMNE serve`
-exposes the local HTTP API. `OMNE execute` plans one objective and runs it. `OMNE compute` prints
-one resource snapshot from the host. `GET /desktop` returns parent tasks, agents, models, the latest
-events, and voice status in one response so the shell does not fan out across those endpoints.
-Compute stays on `GET /compute` because a snapshot can sample the host.
+The shell talks to OMNE Core over HTTP. `core.api.runtime.build_OMNE` assembles the process. Missing
+agent or model directories leave those registries empty.
 
-The programmatic entry is `core.api.main.main`. `core.api.runtime.build_OMNE` assembles the process.
-Missing agent or model directories leave those registries empty instead of inventing entries.
+## Commands
 
-## Tasks
+`OMNE check` validates configuration and creates the workspace and data directories. It does not
+build the runtime. `OMNE serve` exposes the local HTTP API. `OMNE execute` creates a mission for one
+objective and runs it. `OMNE execute --dry-run` stores the plan and does not call tools.
+`OMNE compute` prints one resource snapshot. Inspection commands print JSON: `mission list`,
+`mission show`, `world`, `agents`, `workers`, `models`, `capabilities`, `trace`, `events`, and
+`memory`.
 
-An objective becomes a parent task and one child task per plan node. Status changes go through the
-table in `core/orchestrator/task.py`. Dependencies run first. Independent children run together only
-when each has a free agent, the step is not exclusive, and the allocator returns ALLOW. A failed
-child moves to RECOVERING. While `retry_count` is below `retry_limit` it returns to QUEUED. After
-that it becomes FAILED with error code `escalated`.
+## Mission
 
-High-risk tools return CONFIRM in development and testing. The task waits. `confirm` with approval
-runs the stored arguments. Denial fails the task and does not execute the tool. Production denies
-those tools.
+A mission sits above the task graph. It is stored in `memory/missions.sqlite` and moves through
+CREATED, ANALYZING, PLANNING, READY, RUNNING, WAITING, VERIFYING, COMPLETED, FAILED, CANCELLED,
+PAUSED, and RECOVERING. Each change publishes a `mission.*` event. `OMNE execute` creates one
+mission for the objective. An ambiguous request such as "delete the project" becomes WAITING and
+records a question. A privileged or destructive terminal command is denied before any tool runs.
 
-## Tools and models
+## World state
 
-The gateway validates arguments, evaluates policy, writes an audit record, then executes. Tools do
-not run on the way into validation. Filesystem paths must stay inside the workspace. Commands use
-`shell=False`.
+`WorldStateService` keeps a revision and rebuilds from registries, the task store, missions,
+workers, a cached telemetry snapshot, and the workspace project. The cache lasts
+`world_state_ttl_seconds` unless an important event invalidates it. `GET /world` returns that
+document. GPU stays unavailable when `nvidia-smi` is absent. Configuration in the document does not
+include secrets.
 
-The mock provider is the default route. xAI is called only with `XAI_API_KEY` from the environment.
-A local provider with an empty base URL reports unavailable and does not open a socket. The model
-cache stores metadata and does not load weights. `model.loaded` is not emitted.
+## Intent and decision
 
-## Memory, voice, and compute
+`IntentEngine` parses known commands locally. It calls no model. A caller can pass model text when a
+model was already consulted. Unknown text falls back to a conversation intent. Ambiguous deletes and
+bare "fix it" / "do it" requests become questions.
 
-Memory records are scoped to conversation, task, project, long_term, or system. A caller cannot read
-a scope it was not granted. Retrieval is a bounded SQLite query, not a dump of the database.
+`DecisionEngine` chooses DIRECT_TOOL, LOCAL_MODEL, CLOUD_MODEL, HYBRID, DEFER, WAIT, ASK_USER, or
+DENY from the intent, execution mode, and declared availability. It does not map a task id to a
+model id. The existing planner still builds the task graph for requests that are allowed to run.
+`select()` remains priority-first so development and testing keep the mock route. `choose()` drops
+mock in production and drops cloud models in offline and local modes. A local model with an empty
+URL is UNAVAILABLE. `load()` does not download or map weights and does not emit `model.loaded`.
 
-Voice listen returns without opening a device unless the permission decision is ALLOW. The default
-policy denies `voice.transmit`, and no voice provider is configured.
+Execution mode is `OMNE_EXECUTION_MODE`. When it is omitted, development, testing, and production
+follow `OMNE_ENVIRONMENT`.
 
-CPU, memory, disk, and network come from the host. GPU telemetry uses `nvidia-smi` when it exists
-and otherwise reports `available: false`. Unknown values stay null. A full snapshot is reused for
-one second. A later CPU read can use the previous sample when it is already old enough, so
-allocation does not sleep on every batch. `system.cpu` still reads the host.
+## Agents and workers
 
-## Shell
+An agent is a manifest: identity, capabilities, tools, permissions, and `max_workers` (default 1).
+The coding agent allows two workers. A worker is one running slot with a task, mission, model, and
+trace. `admit_worker` denies a start at `max_workers` and waits when a measured CPU percent is at
+least 95. Unknown CPU does not count as free or busy capacity. Discovery loads `agent.toml` and
+`manifest.toml` only, so `tools.toml` and `permissions.toml` cannot grant anything by existing.
 
-The shell is a desktop. Icons and the OMNE menu open windows for the core, launcher, tasks, agents,
-models, notifications, and voice. The taskbar shows the clock, the character state, and the windows
-that are open. Clicking the front taskbar button hides that window. The page talks to the core over
-HTTP and does not open a microphone.
+## Capabilities, context, memory, and verification
+
+The capability registry lists tools, agents, and models. `GET /capabilities` returns it.
+
+The context builder ranks a few memory notes and the project name, then stops at the configured item
+and character limits. It does not send the memory database to a model. Memory rows gained `trace_id`
+and `source` columns. Older databases keep their rows. Context uses the task and project scopes
+only.
+
+The verifier checks file writes and HTML produced by `model_then_write`. Other results are
+INCONCLUSIVE. A FAIL blocks completion when `verification_required` is true, which is the default.
+An agent saying the work is done is not evidence.
+
+## Trace, events, and recovery
+
+`trace_id` is stored on the mission and copied onto events published in that context.
+`GET /traces/{trace_id}` returns the matching events and missions. Event replay folds those events
+into a state document and does not call tools.
+
+Recovery classifies failures and chooses retry, backoff, a different model, a different agent,
+replan, ask-user, or abort. Destructive tool failures are not retried. Retries stop at
+`task_retry_limit`. Replan and a different tool stop the current attempt and record the decision. A
+different model or agent is used only when another enabled candidate exists.
+
+## Permissions
+
+The gateway is still the only execution path. Command classes (READ_ONLY, MUTATING, PRIVILEGED,
+DESTRUCTIVE, NETWORK, PACKAGE_INSTALL, PROCESS_CONTROL, SYSTEM_CONFIGURATION) are attached to
+terminal and process decisions. The deny list is unchanged. Workers use the agent manifest grants
+for that call. They do not receive extra permissions because a mission exists.
+
+## Model cache
+
+The text cache key includes provider, model, model version, system text, prompt, tool definitions,
+world revision, context revision, and generation settings. A new mission changes the world revision,
+so the same sentence in a later mission is a miss. Tool results, permission decisions, and live
+telemetry are not cached. The cache emits hit, miss, bypass, and invalidation records.
+`cache_ttl_seconds` of 0 means the key, not the clock, decides freshness.
+
+## API and shell
+
+Existing routes stay in place. Added routes: missions, world, capabilities, workers, traces, memory,
+verification, graph, and questions. `GET /desktop` still returns tasks, agents, models, events, and
+voice, and also returns missions and workers. The shell opens Missions and Workers windows from that
+document. Character state still follows task status when no mission status is present. When mission
+statuses are present, analyzing, planning, verifying, and waiting come from those statuses. No
+character asset is shipped. Listen stays disabled.
+
+`GET /graph` lists nodes and edges that exist in the current stores. It does not invent a galaxy
+animation.
 
 ## Linux integration
 
-`scripts/linux/install.sh` installs a user systemd unit under the chosen prefix. It refuses `/boot`
-and does not change the bootloader. The image and VM scripts exit 2 without creating an ISO or
-starting QEMU.
+`scripts/linux/install.sh` installs a user systemd unit and refuses `/boot`. It does not change the
+bootloader. The image and VM scripts exit 2 and do not create an ISO or start QEMU.

@@ -172,9 +172,25 @@ def _allowed_origin(allowed_origins: list[str], origin: str | None) -> str | Non
 
 
 def _is_runtime_path(path: str) -> bool:
-    if path in {"/tasks", "/events", "/agents", "/models", "/compute", "/voice", "/desktop"}:
+    exact = {
+        "/tasks",
+        "/events",
+        "/agents",
+        "/models",
+        "/compute",
+        "/voice",
+        "/desktop",
+        "/missions",
+        "/world",
+        "/capabilities",
+        "/workers",
+        "/graph",
+        "/questions",
+        "/memory",
+    }
+    if path in exact:
         return True
-    return path.startswith("/tasks/")
+    return path.startswith(("/tasks/", "/missions/", "/workers/", "/traces/", "/verification/"))
 
 
 def _read_json_body(handler: BaseHTTPRequestHandler) -> dict[str, object]:

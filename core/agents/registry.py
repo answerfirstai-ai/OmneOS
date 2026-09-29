@@ -19,6 +19,8 @@ class AgentRegistry:
             return []
         loaded: list[AgentManifest] = []
         for path in sorted(directory.rglob("*.toml")):
+            if path.name not in {"agent.toml", "manifest.toml"}:
+                continue
             loaded.append(self.register(load_manifest(path, known_tools=known_tools)))
         return loaded
 

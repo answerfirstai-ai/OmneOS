@@ -1,0 +1,14 @@
+tools = [
+  "filesystem.read",
+  "filesystem.write",
+  "filesystem.search",
+  "filesystem.create_directory",
+  "terminal.execute",
+  "process.list",
+  "process.start",
+  "process.stop",
+  "git.status",
+  "git.diff",
+  "git.branch",
+  "git.commit",
+]

@@ -11,9 +11,12 @@ from core.compute.allocation import AllocationDecision
 from core.compute.monitor import SystemMonitor
 from core.compute.scheduler import ComputeScheduler
 from core.events.bus import EventBus
+from core.models.registry import ModelRegistry
 from core.orchestrator.executor.executor import ExecutionFailure, TaskExecutor
 from core.orchestrator.store import TaskStore
 from core.orchestrator.task import Task, TaskErrorRecord, TaskStatus
+from core.recovery.policy import RecoveryAction, classify_failure, decide_recovery
+from core.security.commands import is_destructive
 
 
 class TaskScheduler:
@@ -31,6 +34,8 @@ class TaskScheduler:
         runtime: AgentRuntime,
         lifecycle: AgentLifecycle,
         max_parallel: int,
+        models: ModelRegistry | None = None,
+        execution_mode: str = "testing",
     ) -> None:
         self._store = store
         self._executor = executor
@@ -41,6 +46,8 @@ class TaskScheduler:
         self._runtime = runtime
         self._lifecycle = lifecycle
         self._max_parallel = max_parallel
+        self._models = models
+        self._mode = execution_mode
 
     async def execute_parent(self, parent_id: str) -> Task:
         parent = self._store.get(parent_id)
@@ -105,6 +112,36 @@ class TaskScheduler:
                     ]
                     if task.status is TaskStatus.RUNNING:
                         task = self._store.transition(task, TaskStatus.RECOVERING, errors=errors)
+                    action = decide_recovery(
+                        classify_failure(exc.code),
+                        retry_count=task.retry_count,
+                        retry_limit=task.retry_limit,
+                        destructive=_task_is_destructive(task),
+                    )
+                    updates = _alternate_assignment(self, task, action)
+                    if updates is None:
+                        action = RecoveryAction.ABORT
+                    if action in {
+                        RecoveryAction.ABORT,
+                        RecoveryAction.ASK_USER,
+                        RecoveryAction.REPLAN,
+                        RecoveryAction.DIFFERENT_TOOL,
+                    }:
+                        failed = self._store.transition(
+                            task,
+                            TaskStatus.FAILED,
+                            errors=[
+                                *errors,
+                                TaskErrorRecord(code="escalated", message=action.value),
+                            ],
+                        )
+                        self._events.publish(
+                            "task.failed",
+                            task_id=failed.id,
+                            agent_id=failed.assigned_agent,
+                            payload={"code": exc.code, "recovery": action.value},
+                        )
+                        return failed
                     if task.retry_count >= task.retry_limit:
                         failed = self._store.transition(
                             task,
@@ -130,12 +167,13 @@ class TaskScheduler:
                         retry_count=task.retry_count + 1,
                         observations=[],
                         errors=errors,
+                        **(updates or {}),
                     )
                     self._events.publish(
                         "task.recovered",
                         task_id=task.id,
                         agent_id=task.assigned_agent,
-                        payload={"retry_count": task.retry_count},
+                        payload={"retry_count": task.retry_count, "recovery": action.value},
                     )
         finally:
             current = self._store.get(task.id)
@@ -144,7 +182,7 @@ class TaskScheduler:
 
     def _select_batch(self, ready: list[Task]) -> list[Task]:
         batch: list[Task] = []
-        used_agents: set[str] = set()
+        used_agents: dict[str, int] = {}
         snapshot = self._monitor.snapshot()
         for child in ready:
             if len(batch) >= self._max_parallel:
@@ -155,7 +193,7 @@ class TaskScheduler:
             if batch and any(bool(item.metadata.get("exclusive")) for item in batch):
                 continue
             agent_id = child.assigned_agent
-            if agent_id and (agent_id in used_agents or not self._agent_free(agent_id)):
+            if agent_id and not self._has_worker_slot(agent_id, used_agents.get(agent_id, 0)):
                 continue
             decision = self._compute.request(
                 child.required_resources,
@@ -167,10 +205,24 @@ class TaskScheduler:
                 continue
             batch.append(child)
             if agent_id:
-                used_agents.add(agent_id)
+                used_agents[agent_id] = used_agents.get(agent_id, 0) + 1
             if exclusive:
                 break
         return batch
+
+    def _worker_limit(self, agent_id: str) -> int:
+        try:
+            return self._agents.get(agent_id).max_workers
+        except KeyError:
+            return 1
+
+    def _has_worker_slot(self, agent_id: str, already_batched: int) -> bool:
+        limit = self._worker_limit(agent_id)
+        if self._runtime.active(agent_id) + already_batched >= limit:
+            return False
+        if limit > 1:
+            return True
+        return self._agent_free(agent_id)
 
     def _agent_free(self, agent_id: str) -> bool:
         try:
@@ -211,6 +263,72 @@ class TaskScheduler:
             parent = self._store.transition(parent, TaskStatus.CANCELLED)
         self._events.publish("task.cancelled", task_id=parent.id)
         return self._store.get(parent.id)
+
+
+def _alternate_assignment(
+    scheduler: TaskScheduler, task: Task, action: RecoveryAction
+) -> dict[str, str] | None:
+    """Return a field update, an empty update, or None when no alternate exists."""
+
+    if action is RecoveryAction.DIFFERENT_MODEL:
+        alternate = _other_model(scheduler, task)
+        if alternate is None:
+            return None
+        return {"assigned_model": alternate}
+    if action is RecoveryAction.DIFFERENT_AGENT:
+        alternate = _other_agent(scheduler, task)
+        if alternate is None:
+            return None
+        return {"assigned_agent": alternate}
+    return {}
+
+
+def _other_model(scheduler: TaskScheduler, task: Task) -> str | None:
+    models = scheduler._models
+    if models is None or task.assigned_model is None:
+        return None
+    try:
+        current = models.get(task.assigned_model)
+    except KeyError:
+        return None
+    required = set(current.capabilities)
+    candidates = [
+        model
+        for model in models.enabled()
+        if model.id != current.id and required <= set(model.capabilities)
+    ]
+    if scheduler._mode == "production":
+        candidates = [model for model in candidates if model.provider != "mock"]
+    if scheduler._mode in {"offline", "local"}:
+        candidates = [model for model in candidates if model.local]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda model: (model.priority, model.id))
+    return candidates[0].id
+
+
+def _other_agent(scheduler: TaskScheduler, task: Task) -> str | None:
+    current = task.assigned_agent
+    if current is None:
+        return None
+    try:
+        manifest = scheduler._agents.get(current)
+    except KeyError:
+        return None
+    for capability in manifest.capabilities:
+        for candidate in scheduler._agents.by_capability(capability):
+            if candidate.id != current and scheduler._agents.is_enabled(candidate.id):
+                return candidate.id
+    return None
+
+
+def _task_is_destructive(task: Task) -> bool:
+    for call in task.calls:
+        if call.tool_id in {"filesystem.write", "git.commit", "process.stop"}:
+            return True
+        if call.tool_id == "terminal.execute":
+            return is_destructive(call.arguments.get("argv"))
+    return False
 
 
 def _unapproved_waiting(children: list[Task]) -> bool:
