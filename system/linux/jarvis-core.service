@@ -1,0 +1,12 @@
+[Unit]
+Description=JARVIS Core
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/jarvis serve
+WorkingDirectory=%h
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

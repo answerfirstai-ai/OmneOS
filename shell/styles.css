@@ -22,10 +22,19 @@ body {
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
+.top,
 main {
-  max-width: 36rem;
+  max-width: 52rem;
   margin: 0 auto;
-  padding: 4.5rem 1.5rem;
+  padding: 1.5rem;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+  padding-bottom: 0;
 }
 
 .eyebrow {
@@ -36,24 +45,61 @@ main {
   text-transform: uppercase;
 }
 
-h1 {
-  margin: 0.4rem 0 0;
-  font-size: 2.4rem;
+h1,
+h2 {
+  margin: 0.35rem 0 0;
   font-weight: 560;
   letter-spacing: -0.03em;
 }
 
-.summary {
-  margin: 0.75rem 0 1.5rem;
+h1 {
+  font-size: 2.2rem;
+}
+
+h2 {
+  margin-bottom: 0.8rem;
   color: var(--muted);
-  line-height: 1.5;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#character {
+  margin: 0;
+  min-width: 7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  text-align: center;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+#character[data-state="success"] {
+  color: var(--ok);
+}
+
+#character[data-state="error"] {
+  color: var(--unavailable);
+}
+
+#character[data-state="thinking"],
+#character[data-state="working"],
+#character[data-state="listening"] {
+  color: var(--checking);
+}
+
+main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+  padding-top: 1rem;
 }
 
 .panel {
   border: 1px solid var(--line);
   border-radius: 0.75rem;
   background: var(--panel);
-  padding: 1.25rem 1.3rem;
+  padding: 1.1rem 1.2rem;
 }
 
 #status {
@@ -74,15 +120,40 @@ h1 {
   color: var(--unavailable);
 }
 
-#detail {
+#detail,
+#launch-result,
+#voice-status {
   margin: 0.7rem 0 0;
   color: var(--muted);
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
+label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--muted);
+}
+
+input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+}
+
+ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text);
+  line-height: 1.45;
+}
+
 button {
-  margin-top: 1rem;
+  margin-top: 0.8rem;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
@@ -92,7 +163,20 @@ button {
   cursor: pointer;
 }
 
-button:focus-visible {
+button:disabled {
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
+button:focus-visible,
+input:focus-visible {
   outline: 2px solid var(--checking);
   outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .top {
+    align-items: start;
+    flex-direction: column;
+  }
 }

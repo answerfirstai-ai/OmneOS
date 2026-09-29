@@ -1,0 +1,30 @@
+id = "system"
+name = "System"
+version = "0.1.0"
+description = "Inspects host telemetry and running processes."
+capabilities = ["system_inspection", "process_inspection"]
+tools = [
+  "system.cpu",
+  "system.memory",
+  "system.gpu",
+  "system.disk",
+  "system.network",
+  "process.list",
+]
+
+[permissions]
+system = ["read"]
+process = ["list"]
+
+[lifecycle]
+persistent = false
+startup = "on_demand"
+shutdown = "after_task"
+
+[resources]
+ram_mb = 64
+vram_mb = 0
+cpu_threads = 1
+disk_mb = 0
+ram_known = true
+vram_known = true

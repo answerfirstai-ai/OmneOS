@@ -1,38 +1,32 @@
 # Roadmap
 
-The implementation follows the JARVIS OS master specification. A phase starts only after the
-previous phase meets its acceptance criteria.
+## Implemented
 
-## Phase 1 — Foundation
+| Phase | What is in this revision                                          |
+| ----- | ----------------------------------------------------------------- |
+| 1     | Configuration, logging, health service, shell, CI                 |
+| 2     | Tasks, events, planner, executor, `jarvis execute`                |
+| 3     | Filesystem, terminal, process, system, git, and browser tools     |
+| 4     | Permission policy, confirmation, audit, fail-closed evaluator     |
+| 5     | Mock, xAI, and local providers, registry, and router              |
+| 6     | Agent manifests, registry, lifecycle, and the four default agents |
+| 7     | Scoped SQLite memory and access checks                            |
+| 8     | Host telemetry, allocation, and model-cache metadata              |
+| 9     | Dependency scheduling, bounded recovery, and result aggregation   |
+| 10    | Desktop shell with launcher, monitors, and notifications          |
+| 11    | Character state driven by health, voice, and task status          |
+| 12    | Voice status that stays silent without permission and a provider  |
+| 13    | User systemd unit, installer, and health command                  |
+| 14    | Image script that exits when it cannot build                      |
+| 15    | VM script that exits when no image is present                     |
 
-Implemented in this revision.
+## Not done
 
-- Python package `core` with configuration, logging, and a local health service.
-- TypeScript shell that displays core health.
-- Formatting, linting, type checks, tests, and a CI workflow.
-- Development, testing, and production configuration files.
+Phase 14 does not write `JARVIS-OS.iso`. The script exits 2 when it is not root or when
+`debootstrap` or `xorriso` is missing, and it still exits 2 when those tools exist because this
+revision does not download a base image.
 
-## Later phases
+Phase 15 does not boot a virtual machine. `scripts/linux/vm-boot.sh` exits 2 when the image or
+`qemu-system-x86_64` is absent.
 
-These phases are not implemented:
-
-| Phase | Subject                                                                      |
-| ----- | ---------------------------------------------------------------------------- |
-| 2     | Task model, state transitions, events, and a minimal execution path          |
-| 3     | Filesystem, terminal, process, system, and Git tools                         |
-| 4     | Permission policies, evaluation, confirmation, and audit                     |
-| 5     | Model provider interface, mock provider, xAI provider, registry, and routing |
-| 6     | Agent manifests, registry, lifecycle, and initial agents                     |
-| 7     | Scoped memory and retrieval                                                  |
-| 8     | Compute telemetry, allocation, and model-cache metadata                      |
-| 9     | Multi-agent orchestration and recovery                                       |
-| 10    | Desktop shell, launcher, search, and monitors                                |
-| 11    | Character renderer driven by core events                                     |
-| 12    | Voice providers                                                              |
-| 13    | Linux service integration                                                    |
-| 14    | Reproducible OS image                                                        |
-| 15    | Virtual machine acceptance                                                   |
-| 16    | Physical hardware, only with explicit approval                               |
-
-Protocol documents for agents, tools, models, compute, memory, and events will be added with the
-phase that introduces each protocol.
+Phase 16, physical hardware installation, has not been started.

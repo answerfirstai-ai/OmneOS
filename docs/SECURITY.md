@@ -1,57 +1,46 @@
 # Security
 
-Phase 1 has a narrow attack surface: configuration parsing, logging, and a local health service.
-This document describes that behavior. It does not claim coverage for agents, tools, or model
-providers, which are not implemented.
+JARVIS fails closed. A missing grant, an unknown tool, a policy exception, or an invalid decision is
+a denial.
 
 ## Secrets
 
-- Credentials are not required to run the foundation.
-- No API keys, tokens, passwords, or private certificates are stored in the repository.
-- `.env` is gitignored. `.env.example` contains only documented variable names and local defaults.
-- The process does not auto-load `.env`, so placing a secret file next to the code does not publish
-  it into the process.
+- `XAI_API_KEY` is read from the process environment when the xAI provider is constructed.
+- The key is not a `JARVIS_` setting, is not written to disk by the core, and is not returned by the
+  HTTP API.
+- `.env` is gitignored. The process does not auto-load it.
+- Unknown `JARVIS_` variables and unknown TOML keys are rejected.
 
-## Startup
+## Permissions
 
-Invalid configuration refuses to start and returns exit code 2. Unknown `JARVIS_` environment
-variables are rejected. Unknown TOML keys are rejected. The health service does not start when
-settings fail validation.
+Every tool call goes through `ToolGateway`. The default policy:
 
-## Network
+- Allows workspace filesystem reads, writes, search, and directory creation inside the workspace.
+- Denies paths outside the workspace, `.git` paths, and recursive removal.
+- Denies `sudo`, `su`, `doas`, `pkexec`, shutdown, disk partitioning, firewall, and bootloader
+  commands even when the caller has already approved a confirmation.
+- Requires confirmation for `terminal.execute`, `process.start`, `process.stop`, and `git.commit` in
+  development and testing.
+- Denies those high-risk tools in production.
+- Denies `voice.transmit`.
+- Denies signaling pid 1. The process tool also rejects pid 1 before a signal is sent.
 
-The default bind address is `127.0.0.1`. A non-loopback bind happens only when `JARVIS_HOST` or the
-TOML `host` field sets one, and the server logs a warning.
+Decisions are appended to the audit log. The evaluator turns policy exceptions into DENY with policy
+id `fail-closed`.
 
-`/health` and `/` return a fixed JSON document. The health document omits filesystem paths,
-environment variable values, and directory listings. Other paths return a JSON `not_found` error.
-Methods other than `GET` and `OPTIONS` return `method_not_allowed`.
+## Network and process
 
-CORS is fail-closed. When `cors_origins` is empty, responses include no
-`Access-Control-Allow-Origin` header. A request origin is echoed only when it is listed. `*` is the
-only way to allow every origin, and it cannot be mixed with specific origins.
+The default bind address is `127.0.0.1`. A non-loopback bind logs a warning. There is no
+authentication on the local API. Do not publish the port to an untrusted network.
 
-The development configuration allows the local shell origins `http://127.0.0.1:4173` and
-`http://localhost:4173`. The production configuration allows none.
+CORS stays empty unless `cors_origins` lists the request origin. `POST /health` is method not
+allowed. Task routes accept a JSON body up to 1 MB.
 
-There is no authentication on the health endpoint. The endpoint discloses the service name, version,
-environment name, and `status`. Do not publish the development port to an untrusted network. The
-Compose file publishes port 8787 for local use and should be treated as a development entry point.
+Terminal and process tools run with `shell=False`. The subprocess environment keeps `PATH`, `HOME`,
+`LANG`, `LC_ALL`, `TMPDIR`, and `SYSTEMROOT` only.
 
-## Host operations
+## Host changes
 
-Phase 1 does not install packages on the host, change boot configuration, or execute
-operator-supplied shell commands. The only filesystem writes performed by `jarvis check` and
-`jarvis serve` are creation of the configured workspace and data directories.
-
-## Container
-
-The container image definition runs the core as a non-root user. The image build itself was not
-executed in the Phase 1 development environment because Docker was not installed there. Review the
-Dockerfile before relying on it.
-
-## Later phases
-
-Tool execution, model requests, and agent actions are out of scope here. When they arrive, a central
-permission check has to run before any host operation. This phase does not weaken that future
-requirement: there is no side path that executes host commands.
+`jarvis check` and the installer create directories under the workspace, data directory, or the
+requested prefix. The installer refuses `/boot` and does not edit boot configuration. The image
+script does not write `JARVIS-OS.iso`. No physical disk installation is performed.

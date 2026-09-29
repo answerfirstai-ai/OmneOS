@@ -7,11 +7,13 @@ import threading
 from collections.abc import Mapping
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from core import __version__
+from core.api.routes import route_get, route_post
 from core.config.settings import Settings
 from core.logging_config import get_logger
+from core.orchestrator.service import Jarvis
 
 logger = get_logger("api")
 
@@ -40,9 +42,11 @@ class CoreHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = True
     daemon_threads = True
     settings: Settings
+    runtime: Jarvis | None
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, runtime: Jarvis | None = None) -> None:
         self.settings = settings
+        self.runtime = runtime
         super().__init__((settings.host, settings.port), CoreRequestHandler)
 
 
@@ -70,7 +74,25 @@ class CoreRequestHandler(BaseHTTPRequestHandler):
         )
 
     def do_POST(self) -> None:
-        self._reject_method()
+        status = HTTPStatus.INTERNAL_SERVER_ERROR
+        payload: Mapping[str, object] = {"error": "internal_error"}
+        try:
+            body = _read_json_body(self)
+            status, payload = route_post(self.server.runtime, urlparse(self.path).path, body)
+        except ValueError as exc:
+            status = HTTPStatus.BAD_REQUEST
+            payload = {"error": str(exc)}
+        except Exception:
+            logger.exception("request failed method=%s path=%s", self.command, self.path)
+            status = HTTPStatus.INTERNAL_SERVER_ERROR
+            payload = {"error": "internal_error"}
+        self._send_json(status, payload)
+        logger.info(
+            "request method=%s path=%s status=%s",
+            self.command,
+            urlparse(self.path).path,
+            int(status),
+        )
 
     def do_PUT(self) -> None:
         self._reject_method()
@@ -85,6 +107,8 @@ class CoreRequestHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.NO_CONTENT)
         self.send_header("Content-Length", "0")
         self.send_header("Connection", "close")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self._apply_cors()
         self.end_headers()
 
@@ -92,16 +116,19 @@ class CoreRequestHandler(BaseHTTPRequestHandler):
         """Suppress the default stderr access log; structured logs are used instead."""
 
     def _route_get(self) -> tuple[HTTPStatus, Mapping[str, object]]:
-        path = urlparse(self.path).path
-        if path == "/health":
+        parsed = urlparse(self.path)
+        if parsed.path == "/health":
             return HTTPStatus.OK, health_payload(self.server.settings)
-        if path == "/":
+        if parsed.path == "/":
             return HTTPStatus.OK, {
                 "service": "jarvis-core",
                 "version": __version__,
                 "health": "/health",
+                "tasks": "/tasks",
             }
-        return HTTPStatus.NOT_FOUND, {"error": "not_found", "path": path}
+        if _is_runtime_path(parsed.path):
+            return route_get(self.server.runtime, parsed.path, parse_qs(parsed.query))
+        return HTTPStatus.NOT_FOUND, {"error": "not_found", "path": parsed.path}
 
     def _reject_method(self) -> None:
         self._send_json(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"})
@@ -143,11 +170,36 @@ def _allowed_origin(allowed_origins: list[str], origin: str | None) -> str | Non
     return None
 
 
+def _is_runtime_path(path: str) -> bool:
+    if path in {"/tasks", "/events", "/agents", "/models", "/compute", "/voice"}:
+        return True
+    return path.startswith("/tasks/")
+
+
+def _read_json_body(handler: BaseHTTPRequestHandler) -> dict[str, object]:
+    raw_length = handler.headers.get("Content-Length", "0")
+    try:
+        length = int(raw_length)
+    except ValueError as exc:
+        raise ValueError("Content-Length must be an integer") from exc
+    if length < 0 or length > 1_000_000:
+        raise ValueError("request body is too large")
+    raw = handler.rfile.read(length) if length else b"{}"
+    try:
+        loaded = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("request body must be JSON") from exc
+    if not isinstance(loaded, dict):
+        raise ValueError("request body must be a JSON object")
+    return {str(key): value for key, value in loaded.items()}
+
+
 class CoreServer:
     """Lifecycle wrapper around :class:`CoreHTTPServer`."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, runtime: Jarvis | None = None) -> None:
         self.settings = settings
+        self.runtime = runtime
         self._httpd: CoreHTTPServer | None = None
         self._thread: threading.Thread | None = None
 
@@ -161,7 +213,7 @@ class CoreServer:
         if self._httpd is not None:
             raise RuntimeError("JARVIS Core server is already running")
         try:
-            self._httpd = CoreHTTPServer(self.settings)
+            self._httpd = CoreHTTPServer(self.settings, self.runtime)
         except OSError as exc:
             raise ServerError(
                 f"Unable to bind {self.settings.host}:{self.settings.port}: {exc.strerror}"

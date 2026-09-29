@@ -1,0 +1,17 @@
+id = "xai-default"
+provider = "xai"
+model_name = "grok-4"
+capabilities = ["reasoning", "coding", "planning", "tool_use"]
+local = false
+priority = 100
+cost_input = "unknown"
+cost_output = "unknown"
+latency = "unknown"
+
+[requirements]
+ram_mb = 0
+vram_mb = 0
+cpu_threads = 1
+disk_mb = 0
+ram_known = true
+vram_known = true

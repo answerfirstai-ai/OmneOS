@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jarvis-os"
 version = "0.1.0"
-description = "JARVIS OS core: configuration, logging, and a local health service."
+description = "JARVIS OS core: tasks, tools, permissions, models, and a local API."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }

@@ -1,0 +1,22 @@
+id = "research"
+name = "Research"
+version = "0.1.0"
+description = "Collects sources that are already available in the workspace."
+capabilities = ["source_collection", "summarization", "research"]
+tools = ["filesystem.read", "filesystem.search"]
+
+[permissions]
+filesystem = ["workspace"]
+
+[lifecycle]
+persistent = false
+startup = "on_demand"
+shutdown = "after_task"
+
+[resources]
+ram_mb = 64
+vram_mb = 0
+cpu_threads = 1
+disk_mb = 0
+ram_known = true
+vram_known = true

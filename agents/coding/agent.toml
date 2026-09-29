@@ -1,0 +1,38 @@
+id = "coding"
+name = "Coding"
+version = "0.1.0"
+description = "Writes and reviews files inside the workspace."
+capabilities = ["software_development", "code_analysis", "testing", "debugging"]
+tools = [
+  "filesystem.read",
+  "filesystem.write",
+  "filesystem.search",
+  "filesystem.create_directory",
+  "terminal.execute",
+  "process.list",
+  "process.start",
+  "process.stop",
+  "git.status",
+  "git.diff",
+  "git.branch",
+  "git.commit",
+]
+
+[permissions]
+filesystem = ["workspace"]
+terminal = ["workspace"]
+process = ["list", "start", "signal"]
+git = ["read", "commit"]
+
+[lifecycle]
+persistent = false
+startup = "on_demand"
+shutdown = "after_task"
+
+[resources]
+ram_mb = 64
+vram_mb = 0
+cpu_threads = 1
+disk_mb = 0
+ram_known = true
+vram_known = true

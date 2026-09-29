@@ -7,15 +7,53 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <header class="top">
+      <div>
+        <p class="eyebrow">JARVIS OS</p>
+        <h1>Desktop</h1>
+      </div>
+      <p id="character" data-state="idle">idle</p>
+    </header>
     <main id="app">
-      <p class="eyebrow">JARVIS OS</p>
-      <h1>Core</h1>
-      <p class="summary">Local status for the JARVIS Core process.</p>
       <section class="panel" aria-live="polite">
+        <h2>Core</h2>
         <p id="status" data-state="checking">checking</p>
         <p id="detail"></p>
+        <button id="refresh" type="button">Check again</button>
       </section>
-      <button id="refresh" type="button">Check again</button>
+      <form id="launcher" class="panel">
+        <h2>Launcher</h2>
+        <label for="objective">Objective</label>
+        <input
+          id="objective"
+          name="objective"
+          type="text"
+          placeholder="write file notes.txt with content hello"
+        />
+        <button type="submit">Run</button>
+        <p id="launch-result"></p>
+      </form>
+      <section class="panel">
+        <h2>Tasks</h2>
+        <ul id="tasks"></ul>
+      </section>
+      <section class="panel">
+        <h2>Agents</h2>
+        <ul id="agents"></ul>
+      </section>
+      <section class="panel">
+        <h2>Models</h2>
+        <ul id="models"></ul>
+      </section>
+      <section class="panel">
+        <h2>Notifications</h2>
+        <ul id="notifications"></ul>
+      </section>
+      <section class="panel">
+        <h2>Voice</h2>
+        <p id="voice-status">unavailable</p>
+        <button id="voice-listen" type="button" disabled>Listen</button>
+      </section>
     </main>
     <script type="module" src="./dist/main.js"></script>
   </body>

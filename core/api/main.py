@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import signal
 import sys
 import threading
@@ -10,6 +11,7 @@ from pathlib import Path
 from types import FrameType
 
 from core import __version__
+from core.api.runtime import build_jarvis
 from core.api.server import CoreServer, ServerError
 from core.config.errors import ConfigurationError
 from core.config.settings import (
@@ -19,6 +21,7 @@ from core.config.settings import (
     prepare_runtime_directories,
 )
 from core.logging_config import configure_logging, get_logger
+from core.orchestrator.task import TaskStatus
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -57,6 +60,10 @@ def main(argv: list[str] | None = None) -> int:
         return _run_check(settings)
     if args.command == "serve":
         return _run_serve(settings)
+    if args.command == "execute":
+        return _run_execute(settings, args.objective)
+    if args.command == "compute":
+        return _run_compute(settings)
     print(f"error: unknown command {args.command}", file=sys.stderr)
     return 2
 
@@ -64,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="jarvis",
-        description="JARVIS Core foundation commands.",
+        description="JARVIS Core commands.",
     )
     parser.add_argument("--version", action="store_true", help="print the core version and exit")
     parser.add_argument(
@@ -75,9 +82,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("check", help="load configuration, prepare directories, and exit")
-    serve = commands.add_parser("serve", help="serve the local core health endpoint")
+    serve = commands.add_parser("serve", help="serve the local core HTTP API")
     serve.add_argument("--host", default=None, help="override the configured bind host")
     serve.add_argument("--port", type=int, default=None, help="override the configured bind port")
+    execute = commands.add_parser("execute", help="plan and run one objective")
+    execute.add_argument("objective", help="objective text")
+    commands.add_parser("compute", help="print one host resource snapshot")
     return parser
 
 
@@ -106,9 +116,35 @@ def _run_check(settings: Settings) -> int:
     return 0
 
 
+def _run_execute(settings: Settings, objective: str) -> int:
+    try:
+        task = build_jarvis(settings).execute_sync(objective)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps({"id": task.id, "status": task.status.value}, sort_keys=True))
+    if task.status is TaskStatus.COMPLETED:
+        return 0
+    if task.status is TaskStatus.WAITING:
+        return 3
+    return 1
+
+
+def _run_compute(settings: Settings) -> int:
+    snapshot = build_jarvis(settings).compute_status()
+    print(json.dumps(snapshot.model_dump(), sort_keys=True))
+    return 0
+
+
 def _run_serve(settings: Settings) -> int:
     logger = get_logger("api")
-    server = CoreServer(settings)
+    try:
+        runtime = build_jarvis(settings)
+    except ValueError as exc:
+        logger.error("%s", exc)
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    server = CoreServer(settings, runtime)
 
     def _request_stop(signum: int, _frame: FrameType | None) -> None:
         logger.info("shutdown requested signal=%s", signum)

@@ -117,6 +117,23 @@ def test_allowed_origin_is_echoed(server: CoreServer) -> None:
     assert origin == "http://127.0.0.1:4173"
 
 
+def test_options_allows_json_post_from_the_shell(server: CoreServer) -> None:
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{server.port}/tasks",
+        headers={
+            "Origin": "http://127.0.0.1:4173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+        method="OPTIONS",
+    )
+    with urllib.request.urlopen(request, timeout=2) as response:
+        assert response.status == 204
+        assert response.headers.get("Access-Control-Allow-Origin") == "http://127.0.0.1:4173"
+        assert "POST" in (response.headers.get("Access-Control-Allow-Methods") or "")
+        assert "Content-Type" in (response.headers.get("Access-Control-Allow-Headers") or "")
+
+
 def test_disallowed_origin_is_omitted(server: CoreServer) -> None:
     _status, _body, origin = _request(
         f"http://127.0.0.1:{server.port}/health",

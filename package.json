@@ -12,7 +12,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "test": "tsc -p shell/tsconfig.test.json && node --test shell/dist-test/health.test.js shell/dist-test/shell.test.js",
+    "test": "tsc -p shell/tsconfig.test.json && node --test shell/dist-test/**/*.test.js",
     "typecheck": "tsc -p shell/tsconfig.json --noEmit && tsc -p shell/tsconfig.test.json --noEmit"
   },
   "devDependencies": {

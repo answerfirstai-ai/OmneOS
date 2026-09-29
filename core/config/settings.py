@@ -29,6 +29,17 @@ ENV_TO_FIELD: dict[str, str] = {
     "JARVIS_WORKSPACE_ROOT": "workspace_root",
     "JARVIS_DATA_DIR": "data_dir",
     "JARVIS_CORS_ORIGINS": "cors_origins",
+    "JARVIS_MAX_PARALLEL_TASKS": "max_parallel_tasks",
+    "JARVIS_TASK_RETRY_LIMIT": "task_retry_limit",
+    "JARVIS_TOOL_TIMEOUT_SECONDS": "tool_timeout_seconds",
+    "JARVIS_XAI_BASE_URL": "xai_base_url",
+    "JARVIS_XAI_MODEL": "xai_model",
+    "JARVIS_XAI_TIMEOUT_SECONDS": "xai_timeout_seconds",
+    "JARVIS_XAI_MAX_RETRIES": "xai_max_retries",
+    "JARVIS_LOCAL_MODEL_BASE_URL": "local_model_base_url",
+    "JARVIS_BROWSER_COMMAND": "browser_command",
+    "JARVIS_AGENTS_DIR": "agents_dir",
+    "JARVIS_MODELS_DIR": "models_dir",
 }
 
 KNOWN_ENVIRONMENT_VARIABLES: frozenset[str] = frozenset(ENV_TO_FIELD) | {"JARVIS_CONFIG"}
@@ -47,6 +58,17 @@ class Settings(BaseModel):
     workspace_root: Path = Path("workspace")
     data_dir: Path = Path("memory")
     cors_origins: list[str] = Field(default_factory=list)
+    max_parallel_tasks: int = Field(default=2, ge=1, le=32)
+    task_retry_limit: int = Field(default=2, ge=0, le=10)
+    tool_timeout_seconds: int = Field(default=15, ge=1, le=120)
+    xai_base_url: str = "https://api.x.ai/v1"
+    xai_model: str = "grok-4"
+    xai_timeout_seconds: int = Field(default=30, ge=1, le=300)
+    xai_max_retries: int = Field(default=2, ge=0, le=5)
+    local_model_base_url: str = ""
+    browser_command: str = ""
+    agents_dir: Path = Path("agents")
+    models_dir: Path = Path("models/manifests")
 
     @field_validator("log_level", mode="before")
     @classmethod
@@ -72,6 +94,34 @@ class Settings(BaseModel):
         if "*" in cleaned and cleaned != ["*"]:
             raise ValueError("CORS origin * cannot be combined with other origins")
         return cleaned
+
+    @field_validator("xai_base_url")
+    @classmethod
+    def _validate_xai_base_url(cls, value: str) -> str:
+        stripped = value.strip().rstrip("/")
+        if not stripped.startswith("https://"):
+            raise ValueError("xai_base_url must start with https://")
+        return stripped
+
+    @field_validator("xai_model")
+    @classmethod
+    def _validate_xai_model(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("xai_model must not be empty")
+        return stripped
+
+    @field_validator("local_model_base_url", "browser_command")
+    @classmethod
+    def _strip_optional(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("local_model_base_url")
+    @classmethod
+    def _validate_local_model_url(cls, value: str) -> str:
+        if value and not (value.startswith("http://") or value.startswith("https://")):
+            raise ValueError("local_model_base_url must start with http:// or https://")
+        return value.rstrip("/")
 
 
 def load_settings(
@@ -105,6 +155,8 @@ def load_settings(
         update={
             "workspace_root": _resolve_path(working_directory, settings.workspace_root),
             "data_dir": _resolve_path(working_directory, settings.data_dir),
+            "agents_dir": _resolve_path(working_directory, settings.agents_dir),
+            "models_dir": _resolve_path(working_directory, settings.models_dir),
         }
     )
 

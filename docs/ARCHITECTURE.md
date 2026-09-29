@@ -1,125 +1,68 @@
 # Architecture
 
-JARVIS OS is an AI-native operating environment for x86-64 workstations. Linux remains the kernel
-and the owner of hardware, process, memory, networking, filesystem, device, security, and graphics
-infrastructure. JARVIS is the orchestration layer and user-facing environment above that platform.
+JARVIS OS is an orchestration layer above Linux. Linux owns the kernel, hardware, processes, and
+devices. JARVIS plans work, checks permission, and calls a small set of tools. Models do not receive
+a shell.
 
-Phase 1 implements only the foundation required to install, configure, log, test, and start that
-layer. Later subsystems stay behind the boundaries below and are not present in this revision.
-
-## Phase 1 runtime
+## Runtime
 
 ```text
 HUMAN
   |
   v
-SHELL (TypeScript, static page)
-  |
-  |  HTTP GET /health
-  v
-JARVIS CORE (Python)
-  |
-  +-- configuration
-  +-- logging
-  +-- local health service
-  |
-  v
-workspace/ and memory/ directories
+SHELL (TypeScript) -- HTTP --> JARVIS CORE (Python)
+                                 |
+                                 +-- planner
+                                 +-- scheduler and executor
+                                 +-- permission evaluator and audit
+                                 +-- tool gateway
+                                 +-- model router
+                                 +-- memory, events, compute
 ```
 
-The core process is usable without the shell. The shell is a separate program that reads the public
-health document. It does not import Python and it does not execute host commands.
+`jarvis check` validates configuration and creates the workspace and data directories.
+`jarvis serve` exposes the local HTTP API. `jarvis execute` plans one objective and runs it.
+`jarvis compute` prints one resource snapshot from the host.
 
-## Process entry
+The programmatic entry is `core.api.main.main`. `core.api.runtime.build_jarvis` assembles the
+process. Missing agent or model directories leave those registries empty instead of inventing
+entries.
 
-- `jarvis check` loads configuration, creates the runtime directories, emits a log record, and
-  exits.
-- `jarvis serve` binds a local HTTP server. `GET /health` returns the public status document.
-  `GET /` returns a short service description.
-- `python -m core` uses the same command parser.
+## Tasks
 
-The programmatic entry for this phase is `core.api.main.main`. A task execution API is part of Phase
-2 and is intentionally absent.
+An objective becomes a parent task and one child task per plan node. Status changes go through the
+table in `core/orchestrator/task.py`. Dependencies run first. Independent children run together only
+when each has a free agent, the step is not exclusive, and the allocator returns ALLOW. A failed
+child moves to RECOVERING. While `retry_count` is below `retry_limit` it returns to QUEUED. After
+that it becomes FAILED with error code `escalated`.
 
-## Configuration
+High-risk tools return CONFIRM in development and testing. The task waits. `confirm` with approval
+runs the stored arguments. Denial fails the task and does not execute the tool. Production denies
+those tools.
 
-Settings are a typed pydantic model. `load_settings` merges sources in this order:
+## Tools and models
 
-1. Built-in defaults.
-2. A TOML file, when one is selected.
-3. `JARVIS_` environment variables, which override the file.
+The gateway validates arguments, evaluates policy, writes an audit record, then executes. Tools do
+not run on the way into validation. Filesystem paths must stay inside the workspace. Commands use
+`shell=False`.
 
-File selection:
+The mock provider is the default route. xAI is called only with `XAI_API_KEY` from the environment.
+A local provider with an empty base URL reports unavailable and does not open a socket. The model
+cache stores metadata and does not load weights. `model.loaded` is not emitted.
 
-- `--config` or `JARVIS_CONFIG` when either is set. A missing file is an error.
-- Otherwise `configs/<JARVIS_ENVIRONMENT>/jarvis.toml` relative to the working directory, when that
-  file exists.
-- Otherwise defaults only.
+## Memory, voice, and compute
 
-Relative `workspace_root` and `data_dir` values resolve against the process working directory. The
-supported environment names are `development`, `testing`, and `production`. Unknown `JARVIS_`
-variables and unknown TOML keys are errors, so a misspelled setting refuses startup.
+Memory records are scoped to conversation, task, project, long_term, or system. A caller cannot read
+a scope it was not granted. Retrieval is a bounded SQLite query, not a dump of the database.
 
-JARVIS does not read `.env` files. `.env.example` documents the variables an operator can export.
-This keeps secrets out of an implicit loader.
+Voice listen returns without opening a device unless the permission decision is ALLOW. The default
+policy denies `voice.transmit`, and no voice provider is configured.
 
-## Logging
+CPU, memory, disk, and network come from the host. GPU telemetry uses `nvidia-smi` when it exists
+and otherwise reports `available: false`. Unknown values stay null.
 
-Logs are emitted on the `jarvis` logger hierarchy. The format is `text` or `json`, selected by
-configuration. Configuring logging again replaces the previous handler. Library code does not
-configure logging on import; the command entry point does.
+## Linux integration
 
-## HTTP service
-
-The server uses the Python standard library. It binds to `127.0.0.1` and port `8787` unless
-configuration overrides those values. Binding `0.0.0.0` or `::` is allowed only by explicit
-configuration and produces a warning.
-
-Responses are JSON. The health document contains `status`, `service`, `version`, and `environment`.
-It does not include filesystem paths. Browser origins are echoed only when they appear in
-`cors_origins`. An empty list sends no CORS header. The value `*` allows any origin and cannot be
-combined with other entries.
-
-## Shell
-
-The TypeScript project in `shell/` compiles to ES modules. `shell/index.html` loads the built module
-and requests `/health`. The core base URL defaults to `http://127.0.0.1:8787` and can be overridden
-with `?core=`.
-
-## Packaging
-
-`Dockerfile` and `docker-compose.yml` describe a reproducible core process. They are not an
-operating-system image. Image generation belongs to a later phase. The container listens on all
-interfaces inside its network namespace because the process must accept connections published by
-Compose. The image runs as the unprivileged `jarvis` user.
-
-## Decisions that differ from the target tree
-
-The target repository diagram includes protocol documents and packages for agents, tools, models,
-memory services, permissions, and compute. Those files are omitted until the phase that implements
-them. Creating them now would describe behavior the process does not have.
-
-The Python package lives at `core/` and imports as `core`, matching the diagram. The shell stays in
-`shell/` and is built by the root `package.json`.
-
-The license is MIT. The specification requires a license file and does not name one.
-
-## Boundaries reserved for later phases
-
-These concerns stay separate as their implementations arrive:
-
-- Core orchestration
-- Models and model providers
-- Agents
-- Tools
-- Permissions
-- Memory beyond the on-disk data directory
-- Events
-- Compute management
-- The full desktop shell
-- Linux integration
-- Image generation
-
-No model provider is wired into core. No tool can execute host commands in this phase because no
-tool interface exists. Adding those paths later must go through the permission system required by
-the specification.
+`scripts/linux/install.sh` installs a user systemd unit under the chosen prefix. It refuses `/boot`
+and does not change the bootloader. The image and VM scripts exit 2 without creating an ISO or
+starting QEMU.

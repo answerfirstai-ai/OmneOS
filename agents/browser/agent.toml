@@ -1,0 +1,22 @@
+id = "browser"
+name = "Browser"
+version = "0.1.0"
+description = "Opens a configured browser command. Navigation is unavailable until one is set."
+capabilities = ["browser_navigation", "page_extraction"]
+tools = ["browser.open", "browser.search"]
+
+[permissions]
+browser = ["navigate"]
+
+[lifecycle]
+persistent = false
+startup = "on_demand"
+shutdown = "after_task"
+
+[resources]
+ram_mb = 64
+vram_mb = 0
+cpu_threads = 1
+disk_mb = 0
+ram_known = true
+vram_known = true
