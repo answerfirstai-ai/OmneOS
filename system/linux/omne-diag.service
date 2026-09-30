@@ -1,18 +1,15 @@
 [Unit]
-Description=OMNE boot
-After=omne-core.service systemd-user-sessions.service
+Description=OMNE boot diagnostics
+After=multi-user.target omne-boot.service
 Wants=omne-core.service
-Conflicts=getty@tty1.service
-Before=getty@tty1.service
 
 [Service]
-Type=idle
-ExecStart=/usr/bin/omne-boot
+Type=oneshot
+Environment=OMNE_ENVIRONMENT=production
+Environment=OMNE_CONFIG=/etc/omne/OMNE.toml
+ExecStart=/usr/bin/omne-diag
 StandardOutput=journal+console
 StandardError=journal+console
-DeviceAllow=/dev/ttyS0 rw
-DeviceAllow=/dev/console rw
-DeviceAllow=/dev/tty1 rw
 Restart=no
 NoNewPrivileges=true
 ProtectSystem=strict
@@ -29,4 +26,4 @@ CapabilityBoundingSet=
 InaccessiblePaths=-/boot -/efi -/etc/shadow -/etc/gshadow -/etc/sudoers -/etc/ssh
 
 [Install]
-WantedBy=omne.target
+WantedBy=multi-user.target

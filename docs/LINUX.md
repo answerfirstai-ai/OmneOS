@@ -91,10 +91,15 @@ those programs from the application reader. See `docs/APPLICATIONS.md`. Browser 
 installed with the image. Playwright is documented and not imported. See `docs/BROWSER.md`. Process
 inspection reads `/proc` and does not signal a running process. See `docs/PROCESSES.md`.
 
-`omne-boot` is the tty1 program. It prints Hardware, Storage, Network, GPU, Core, and Models from
-the live machine and from `GET /health` and `GET /models`. A check is printed only when that probe
-succeeds. An unavailable GPU stays unavailable. `OMNE READY` requires hardware, storage, and the
-core. Network, GPU, and models are shown either way.
+`omne-boot` prints Hardware, Storage, Network, GPU, Core, and Models from the live machine and from
+`GET /health` and `GET /models`. A check is printed only when that probe succeeds. An unavailable
+GPU stays unavailable. `OMNE READY` requires hardware, storage, and the core. Network, GPU, and
+models are shown either way. The unit sends that checklist to the journal and to `/dev/console`, and
+the program also writes `/dev/ttyS0`, so a serial boot log can see it. `ipc ok` is printed only
+after `GET /health` returns the core payload. `omne-diag` runs after `multi-user.target` and records
+unit state and the journal. It does not delay that target, start a session, or enter recovery.
+`omne-session` starts labwc after the same target, with no display manager. It prints
+`labwc running` only after the Wayland socket exists.
 
 ```bash
 sudo bash scripts/linux/build-disk.sh --rootfs /var/tmp/omne-rootfs --dest /var/tmp/OMNE-OS.img
@@ -107,5 +112,6 @@ bash scripts/linux/vm-test.sh --iso /var/tmp/OMNE-OS.iso
 `vm-test.sh` is the headless ISO boot test. It exits 0 only when the guest reaches the OMNE desktop.
 See `docs/VM_TEST.md`. `scripts/linux/build-iso.sh` writes a bootable ISO in a temporary directory
 when it is root on Ubuntu 24.04 x86-64. The build is described in `docs/ISO_BUILD.md`. The graphical
-session is labwc, described in `docs/GRAPHICS_ARCHITECTURE.md`. The ISO installs labwc and does not
-start it. A physical install is later.
+session is labwc, described in `docs/GRAPHICS_ARCHITECTURE.md`. The ISO installs labwc and starts it
+from `omne-session` after `multi-user.target`. A display manager is not installed. A physical
+install is later.

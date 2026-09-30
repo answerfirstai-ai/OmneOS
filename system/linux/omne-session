@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""Start labwc and report the session only after its Wayland socket exists.
+
+This process is the session. It does not print a success line for a compositor
+that exited, and it does not launch applications, agents, models, or recovery.
+"""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+_SHELL_URL = "http://127.0.0.1:4173/"
+_OWNED_APPLICATION = "/usr/lib/omne/applications/omne-hello"
+_REBOOT_SOCKET = "/run/omne-reboot.sock"
+
+
+def session_markers(*, alive: bool, socket_ready: bool, desktop_ready: bool) -> list[str]:
+    """Lines the serial log may score. Empty until labwc owns a Wayland socket."""
+
+    if not alive or not socket_ready:
+        return []
+    lines = ["labwc running", "wayland display ready"]
+    if desktop_ready:
+        lines.append("OMNE desktop ready")
+    return lines
+
+
+def renderer_environment(device_names: list[str]) -> dict[str, str]:
+    """Use pixman when the DRM device has no render node."""
+
+    if any(name.startswith("renderD") for name in device_names):
+        return {}
+    return {"WLR_RENDERER": "pixman"}
+
+
+def labwc_environment(base: dict[str, str], device_names: list[str]) -> dict[str, str]:
+    """Run labwc on DRM. A preset WAYLAND_DISPLAY would select the nested backend."""
+
+    env = dict(base)
+    env.pop("WAYLAND_DISPLAY", None)
+    env.pop("DISPLAY", None)
+    env["WLR_BACKENDS"] = "drm"
+    env.update(renderer_environment(device_names))
+    return env
+
+
+def startup_environments(base: dict[str, str], device_names: list[str]) -> list[dict[str, str]]:
+    """Prefer the GPU renderer, then pixman when EGL cannot create a screen."""
+
+    primary = labwc_environment(base, device_names)
+    environments = [primary]
+    if "WLR_RENDERER" not in primary:
+        fallback = dict(primary)
+        fallback["WLR_RENDERER"] = "pixman"
+        environments.append(fallback)
+    return environments
+
+
+def _write_config(home: str) -> None:
+    directory = Path(home) / ".config" / "labwc"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "rc.xml").write_text(
+        '<?xml version="1.0"?>\n'
+        "<labwc_config>\n"
+        "  <core>\n"
+        "    <xwayland>no</xwayland>\n"
+        "  </core>\n"
+        "  <keyboard>\n"
+        '    <keybind key="C-A-Delete">\n'
+        '      <action name="Execute" command="/usr/lib/omne/request-reboot" />\n'
+        "    </keybind>\n"
+        "  </keyboard>\n"
+        "</labwc_config>\n",
+        encoding="utf-8",
+    )
+
+
+def _device_names() -> list[str]:
+    directory = Path("/dev/dri")
+    try:
+        return sorted(path.name for path in directory.iterdir()) if directory.is_dir() else []
+    except OSError:
+        return []
+
+
+def _socket_ready(path: Path) -> bool:
+    try:
+        return path.is_socket()
+    except OSError:
+        return False
+
+
+def _desktop_ready() -> bool:
+    request = urllib.request.Request(_SHELL_URL, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=3) as response:
+            body = response.read().decode("utf-8", errors="replace")
+    except (OSError, urllib.error.URLError, UnicodeError, ValueError):
+        return False
+    return 'id="desktop"' in body
+
+
+def _wait_for_socket(process: subprocess.Popen[bytes], socket_path: Path, seconds: float) -> bool:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            return False
+        if _socket_ready(socket_path):
+            return True
+        time.sleep(0.2)
+    return _socket_ready(socket_path) and process.poll() is None
+
+
+def _stop(process: subprocess.Popen[bytes]) -> None:
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+
+
+def launch_owned_application(argv: list[str], *, returncode: int) -> str | None:
+    """The serial marker for the one OMNE-owned program. Desktop Exec lines stay refused."""
+
+    if argv != [_OWNED_APPLICATION] or returncode != 0:
+        return None
+    return "application launched"
+
+
+def _run_owned_application() -> None:
+    completed = subprocess.run([_OWNED_APPLICATION], check=False, timeout=10)
+    marker = launch_owned_application([_OWNED_APPLICATION], returncode=completed.returncode)
+    if marker is None:
+        print(f"application_error=exit {completed.returncode}", flush=True)
+        return
+    print(marker, flush=True)
+
+
+def _launch(labwc: str, env: dict[str, str], socket_path: Path) -> int:
+    try:
+        process = subprocess.Popen([labwc], env=env)
+    except OSError as exc:
+        print(f"labwc_error={type(exc).__name__}: {exc}", flush=True)
+        return 1
+    ready = _wait_for_socket(process, socket_path, 20)
+    desktop = _desktop_ready() if ready else False
+    for line in session_markers(
+        alive=process.poll() is None,
+        socket_ready=ready,
+        desktop_ready=desktop,
+    ):
+        print(line, flush=True)
+    if ready:
+        try:
+            _run_owned_application()
+        except OSError as exc:
+            print(f"application_error={type(exc).__name__}: {exc}", flush=True)
+    if not ready:
+        _stop(process)
+        return 1
+    return process.wait()
+
+
+def main() -> int:
+    runtime = os.environ.get("XDG_RUNTIME_DIR", "/run/omne")
+    home = os.environ.get("HOME", "/var/lib/omne")
+    display = "wayland-0"
+    labwc = os.environ.get("OMNE_LABWC", "/usr/bin/labwc")
+    try:
+        _write_config(home)
+    except OSError as exc:
+        print(f"labwc_config_error={type(exc).__name__}: {exc}", flush=True)
+    socket_path = Path(runtime) / display
+    status = 1
+    for env in startup_environments(dict(os.environ), _device_names()):
+        env["XDG_RUNTIME_DIR"] = runtime
+        env["HOME"] = home
+        status = _launch(labwc, env, socket_path)
+        if status != 1:
+            return status
+    print("labwc_error=wayland socket was not created", flush=True)
+    return status
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

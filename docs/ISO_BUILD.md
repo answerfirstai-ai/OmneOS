@@ -16,7 +16,7 @@ UEFI
     → initramfs (iso9660)
     → systemd
     → systemd-networkd
-    → labwc (installed, not started)
+    → labwc (omne-session, after multi-user.target)
     → omne-core, omne-shell, omne-system
     → OMNE recovery
 ```

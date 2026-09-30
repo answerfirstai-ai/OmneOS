@@ -92,6 +92,7 @@ def test_ready_screen_uses_real_passes(tmp_path: Path) -> None:
     assert "✓ Network" in text
     assert "✓ GPU" in text
     assert "✓ Core" in text
+    assert "ipc ok" in text
     assert "✓ Models" in text
     assert text.rstrip().endswith("OMNE READY")
     assert "loaded" not in text.lower()
@@ -132,6 +133,7 @@ def test_core_failure_is_not_ready(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "× Core" in result.stdout  # noqa: RUF001
+    assert "ipc ok" not in result.stdout
     assert "· Models unavailable" in result.stdout
     assert "OMNE NOT READY" in result.stdout
     assert "OMNE READY" not in result.stdout

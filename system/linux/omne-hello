@@ -1,0 +1,3 @@
+#!/bin/sh
+# OMNE-owned readiness program. It is not a desktop Exec line.
+printf '%s\n' omne-hello

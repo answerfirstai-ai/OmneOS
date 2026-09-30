@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""Ask the root reboot socket to enter reboot.target. This is not a shell."""
+
+from __future__ import annotations
+
+import socket
+import sys
+
+_SOCKET = "/run/omne-reboot.sock"
+
+
+def main() -> int:
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        client.connect(_SOCKET)
+    except OSError as exc:
+        print(f"reboot_error={type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        client.close()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -41,7 +41,8 @@ DevicePolicy=closed
 MemoryMax=256M
 TasksMax=32
 ReadOnlyPaths=/usr/share/omne/shell
-InaccessiblePaths=/boot /efi /root /etc/shadow /etc/gshadow /etc/sudoers /etc/ssh /etc/omne /var/lib/omne
+# A leading '-' skips a path that is not on this image. /efi is absent on the live ISO.
+InaccessiblePaths=-/boot -/efi -/root -/etc/shadow -/etc/gshadow -/etc/sudoers -/etc/ssh -/etc/omne -/var/lib/omne
 
 [Install]
 WantedBy=omne.target

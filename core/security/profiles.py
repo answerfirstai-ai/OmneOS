@@ -94,7 +94,7 @@ _CORE_SANDBOX = (
     "TasksMax=64",
     "CPUQuota=200%",
     "LimitNOFILE=1024",
-    "InaccessiblePaths=/boot /efi /root /etc/shadow /etc/gshadow /etc/sudoers /etc/ssh",
+    "InaccessiblePaths=-/boot -/efi -/root -/etc/shadow -/etc/gshadow -/etc/sudoers -/etc/ssh",
 )
 
 _SHELL_SANDBOX = (
@@ -128,8 +128,8 @@ _SHELL_SANDBOX = (
     "MemoryMax=256M",
     "TasksMax=32",
     "ReadOnlyPaths=/usr/share/omne/shell",
-    "InaccessiblePaths=/boot /efi /root /etc/shadow /etc/gshadow /etc/sudoers "
-    "/etc/ssh /etc/omne /var/lib/omne",
+    "InaccessiblePaths=-/boot -/efi -/root -/etc/shadow -/etc/gshadow -/etc/sudoers "
+    "-/etc/ssh -/etc/omne -/var/lib/omne",
 )
 
 

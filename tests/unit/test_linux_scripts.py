@@ -231,10 +231,27 @@ def test_stage_places_services_on_the_ubuntu_base(tmp_path: Path) -> None:
     assert "Requires=omne-core.service" in shell
     assert "WantedBy=multi-user.target" in target
     assert "omne-boot.service" in target
+    assert "omne-session.service" not in target
+    assert "omne-diag.service" not in target
     boot = (dest / "etc/systemd/system/omne-boot.service").read_text(encoding="utf-8")
     assert "Conflicts=getty@tty1.service" in boot
-    assert "TTYPath=/dev/tty1" in boot
+    assert "StandardOutput=journal+console" in boot
+    assert "DeviceAllow=/dev/ttyS0 rw" in boot
+    assert "InaccessiblePaths=-/boot -/efi" in core
+    assert "InaccessiblePaths=-/boot -/efi" in shell
+    assert "InaccessiblePaths=-/boot -/efi" in boot
+    diag = (dest / "etc/systemd/system/omne-diag.service").read_text(encoding="utf-8")
+    assert "InaccessiblePaths=-/boot -/efi" in diag
+    assert "After=multi-user.target" in diag
+    session = (dest / "etc/systemd/system/omne-session.service").read_text(encoding="utf-8")
+    assert "After=multi-user.target" in session
+    assert "WAYLAND_DISPLAY" not in session
+    assert "ExecStart=/usr/bin/omne-session" in session
+    assert (dest / "usr/bin/omne-session").is_file()
+    assert (dest / "usr/lib/omne/applications/omne-hello").is_file()
+    assert (dest / "etc/systemd/system/omne-reboot.socket").is_file()
     assert (dest / "usr/bin/omne-boot").is_file()
+    assert (dest / "usr/bin/omne-diag").is_file()
     assert (dest / "usr/lib/omne/agents/coding/agent.toml").is_file()
     assert (dest / "usr/lib/omne/models/manifests/mock-default.toml").is_file()
     assert (dest / "usr/share/omne/shell/dist/main.js").is_file()
@@ -288,7 +305,11 @@ def test_packages_are_services_without_a_kernel(tmp_path: Path) -> None:
     assert "./etc/systemd/system/omne-shell.service" in shell
     assert "./etc/systemd/system/omne.target" in system
     assert "./usr/bin/omne-boot" in system
+    assert "./usr/bin/omne-diag" in system
+    assert "./usr/bin/omne-session" in system
     assert "./etc/systemd/system/omne-boot.service" in system
+    assert "./etc/systemd/system/omne-diag.service" in system
+    assert "./etc/systemd/system/omne-session.service" in system
     info = _run(["dpkg-deb", "-I", str(dest / names[2])]).stdout
     assert "omne-core (= 0.1.0)" in info
     assert "omne-shell (= 0.1.0)" in info
@@ -434,6 +455,8 @@ def test_vm_test_dry_run_lists_checks_without_booting(tmp_path: Path) -> None:
     assert "graphical-session" in result.stdout
     assert "omne-shell" in result.stdout
     assert "recovery" in result.stdout
+    assert "ipc" in result.stdout
+    assert "BLOCKED" in result.stdout
     assert "OS-ready requires the OMNE desktop" in result.stdout
     assert "dry-run: no virtual machine was started" in result.stdout
     assert "OS-ready: yes" not in result.stdout

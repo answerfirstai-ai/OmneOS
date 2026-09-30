@@ -76,7 +76,9 @@ echo "audio: ich9-hda"
 echo "serial: file"
 echo "snapshot: available"
 echo "desktop: not started"
-echo "checks: iso-boots kernel systemd omne-service core-health graphical-session omne-shell network filesystem applications agents models reboot shutdown recovery"
+echo "checks: iso-boots kernel systemd network filesystem omne-service core-health ipc graphical-session wayland omne-shell applications agents models recovery reboot shutdown"
+echo "dependencies: omne-service -> core-health -> ipc -> graphical-session -> wayland -> omne-shell -> applications -> agents -> models -> recovery"
+echo "blocked: a failed dependency marks later checks BLOCKED"
 echo "OS-ready requires the OMNE desktop"
 
 if [[ -z "${image}" || ! -f "${image}" ]]; then
@@ -103,7 +105,6 @@ image="$(realpath -m "${image}")"
 serial="${work}/serial.log"
 monitor="${work}/monitor.sock"
 disk="${work}/data.qcow2"
-results="${work}/results.txt"
 qemu_pid=""
 
 cleanup() {
@@ -190,80 +191,17 @@ PY
 boot_ok=0
 if wait_for "Reached target multi-user.target" "${timeout_seconds}"; then
   boot_ok=1
+  # The checklist retries core health. Score it before the guest is rebooted.
+  if ! wait_for "OMNE READY" 90; then
+    wait_for "OMNE NOT READY" 60 || true
+  fi
+  # labwc starts after multi-user.target. Give it time to open the socket.
+  wait_for "labwc running" 45 || true
   sleep 3
 fi
 clean_log
 log="${work}/serial.clean"
 touch "${log}"
-
-record() {
-  printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "${results}"
-  echo "$2 $1: $3"
-}
-: > "${results}"
-
-if grep -q "Linux version" "${log}" && grep -q "root=LABEL=OMNE" "${log}"; then
-  record iso-boots pass "kernel command line mounted the OMNE ISO"
-else
-  record iso-boots fail "the serial log did not show an OMNE kernel command line"
-fi
-if grep -q "Linux version" "${log}"; then
-  record kernel pass "Linux version was printed"
-else
-  record kernel fail "Linux version was not printed"
-fi
-if grep -q "Reached target multi-user.target" "${log}"; then
-  record systemd pass "multi-user.target was reached"
-else
-  record systemd fail "multi-user.target was not reached"
-fi
-if grep -q "Started omne-core.service" "${log}" && grep -q "Reached target omne.target" "${log}"; then
-  record omne-service pass "omne.target started OMNE Core"
-else
-  record omne-service fail "omne.target did not start"
-fi
-if grep -q "OMNE READY" "${log}"; then
-  record core-health pass "the boot checklist reported OMNE READY"
-else
-  record core-health fail "the boot checklist did not report a healthy core"
-fi
-if grep -q "labwc" "${log}" || grep -q "Reached target graphical.target" "${log}"; then
-  record graphical-session pass "a graphical session was recorded"
-else
-  record graphical-session fail "labwc and graphical.target were not started"
-fi
-if grep -q "labwc" "${log}" && grep -q "OMNE desktop ready" "${log}"; then
-  record omne-shell pass "the OMNE desktop was shown"
-else
-  record omne-shell fail "the shell service started without a visible OMNE desktop"
-fi
-if grep -q "Started systemd-networkd.service" "${log}" \
-  && grep -q "Reached target network.target" "${log}" \
-  && grep -q "virtio_net" "${log}"; then
-  record network pass "systemd-networkd reached network.target on virtio-net"
-else
-  record network fail "the virtio network did not reach network.target"
-fi
-if grep -q "root=LABEL=OMNE" "${log}" && grep -q "Reached target local-fs.target" "${log}"; then
-  record filesystem pass "the ISO root and local filesystems mounted"
-else
-  record filesystem fail "the root filesystem did not finish mounting"
-fi
-if grep -q "application launched" "${log}"; then
-  record applications pass "an application launch was recorded"
-else
-  record applications fail "no application launch was observed"
-fi
-if grep -q "agent task completed" "${log}"; then
-  record agents pass "a safe agent task was recorded"
-else
-  record agents fail "no safe agent task was observed"
-fi
-if grep -q "model runtime ready" "${log}"; then
-  record models pass "the model runtime reported ready"
-else
-  record models fail "the model runtime did not report ready"
-fi
 
 linux_before=0
 multi_before=0
@@ -293,11 +231,6 @@ if [[ "${boot_ok}" -eq 1 ]] && kill -0 "${qemu_pid}" 2>/dev/null; then
   done
 fi
 clean_log
-if [[ "${reboot_ok}" -eq 1 ]]; then
-  record reboot pass "systemd reached reboot.target and the guest restarted"
-else
-  record reboot fail "the guest did not reboot"
-fi
 
 shutdown_ok=0
 shutdown_before=0
@@ -326,43 +259,35 @@ shutdown_now="$(grep -c "Reached target poweroff.target" "${log}" || true)"
 if [[ "${shutdown_now}" -gt "${shutdown_before}" ]] && ! kill -0 "${qemu_pid}" 2>/dev/null; then
   shutdown_ok=1
 fi
-if [[ "${shutdown_ok}" -eq 1 ]]; then
-  record shutdown pass "systemd reached poweroff.target and QEMU exited"
-else
-  record shutdown fail "the guest did not power off"
-fi
-if grep -E -q "SAFE_MODE|recovery state RECOVERY" "${log}"; then
-  record recovery pass "a recovery state was recorded"
-else
-  record recovery fail "recovery mode was not observed; the live journal is volatile and no recovery command ran"
-fi
-
 later_disk="$(sha256sum "${disk}" | awk '{print $1}')"
 later_iso="$(sha256sum "${image}" | awk '{print $1}')"
+snapshot_ok=0
 if [[ "${later_disk}" == "${disk_hash}" && "${later_iso}" == "${iso_hash}" ]]; then
+  snapshot_ok=1
   echo "snapshot: backing disk unchanged"
 else
   echo "snapshot: backing disk changed" >&2
-  record snapshot fail "a virtual disk or the ISO changed during the run"
 fi
 if qemu-img snapshot -l "${disk}" | grep -q baseline; then
   echo "snapshot: baseline present"
 else
   echo "snapshot: baseline missing" >&2
+  snapshot_ok=0
 fi
 
-os_ready=yes
-while IFS="$(printf '\t')" read -r name status detail; do
-  if [[ "${status}" != "pass" ]]; then
-    os_ready=no
-  fi
-done < "${results}"
-if [[ "${os_ready}" == "yes" ]] \
-  && grep -q $'^graphical-session\tpass\t' "${results}" \
-  && grep -q $'^omne-shell\tpass\t' "${results}"; then
-  echo "OS-ready: yes"
-  exit 0
+run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+artifact="${script_root}/artifacts/vm-test/${run_id}"
+score_args=(
+  --log "${log}"
+  --dest "${artifact}"
+  --run-id "${run_id}"
+  --elapsed-ms "$((SECONDS * 1000))"
+)
+if [[ "${snapshot_ok}" -eq 1 ]]; then
+  score_args+=(--snapshot-ok)
 fi
-echo "OS-ready: no"
+if ! kill -0 "${qemu_pid}" 2>/dev/null; then
+  score_args+=(--guest-exited)
+fi
 echo "log: ${work}/serial.clean"
-exit 2
+python3 "${script_root}/scripts/linux/vm-score.py" "${score_args[@]}"
