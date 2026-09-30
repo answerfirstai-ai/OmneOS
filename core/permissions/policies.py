@@ -40,6 +40,9 @@ TOOL_GRANTS: dict[str, tuple[str, str]] = {
     "network.disconnect": ("network", "configure"),
     "network.enable": ("network", "configure"),
     "network.disable": ("network", "configure"),
+    "audio.set_default": ("audio", "configure"),
+    "audio.set_volume": ("audio", "configure"),
+    "audio.set_mute": ("audio", "configure"),
 }
 
 HIGH_RISK_TOOLS = frozenset(
@@ -52,6 +55,9 @@ HIGH_RISK_TOOLS = frozenset(
         "network.disconnect",
         "network.enable",
         "network.disable",
+        "audio.set_default",
+        "audio.set_volume",
+        "audio.set_mute",
     }
 )
 FILESYSTEM_TOOLS = frozenset(

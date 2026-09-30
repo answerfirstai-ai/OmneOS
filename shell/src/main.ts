@@ -44,6 +44,7 @@ import {
   type GraphLayout,
 } from "./graph-layout.js";
 import { hudText, readCompute, resourcePressure, type HudLine } from "./hud.js";
+import { readAudioStatus, type AudioStatusView } from "./audio-status.js";
 import { readNetworkStatus, type NetworkStatusView } from "./network-status.js";
 import { coreHealthUrl, parseHealth, type CoreHealth } from "./health.js";
 import { inspectMission } from "./mission-view.js";
@@ -87,6 +88,8 @@ let desktopAgain = false;
 let computeFlight = false;
 let networkFlight = false;
 let networkStatus: NetworkStatusView = { text: "network unknown", state: "unknown" };
+let audioFlight = false;
+let audioStatus: AudioStatusView = { text: "audio unknown", state: "unknown" };
 let graphFlight = false;
 
 /** Read the core base URL from a page query string. */
@@ -807,6 +810,19 @@ function paintProject(): void {
   );
 }
 
+function paintAudio(): void {
+  const element = listElement("audio-status");
+  if (element === null) {
+    return;
+  }
+  if (!shouldRepaint(element.dataset["rendered"] ?? null, audioStatus.text)) {
+    return;
+  }
+  element.dataset["rendered"] = audioStatus.text;
+  element.dataset["state"] = audioStatus.state;
+  element.textContent = audioStatus.text;
+}
+
 function paintNetwork(): void {
   const element = listElement("network-status");
   if (element === null) {
@@ -1098,6 +1114,21 @@ async function refreshDesktop(coreUrl: string, coreOk: boolean): Promise<void> {
   } finally {
     desktopFlight = false;
   }
+}
+
+async function refreshAudio(coreUrl: string): Promise<void> {
+  if (audioFlight) {
+    return;
+  }
+  audioFlight = true;
+  try {
+    audioStatus = readAudioStatus(await fetchJson(coreApiUrl(coreUrl, "/audio")));
+  } catch {
+    audioStatus = { text: "audio unknown", state: "unknown" };
+  } finally {
+    audioFlight = false;
+  }
+  paintAudio();
 }
 
 async function refreshNetwork(coreUrl: string): Promise<void> {
@@ -1530,6 +1561,7 @@ function bootstrap(): void {
     void refresh(status, detail);
     void refreshCompute(coreUrl);
     void refreshNetwork(coreUrl);
+    void refreshAudio(coreUrl);
     window.setInterval(() => {
       void refresh(status, detail);
       void refreshGraph(coreUrl);
@@ -1537,6 +1569,7 @@ function bootstrap(): void {
     window.setInterval(() => {
       void refreshCompute(coreUrl);
       void refreshNetwork(coreUrl);
+      void refreshAudio(coreUrl);
     }, 4000);
   } catch (error) {
     console.error(error);

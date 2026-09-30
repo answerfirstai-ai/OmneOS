@@ -74,6 +74,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_hardware(settings)
     if args.command == "network":
         return _run_network(settings)
+    if args.command == "audio":
+        return _run_audio(settings)
     return _run_inspection(settings, args)
 
 
@@ -108,6 +110,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "hardware", help="print hardware discovered from Linux without changing drivers"
     )
     commands.add_parser("network", help="print network state without changing the host stack")
+    commands.add_parser("audio", help="print audio diagnostics without opening a microphone")
     mission = commands.add_parser("mission", help="inspect missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
     mission_commands.add_parser("list", help="list missions")
@@ -230,6 +233,11 @@ def _run_hardware(settings: Settings) -> int:
 
 def _run_network(settings: Settings) -> int:
     print(json.dumps(build_OMNE(settings).network_view(), sort_keys=True))
+    return 0
+
+
+def _run_audio(settings: Settings) -> int:
+    print(json.dumps(build_OMNE(settings).audio_view(), sort_keys=True))
     return 0
 
 

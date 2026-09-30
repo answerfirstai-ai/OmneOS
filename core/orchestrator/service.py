@@ -44,6 +44,9 @@ from core.trace import new_trace_id, set_mission_id
 from core.verify.verifier import VerificationResult, verify_observations
 from core.voice.service import VoiceService
 from core.world.state import WorldState, WorldStateService
+from omne.audio.model import AudioRequest
+from omne.audio.select import audio_service
+from omne.audio.service import AudioService
 from omne.display.select import diagnose_display
 from omne.hardware.select import hardware_service
 from omne.hardware.service import HardwareService
@@ -146,6 +149,7 @@ class OMNE:
         self._windowing: WindowingService | None = None
         self._hardware: HardwareService | None = None
         self._network: NetworkService | None = None
+        self._audio: AudioService | None = None
         self._events.subscribe(self._on_event)
         self._world.bind(self.build_world)
 
@@ -419,6 +423,47 @@ class OMNE:
 
         service = network_service(self._environment, sink=sink, authorize=authorize)
         self._network = service
+        return service
+
+    def audio_view(self) -> dict[str, object]:
+        with self._lock:
+            return self._audio_service().inspect().model_dump(mode="json")
+
+    def apply_audio(self, request: AudioRequest, grants: dict[str, list[str]]) -> dict[str, object]:
+        with self._lock:
+            return (
+                self._audio_service()
+                .apply(request, grants, self._environment)
+                .model_dump(mode="json")
+            )
+
+    def _audio_service(self) -> AudioService:
+        service = self._audio
+        if service is not None:
+            return service
+
+        def sink(event_type: str, payload: dict[str, Any]) -> None:
+            self._events.publish(event_type, source="audio", payload=payload)
+
+        def authorize(
+            tool_id: str,
+            arguments: dict[str, object],
+            grants: Mapping[str, Sequence[str]],
+            environment: str,
+        ) -> tuple[str, str]:
+            result = PermissionEvaluator().evaluate(
+                PermissionRequest(
+                    tool_id=tool_id,
+                    arguments=dict(arguments),
+                    grants={key: list(value) for key, value in grants.items()},
+                    environment=environment,
+                    workspace_root=str(self._workspace),
+                )
+            )
+            return result.decision.value, result.reason
+
+        service = audio_service(self._environment, sink=sink, authorize=authorize)
+        self._audio = service
         return service
 
     def voice_status(self) -> dict[str, object]:
