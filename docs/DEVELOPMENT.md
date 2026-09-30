@@ -45,6 +45,7 @@ OMNE input
 OMNE storage
 OMNE applications
 OMNE browser
+OMNE processes
 ```
 
 `OMNE_EXECUTION_MODE` selects development, testing, offline, local, online, hybrid, or production.

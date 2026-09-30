@@ -324,7 +324,7 @@ def _other_agent(scheduler: TaskScheduler, task: Task) -> str | None:
 
 def _task_is_destructive(task: Task) -> bool:
     for call in task.calls:
-        if call.tool_id in {"filesystem.write", "git.commit", "process.stop"}:
+        if call.tool_id in {"filesystem.write", "git.commit", "process.stop", "process.restart"}:
             return True
         if call.tool_id == "terminal.execute":
             return is_destructive(call.arguments.get("argv"))

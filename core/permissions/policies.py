@@ -13,6 +13,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.security.commands import classify_command
+from omne.processes.protect import refused_program
 from omne.storage.classify import classify_path
 
 TOOL_GRANTS: dict[str, tuple[str, str]] = {
@@ -24,6 +25,8 @@ TOOL_GRANTS: dict[str, tuple[str, str]] = {
     "process.list": ("process", "list"),
     "process.start": ("process", "start"),
     "process.stop": ("process", "signal"),
+    "process.restart": ("process", "restart"),
+    "process.command": ("process", "command"),
     "system.cpu": ("system", "read"),
     "system.memory": ("system", "read"),
     "system.gpu": ("system", "read"),
@@ -64,6 +67,7 @@ HIGH_RISK_TOOLS = frozenset(
         "terminal.execute",
         "process.start",
         "process.stop",
+        "process.restart",
         "git.commit",
         "network.connect",
         "network.disconnect",
@@ -180,7 +184,10 @@ def _decide(request: PermissionRequest) -> PermissionResult:
         danger = dangerous_command(request.arguments.get("argv"))
         if danger is not None:
             return _deny(danger)
-    if request.tool_id == "process.stop":
+        refusal = refused_program(request.arguments.get("argv"))
+        if refusal is not None:
+            return _deny(refusal)
+    if request.tool_id in {"process.stop", "process.restart"}:
         pid = request.arguments.get("pid")
         if isinstance(pid, int) and pid <= 1:
             return _deny("refusing to signal pid 1 or below")

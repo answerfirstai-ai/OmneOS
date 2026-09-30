@@ -71,6 +71,10 @@ Python:
 - Browser layers. The testing API uses a simulated Firefox session and does not fetch a page. A
   Linux fixture reads a browser desktop entry and a process name, and it does not spawn a process.
   `browser.open` stays unavailable when no browser command is configured. `POST /browser` stays 404.
+- Process inspection. The testing API uses a mock table. A Linux fixture reads CPU time, RAM, the
+  owner, parent, children, start time, and limits, and it does not signal a process. Command lines
+  stay out of the snapshot. Protected and unowned processes cannot be stopped. `POST /processes`
+  stays 404.
 
 TypeScript:
 
