@@ -71,5 +71,8 @@ chords and device names. They do not read keystrokes. `input:bind` does not inst
 `POST /input` is not a route. Storage diagnostics only read sysfs and the mount table. They do not
 format a disk, open a raw device, or write a bootloader. Filesystem tools may use an OMNE workspace
 path and deny system, boot, and device paths, including a symlink or `..` that reaches one.
-`POST /storage` is not a route. The ISO script does not write `OMNE-OS.iso`. No physical disk
-installation is performed.
+`POST /storage` is not a route. Application launch, focus, and close require `application:launch`,
+`application:focus`, and `application:close`. The launcher does not accept a shell command, and a
+desktop `Exec` line that uses a shell is not launchable. The Linux provider does not spawn a
+process. `POST /applications` is not a route. The ISO script does not write `OMNE-OS.iso`. No
+physical disk installation is performed.

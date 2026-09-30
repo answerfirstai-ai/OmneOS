@@ -47,6 +47,9 @@ TOOL_GRANTS: dict[str, tuple[str, str]] = {
     "input.activate": ("input", "use"),
     "input.cancel": ("input", "use"),
     "input.bind": ("input", "bind"),
+    "application.launch": ("application", "launch"),
+    "application.focus": ("application", "focus"),
+    "application.close": ("application", "close"),
 }
 
 HIGH_RISK_TOOLS = frozenset(
@@ -63,6 +66,8 @@ HIGH_RISK_TOOLS = frozenset(
         "audio.set_volume",
         "audio.set_mute",
         "input.bind",
+        "application.launch",
+        "application.close",
     }
 )
 FILESYSTEM_TOOLS = frozenset(

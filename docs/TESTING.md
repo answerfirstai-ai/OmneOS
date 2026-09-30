@@ -65,11 +65,14 @@ Python:
   partitions, mounts, read-only state, and removable media, and it does not gain files during the
   read. Filesystem tools deny traversal, symlinks, unauthorized paths, inaccessible paths, and
   protected system locations. `POST /storage` stays 404.
+- Application lookup. The testing API uses Firefox and Files from the mock catalog. A Linux fixture
+  reads desktop files, a process name, and a window snapshot, and it does not spawn a process. A
+  shell `Exec` line is not launchable. `POST /applications` stays 404.
 
 TypeScript:
 
-- Health parsing, core URL selection, the windowing state parser, and the network, audio, and input
-  tray parsers.
+- Health parsing, core URL selection, the windowing state parser, and the network, audio, input, and
+  application launcher parsers.
 - Character states, including a missing asset and mission-driven analyzing, verifying, and waiting.
 - Environment state, lifecycle stages, mission inspection, permission copy, verification evidence,
   error summaries, notifications, graph layout, the current-mission graph, command copy, detail

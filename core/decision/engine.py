@@ -71,6 +71,7 @@ class DecisionEngine:
             "git.status",
             "system.inspect",
             "browser.open",
+            "application.open",
             "research.workspace",
         }:
             return _decision(

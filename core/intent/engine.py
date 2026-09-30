@@ -116,6 +116,17 @@ def _deterministic(text: str) -> Intent | None:
             requires_host_access=True,
             requires_network=True,
         )
+    opened = re.match(r"^open (?P<name>.+)$", text, re.IGNORECASE)
+    if opened is not None:
+        name = opened.group("name").strip()
+        if name and not any(character in name for character in "|&;<>`$()"):
+            return Intent(
+                intent="application.open",
+                entities={"name": name},
+                desired_outcome="application_opened",
+                risk="medium",
+                requires_host_access=True,
+            )
     metrics = [
         name for name in ("cpu", "memory", "gpu", "disk", "network", "processes") if name in lowered
     ]

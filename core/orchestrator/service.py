@@ -44,6 +44,7 @@ from core.trace import new_trace_id, set_mission_id
 from core.verify.verifier import VerificationResult, verify_observations
 from core.voice.service import VoiceService
 from core.world.state import WorldState, WorldStateService
+from omne.applications.service import ApplicationService
 from omne.audio.model import AudioRequest
 from omne.audio.select import audio_service
 from omne.audio.service import AudioService
@@ -122,6 +123,7 @@ class OMNE:
         activation_shortcut: str = "",
         cancel_shortcut: str = "",
         push_to_talk_shortcut: str = "",
+        applications: ApplicationService | None = None,
     ) -> None:
         self._store = store
         self._scheduler = scheduler
@@ -160,6 +162,7 @@ class OMNE:
         self._audio: AudioService | None = None
         self._input: InputService | None = None
         self._storage: StorageService | None = None
+        self._applications = applications
         self._activation_shortcut = activation_shortcut
         self._cancel_shortcut = cancel_shortcut
         self._push_to_talk_shortcut = push_to_talk_shortcut
@@ -542,6 +545,19 @@ class OMNE:
         service = storage_service(self._environment, sink=sink)
         self._storage = service
         return service
+
+    def applications_view(self) -> dict[str, object]:
+        with self._lock:
+            service = self._applications
+            if service is None:
+                return {
+                    "provider": "mock",
+                    "observed": False,
+                    "applications": [],
+                    "gaps": ["runtime"],
+                    "commanded": False,
+                }
+            return service.catalog().model_dump(mode="json")
 
     def voice_status(self) -> dict[str, object]:
         return self._voice.status()
