@@ -46,20 +46,23 @@ class AudioService:
         request: AudioRequest,
         grants: Mapping[str, Sequence[str]],
         environment: str,
+        *,
+        permitted: bool = False,
     ) -> ApplyOutcome:
-        decision, reason = self._authorize(
-            _ACTIONS[request.action],
-            request.public_arguments(),
-            grants,
-            environment,
-        )
-        if decision != "ALLOW":
-            return ApplyOutcome(
-                applied=False,
-                reason=reason,
-                state=self._provider.inspect(),
-                events=[],
+        if not permitted:
+            decision, reason = self._authorize(
+                _ACTIONS[request.action],
+                request.public_arguments(),
+                grants,
+                environment,
             )
+            if decision != "ALLOW":
+                return ApplyOutcome(
+                    applied=False,
+                    reason=reason,
+                    state=self._provider.inspect(),
+                    events=[],
+                )
         outcome = self._provider.apply(request)
         if outcome.applied:
             self._previous = outcome.state

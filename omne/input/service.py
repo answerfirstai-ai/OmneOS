@@ -69,16 +69,21 @@ class InputService:
         request: InputRequest,
         grants: Mapping[str, Sequence[str]],
         environment: str,
+        *,
+        permitted: bool = False,
     ) -> ApplyOutcome:
-        decision, reason = self._authorize(
-            _ACTIONS[request.action],
-            request.public_arguments(),
-            grants,
-            environment,
-        )
         report = self._provider.inspect()
-        if decision != "ALLOW":
-            return ApplyOutcome(applied=False, reason=reason, state=self._state(report), events=[])
+        if not permitted:
+            decision, reason = self._authorize(
+                _ACTIONS[request.action],
+                request.public_arguments(),
+                grants,
+                environment,
+            )
+            if decision != "ALLOW":
+                return ApplyOutcome(
+                    applied=False, reason=reason, state=self._state(report), events=[]
+                )
         if request.action == "bind":
             self._provider.apply(request)
             return ApplyOutcome(
