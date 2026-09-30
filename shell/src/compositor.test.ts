@@ -122,6 +122,8 @@ test("desktop chords are the window manager", () => {
   const meta = { metaKey: true, ctrlKey: false, altKey: false, shiftKey: false };
   assert.equal(matchDesktopCommand({ ...alt, key: "Tab" }), "switch-next");
   assert.equal(matchDesktopCommand({ ...alt, key: "Tab", shiftKey: true }), "switch-previous");
+  assert.equal(matchDesktopCommand({ ...meta, key: "Tab" }), "switch-next");
+  assert.equal(matchDesktopCommand({ ...meta, key: "Tab", shiftKey: true }), "switch-previous");
   assert.equal(matchDesktopCommand({ ...alt, key: "F4" }), "close-window");
   assert.equal(
     matchDesktopCommand({

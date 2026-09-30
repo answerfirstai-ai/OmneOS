@@ -2014,7 +2014,7 @@ function bindDesktop(): void {
     applyWindows(openWindow(windowState, shortcut.target));
   });
   document.addEventListener("keyup", (event) => {
-    if (event.key === "Alt" && compositor.switcher.length > 0) {
+    if ((event.key === "Alt" || event.key === "Meta") && compositor.switcher.length > 0) {
       applyCompositor(commitSwitcher(compositor));
     }
   });

@@ -58,7 +58,7 @@ export function matchShortcut(event: ShortcutEvent): Shortcut | null {
 
 /** Window-manager chords. These stay separate from the command palette. */
 export function matchDesktopCommand(event: ShortcutEvent): DesktopCommand | null {
-  if (event.altKey && !event.ctrlKey && !event.metaKey && event.key === "Tab") {
+  if ((event.altKey || event.metaKey) && !event.ctrlKey && event.key === "Tab") {
     return event.shiftKey ? "switch-previous" : "switch-next";
   }
   if (event.altKey && !event.ctrlKey && !event.metaKey && event.key === "F4") {
