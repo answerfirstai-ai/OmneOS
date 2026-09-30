@@ -71,7 +71,10 @@ that EFI system partition. The bootloader waits zero seconds and loads one entry
 default target is `multi-user.target`. `ubuntu-desktop`, `gdm3`, `lightdm`, and `plymouth` are
 refused, and `getty@tty1` and `serial-getty@ttyS0` are masked on the disk so a login prompt does not
 replace the console. Ethernet matches `en*` and `eth*` and requests DHCP through systemd-networkd. A
-link that stays down is reported as network down.
+link that stays down is reported as network down. OMNE does not replace that stack. `omne.network`
+reads the interfaces, addresses, DNS, and routes systemd-networkd already published. A later image
+can use iwd for Wi-Fi association and leave addressing with systemd-networkd, and only after an
+explicit grant. This image does not scan a radio or write a network unit. See `docs/NETWORK.md`.
 
 `omne-boot` is the tty1 program. It prints Hardware, Storage, Network, GPU, Core, and Models from
 the live machine and from `GET /health` and `GET /models`. A check is printed only when that probe

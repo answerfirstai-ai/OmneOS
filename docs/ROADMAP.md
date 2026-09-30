@@ -41,9 +41,10 @@ and OVMF are all present. Without them it exits 2 and does not start QEMU.
 Phase 16, physical hardware installation, has not been started. `omne.display` can report whether
 labwc, DRM, a render node, a connected monitor, and an input device are present. It does not start a
 Wayland session. `omne.windowing` records windows and workspaces for that session and does not
-command labwc. `omne.hardware` reads Linux device state and does not configure it. The shell is
-still the web desktop. `docs/GRAPHICS_ARCHITECTURE.md` lists what a VM needs before that session can
-launch. `docs/WINDOWING.md` describes the window record.
+command labwc. `omne.hardware` reads Linux device state and does not configure it. `omne.network`
+reads the Linux network stack and does not replace systemd-networkd. The shell is still the web
+desktop. `docs/GRAPHICS_ARCHITECTURE.md` lists what a VM needs before that session can launch.
+`docs/WINDOWING.md` describes the window record. `docs/NETWORK.md` describes the network read.
 
 The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
 capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,

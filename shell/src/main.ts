@@ -44,6 +44,7 @@ import {
   type GraphLayout,
 } from "./graph-layout.js";
 import { hudText, readCompute, resourcePressure, type HudLine } from "./hud.js";
+import { readNetworkStatus, type NetworkStatusView } from "./network-status.js";
 import { coreHealthUrl, parseHealth, type CoreHealth } from "./health.js";
 import { inspectMission } from "./mission-view.js";
 import { noticesFromEvents } from "./notify.js";
@@ -84,6 +85,8 @@ let detailLevel: DetailLevel = "normal";
 let desktopFlight = false;
 let desktopAgain = false;
 let computeFlight = false;
+let networkFlight = false;
+let networkStatus: NetworkStatusView = { text: "network unknown", state: "unknown" };
 let graphFlight = false;
 
 /** Read the core base URL from a page query string. */
@@ -804,6 +807,19 @@ function paintProject(): void {
   );
 }
 
+function paintNetwork(): void {
+  const element = listElement("network-status");
+  if (element === null) {
+    return;
+  }
+  if (!shouldRepaint(element.dataset["rendered"] ?? null, networkStatus.text)) {
+    return;
+  }
+  element.dataset["rendered"] = networkStatus.text;
+  element.dataset["state"] = networkStatus.state;
+  element.textContent = networkStatus.text;
+}
+
 function paintHud(): void {
   const element = listElement("hud");
   if (element === null) {
@@ -1082,6 +1098,21 @@ async function refreshDesktop(coreUrl: string, coreOk: boolean): Promise<void> {
   } finally {
     desktopFlight = false;
   }
+}
+
+async function refreshNetwork(coreUrl: string): Promise<void> {
+  if (networkFlight) {
+    return;
+  }
+  networkFlight = true;
+  try {
+    networkStatus = readNetworkStatus(await fetchJson(coreApiUrl(coreUrl, "/network")));
+  } catch {
+    networkStatus = { text: "network unknown", state: "unknown" };
+  } finally {
+    networkFlight = false;
+  }
+  paintNetwork();
 }
 
 async function refreshCompute(coreUrl: string): Promise<void> {
@@ -1498,12 +1529,14 @@ function bootstrap(): void {
     const coreUrl = readCoreUrl(window.location.search);
     void refresh(status, detail);
     void refreshCompute(coreUrl);
+    void refreshNetwork(coreUrl);
     window.setInterval(() => {
       void refresh(status, detail);
       void refreshGraph(coreUrl);
     }, 2000);
     window.setInterval(() => {
       void refreshCompute(coreUrl);
+      void refreshNetwork(coreUrl);
     }, 4000);
   } catch (error) {
     console.error(error);

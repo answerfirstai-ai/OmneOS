@@ -37,6 +37,8 @@ def route_get(
         return HTTPStatus.OK, {"windowing": runtime.windowing_view()}
     if path == "/hardware":
         return HTTPStatus.OK, {"hardware": runtime.hardware_view()}
+    if path == "/network":
+        return HTTPStatus.OK, {"network": runtime.network_view()}
     if path == "/voice":
         return HTTPStatus.OK, {"voice": runtime.voice_status()}
     if path == "/missions":

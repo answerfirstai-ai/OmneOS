@@ -72,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_windowing(settings)
     if args.command == "hardware":
         return _run_hardware(settings)
+    if args.command == "network":
+        return _run_network(settings)
     return _run_inspection(settings, args)
 
 
@@ -105,6 +107,7 @@ def _build_parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "hardware", help="print hardware discovered from Linux without changing drivers"
     )
+    commands.add_parser("network", help="print network state without changing the host stack")
     mission = commands.add_parser("mission", help="inspect missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
     mission_commands.add_parser("list", help="list missions")
@@ -222,6 +225,11 @@ def _run_windowing(settings: Settings) -> int:
 
 def _run_hardware(settings: Settings) -> int:
     print(json.dumps(build_OMNE(settings).hardware_view(), sort_keys=True))
+    return 0
+
+
+def _run_network(settings: Settings) -> int:
+    print(json.dumps(build_OMNE(settings).network_view(), sort_keys=True))
     return 0
 
 

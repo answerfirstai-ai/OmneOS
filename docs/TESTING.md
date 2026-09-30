@@ -53,10 +53,13 @@ Python:
 - Hardware discovery. The testing API uses an empty mock inventory. A Linux fixture supplies CPU,
   memory, GPU, VRAM, monitors, input, USB, PCI, storage, Ethernet, Wi-Fi, Bluetooth, audio, a
   camera, and power. Missing VRAM and unrelated thermal zones stay null. `POST /hardware` stays 404.
+- Network reads. The testing API uses an empty mock session. A Linux fixture supplies Ethernet,
+  loopback, Wi-Fi signal, DNS, and a default route. A password in a supplicant file is not part of
+  the record. `POST /network` stays 404.
 
 TypeScript:
 
-- Health parsing, core URL selection, and the windowing state parser.
+- Health parsing, core URL selection, the windowing state parser, and the network tray parser.
 - Character states, including a missing asset and mission-driven analyzing, verifying, and waiting.
 - Environment state, lifecycle stages, mission inspection, permission copy, verification evidence,
   error summaries, notifications, graph layout, the current-mission graph, command copy, detail
@@ -73,6 +76,6 @@ TypeScript:
 refusing to write when not root. The boot checklist is tested against a fixture machine and a local
 core: an unavailable GPU is not a check. Display launch readiness is tested against a fixture DRM
 tree. Window commands are tested against the in-memory record and a snapshot file. Hardware
-discovery is tested against a fixture sysfs tree. The default suite does not run `debootstrap`,
-QEMU, or labwc. Live xAI, a physical GPU workload, and hardware installation are outside the default
-suite.
+discovery is tested against a fixture sysfs tree. Network state is tested against an in-memory
+session and a fixture route table. The default suite does not run `debootstrap`, QEMU, or labwc.
+Live xAI, a physical GPU workload, and hardware installation are outside the default suite.

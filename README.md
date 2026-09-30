@@ -82,8 +82,8 @@ is the OMNE checklist, not a desktop. No `OMNE-OS.iso` is produced. `scripts/lin
 exits 2 and does not write an image. `scripts/linux/vm-boot.sh --run` starts QEMU when the disk and
 OVMF are present. `OMNE display` reports DRM and labwc readiness and does not start a compositor.
 `OMNE windowing` reports the window record and does not command labwc. `OMNE hardware` reports
-devices Linux has already published and does not change drivers. Physical hardware installation is
-not implemented.
+devices Linux has already published and does not change drivers. `OMNE network` reports the Linux
+network stack and does not change it. Physical hardware installation is not implemented.
 
 ## License
 

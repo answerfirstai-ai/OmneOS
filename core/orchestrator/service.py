@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import platform
 import threading
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,8 @@ from core.orchestrator.planner.planner import PlanNode, plan_objective
 from core.orchestrator.scheduler import TaskScheduler
 from core.orchestrator.store import TaskStore
 from core.orchestrator.task import Task, TaskErrorRecord, TaskStatus, TaskStep
+from core.permissions.evaluator import PermissionEvaluator
+from core.permissions.policies import PermissionRequest
 from core.project.context import ProjectContext
 from core.trace import new_trace_id, set_mission_id
 from core.verify.verifier import VerificationResult, verify_observations
@@ -44,6 +47,9 @@ from core.world.state import WorldState, WorldStateService
 from omne.display.select import diagnose_display
 from omne.hardware.select import hardware_service
 from omne.hardware.service import HardwareService
+from omne.network.model import NetworkRequest
+from omne.network.select import network_service
+from omne.network.service import NetworkService
 from omne.windowing.model import WindowRequest
 from omne.windowing.select import windowing_service
 from omne.windowing.service import WindowingService
@@ -139,6 +145,7 @@ class OMNE:
         self._lock = threading.Lock()
         self._windowing: WindowingService | None = None
         self._hardware: HardwareService | None = None
+        self._network: NetworkService | None = None
         self._events.subscribe(self._on_event)
         self._world.bind(self.build_world)
 
@@ -369,6 +376,49 @@ class OMNE:
 
         service = hardware_service(self._environment, sink=sink)
         self._hardware = service
+        return service
+
+    def network_view(self) -> dict[str, object]:
+        with self._lock:
+            return self._network_service().inspect().model_dump(mode="json")
+
+    def apply_network(
+        self, request: NetworkRequest, grants: dict[str, list[str]]
+    ) -> dict[str, object]:
+        with self._lock:
+            return (
+                self._network_service()
+                .apply(request, grants, self._environment)
+                .model_dump(mode="json")
+            )
+
+    def _network_service(self) -> NetworkService:
+        service = self._network
+        if service is not None:
+            return service
+
+        def sink(event_type: str, payload: dict[str, Any]) -> None:
+            self._events.publish(event_type, source="network", payload=payload)
+
+        def authorize(
+            tool_id: str,
+            arguments: dict[str, object],
+            grants: Mapping[str, Sequence[str]],
+            environment: str,
+        ) -> tuple[str, str]:
+            result = PermissionEvaluator().evaluate(
+                PermissionRequest(
+                    tool_id=tool_id,
+                    arguments=dict(arguments),
+                    grants={key: list(value) for key, value in grants.items()},
+                    environment=environment,
+                    workspace_root=str(self._workspace),
+                )
+            )
+            return result.decision.value, result.reason
+
+        service = network_service(self._environment, sink=sink, authorize=authorize)
+        self._network = service
         return service
 
     def voice_status(self) -> dict[str, object]:
