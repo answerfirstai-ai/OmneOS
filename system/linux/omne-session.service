@@ -22,6 +22,7 @@ TimeoutStartSec=30
 StandardOutput=journal+console
 StandardError=journal+console
 NoNewPrivileges=true
+PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ProtectKernelTunables=true

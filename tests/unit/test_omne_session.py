@@ -66,4 +66,5 @@ def test_session_unit_does_not_gate_multi_user() -> None:
     assert "After=multi-user.target" in unit
     assert "omne-session.service" not in target
     assert "WantedBy=multi-user.target" in unit
+    assert "PrivateTmp=true" in unit
     assert "WAYLAND_DISPLAY" not in unit
