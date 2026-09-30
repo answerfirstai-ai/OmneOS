@@ -118,6 +118,29 @@ input:focus-visible {
   inset: 0;
 }
 
+.monitor-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.monitor-region {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.monitor-region span {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .window {
   position: absolute;
   display: flex;
@@ -471,6 +494,73 @@ input {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.pager {
+  display: flex;
+  gap: 4px;
+}
+
+.pager button {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0.35rem 0.6rem;
+  color: var(--muted);
+}
+
+.pager button[aria-pressed="true"] {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.switcher {
+  position: absolute;
+  z-index: 40;
+  top: 16%;
+  left: 50%;
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--glass);
+  transform: translateX(-50%);
+}
+
+.switcher button {
+  min-width: 7rem;
+  border: 1px solid var(--line);
+  background: transparent;
+  padding: 0.7rem 0.9rem;
+}
+
+.switcher button[aria-selected="true"] {
+  border-color: var(--accent);
+}
+
+.toasts {
+  position: absolute;
+  z-index: 35;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(320px, 40vw);
+}
+
+.toast {
+  border: 1px solid var(--line);
+  background: var(--glass);
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.window.is-fullscreen .titlebar,
+.window.is-fullscreen .resize,
+.window.is-maximized .resize {
+  display: none;
+}
+
 .tray {
   display: flex;
   align-items: center;
@@ -701,15 +791,9 @@ input {
   cursor: nwse-resize;
 }
 
-.window.is-maximized {
-  top: 12px !important;
-  left: 108px !important;
-  width: calc(100vw - 124px) !important;
-  height: calc(100% - 24px) !important;
-}
-
-.window.is-maximized .resize {
-  display: none;
+.window.is-maximized,
+.window.is-fullscreen {
+  border-radius: 0;
 }
 
 .split {
@@ -832,23 +916,6 @@ input {
   .icon {
     width: 72px;
     flex: 0 0 auto;
-  }
-
-  .window,
-  #window-launcher,
-  #window-tasks {
-    top: 92px;
-    left: 8px !important;
-    width: calc(100vw - 16px);
-  }
-
-  #window-tasks {
-    top: 300px;
-  }
-
-  .window.is-maximized {
-    left: 8px !important;
-    width: calc(100vw - 16px) !important;
   }
 
   .split {

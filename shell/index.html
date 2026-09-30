@@ -104,7 +104,8 @@
         </button>
       </nav>
 
-      <div class="workspace">
+      <div class="workspace" id="workspace">
+        <div id="monitor-layer" class="monitor-layer"></div>
         <article
           class="window"
           id="window-core"
@@ -529,6 +530,8 @@
           <span class="resize" data-resize="voice"></span>
         </article>
       </div>
+      <div id="switcher" class="switcher" hidden role="listbox" aria-label="Switch window"></div>
+      <div id="toasts" class="toasts" aria-live="polite"></div>
     </div>
 
     <div id="start-menu" class="start-menu" hidden>
@@ -556,6 +559,7 @@
       >
         OMNE
       </button>
+      <div id="workspaces" class="pager" role="toolbar" aria-label="Workspaces"></div>
       <div class="dock" role="toolbar" aria-label="Open windows">
         <button type="button" data-task="core" hidden>Core</button>
         <button type="button" data-task="launcher" aria-pressed="false">Command</button>

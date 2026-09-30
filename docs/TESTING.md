@@ -114,7 +114,8 @@ TypeScript:
   levels, resource lines, and keyboard shortcuts.
 - Voice control staying disabled unless permission, provider, and hardware are all available.
 - Task, agent, model, and notification lines, and one `/desktop` document.
-- Desktop windows open, come to the front, hide, minimize, maximize, and stay within resize bounds.
+- Desktop windows open, come to the front, hide, minimize, maximize, fullscreen, move across
+  monitors, change workspace, switch with the app switcher, and stay within resize bounds.
 
 ## Not claimed
 
