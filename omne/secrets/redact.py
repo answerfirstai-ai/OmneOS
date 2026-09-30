@@ -24,6 +24,7 @@ _HIDDEN_KEYS = frozenset(
         "secret",
         "token",
         "xai_api_key",
+        "nvidia_api_key",
     }
 )
 _MIN_REGISTERED = 8

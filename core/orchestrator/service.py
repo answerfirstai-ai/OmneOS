@@ -31,10 +31,14 @@ from core.memory.store import MemoryStore
 from core.metrics import ReliabilityLedger
 from core.mission.model import Mission, MissionError, MissionStatus, mission_event
 from core.mission.store import MissionStore
+from core.models.cortex import Cortex, IntelligenceContext
 from core.models.lifecycle import LOADED_STATES, SELECTABLE_STATES, ModelLifecycle
+from core.models.providers.base import ModelProvider
+from core.models.providers.nvidia.provider import NvidiaProvider
 from core.models.registry import ModelRegistry
 from core.models.router import ModelRouter, RoutingError
 from core.models.runtime import ModelRuntime
+from core.models.structured import StructuredDecision
 from core.orchestrator.planner.planner import PlanNode, plan_objective
 from core.orchestrator.scheduler import TaskScheduler
 from core.orchestrator.store import TaskStore
@@ -87,6 +91,13 @@ _MODEL_CAPABILITY = {
     "process_inspection": "tool_use",
 }
 
+
+def _required_model_capability(capability: str) -> str:
+    if capability in {"reasoning", "coding", "planning", "tool_use", "vision"}:
+        return capability
+    return _MODEL_CAPABILITY.get(capability, "reasoning")
+
+
 _CANCELLABLE = {
     TaskStatus.QUEUED,
     TaskStatus.PLANNING,
@@ -138,6 +149,14 @@ class OMNE:
         model_runtime: ModelRuntime | None = None,
         resources: ResourceManager | None = None,
         data_dir: Path | None = None,
+        model_route: str = "mock",
+        preferred_nvidia_model: str = "",
+        providers: dict[str, ModelProvider] | None = None,
+        model_names: dict[str, str] | None = None,
+        provider_labels: dict[str, str] | None = None,
+        nvidia_provider: NvidiaProvider | None = None,
+        cortex: Cortex | None = None,
+        nvidia_configured: bool = False,
     ) -> None:
         self._store = store
         self._scheduler = scheduler
@@ -161,6 +180,14 @@ class OMNE:
         self.resources = resources
         self._project = project
         self._mode = execution_mode
+        self._model_route = model_route
+        self._preferred_nvidia_model = preferred_nvidia_model
+        self._providers = providers or {}
+        self._model_names = model_names or {}
+        self._provider_labels = provider_labels or {}
+        self._nvidia = nvidia_provider
+        self._cortex = cortex
+        self._nvidia_configured = nvidia_configured
         self._environment = environment
         self._context_items = context_item_limit
         self._context_chars = context_char_limit
@@ -350,13 +377,14 @@ class OMNE:
 
     def model_views(self) -> list[dict[str, object]]:
         views: list[dict[str, object]] = []
+        ready = self._available_model_ids()
         for model in self._models.enabled():
             state = self._model_lifecycle.state(model.id)
             views.append(
                 {
                     "id": model.id,
                     "provider": model.provider,
-                    "model_name": model.model_name,
+                    "model_name": self._model_names.get(model.id, model.model_name),
                     "local": model.local,
                     "priority": model.priority,
                     "capabilities": list(model.capabilities),
@@ -366,6 +394,12 @@ class OMNE:
                     "lifecycle": state.value,
                     "loaded": state in LOADED_STATES,
                     "context_window": model.context_window,
+                    "reasoning": model.reasoning,
+                    "tool_calling": model.tool_calling,
+                    "vision": model.vision,
+                    "coding": model.coding,
+                    "availability": "available" if model.id in ready else "unavailable",
+                    "resource_class": model.resource_class(),
                     "ram_mb": model.requirements.ram_mb if model.requirements.ram_known else None,
                     "vram_mb": model.requirements.vram_mb
                     if model.requirements.vram_known
@@ -391,7 +425,158 @@ class OMNE:
             view["healthy"] = health["healthy"]
             view["worker_id"] = health["worker_id"]
             view["lifecycle"] = health["lifecycle"]
+        ready = self._available_model_ids()
+        for view in views:
+            model_id = view["id"]
+            if isinstance(model_id, str):
+                view["availability"] = "available" if model_id in ready else "unavailable"
+                external = self._model_names.get(model_id)
+                if external:
+                    view["model_name"] = external
+                cloud = view.get("resource_class") == "CLOUD_MODEL_RESOURCE"
+                if cloud and view.get("engine") is None:
+                    view["gpu"] = "cloud"
         return views
+
+    def nvidia_status(self) -> dict[str, object]:
+        """Report NVIDIA configuration without calling the network."""
+
+        return {
+            "nvidia": "CONFIGURED" if self._nvidia_configured else "NOT CONFIGURED",
+            "provider": "AVAILABLE" if self._nvidia_configured else "UNAVAILABLE",
+            "model": self._preferred_nvidia_model,
+            "inference": "NOT RUN",
+            "authentication": "SKIPPED",
+        }
+
+    async def test_nvidia(self) -> dict[str, object]:
+        """One real completion when a key is configured. Tools are not called."""
+
+        if self._nvidia is None:
+            return {
+                "nvidia": "NOT CONFIGURED",
+                "provider": "UNAVAILABLE",
+                "model": self._preferred_nvidia_model,
+                "inference": "FAIL",
+                "authentication": "SKIPPED",
+                "detail": "NVIDIA provider is not installed",
+            }
+        result = await self._nvidia.probe(self._preferred_nvidia_model or "nvidia")
+        provider = str(result.get("answered_provider") or result.get("provider") or "")
+        self._events.publish(
+            "model.completed" if result.get("inference") == "PASS" else "model.failed",
+            source="models",
+            payload={
+                "provider": "nvidia" if result.get("inference") == "PASS" else provider,
+                "model": result.get("model"),
+                "latency": result.get("latency_ms"),
+                "code": "ok" if result.get("inference") == "PASS" else "probe",
+            },
+        )
+        answered = result.get("answered_provider")
+        if result.get("inference") == "PASS" and answered not in {"", "nvidia"}:
+            result = dict(result)
+            result["inference"] = "FAIL"
+            result["detail"] = "response provider was not nvidia"
+        return result
+
+    def request_model(self, capability: str) -> dict[str, object]:
+        """Name the model a worker should use. Nothing is executed."""
+
+        model_id, fallbacks = self._select_model(capability, self._monitor.snapshot())
+        if model_id is None:
+            return {
+                "capability": capability,
+                "model": None,
+                "provider": None,
+                "model_name": None,
+                "resource_class": None,
+                "fallbacks": [],
+            }
+        model = self._models.get(model_id)
+        return {
+            "capability": capability,
+            "model": model_id,
+            "provider": model.provider,
+            "model_name": self._model_names.get(model_id, model.model_name),
+            "resource_class": model.resource_class(),
+            "fallbacks": fallbacks,
+        }
+
+    async def reason(self, objective: str, *, capability: str = "reasoning") -> StructuredDecision:
+        """Ask the routed model for a decision. Tool requests are not executed."""
+
+        if self._cortex is None:
+            raise RuntimeError("intelligence layer is not configured")
+        text = " ".join(objective.split())
+        if not text:
+            raise ValueError("objective must not be empty")
+        required = _required_model_capability(capability)
+        route = self._route_for_mode()
+        if route == "mock":
+            route = "auto" if self._nvidia_configured else "mock"
+        return await self._cortex.complete(
+            self._intelligence_context(text),
+            self._monitor.snapshot(),
+            capability=required,
+            route=route,
+            available=self._available_model_ids(),
+            preferred_model=self._preferred_nvidia_model or None,
+            allow_mock=self._mode != "production",
+        )
+
+    def _intelligence_context(self, objective: str) -> IntelligenceContext:
+        agents = [
+            f"{manifest.id} ({', '.join(manifest.capabilities[:4])})"
+            for manifest in self._agents.all()[:8]
+        ]
+        workers = [
+            f"{worker.get('worker_id', '')} {worker.get('lifecycle', '')}"
+            for worker in self.worker_views()[:8]
+        ]
+        tools = sorted(
+            capability.id.removeprefix("tool:")
+            for capability in self._capabilities.all()
+            if capability.id.startswith("tool:")
+        )[:16]
+        permissions = sorted(
+            {
+                f"{name}:{','.join(grants)}"
+                for manifest in self._agents.all()
+                for name, grants in manifest.permissions.items()
+            }
+        )[:12]
+        snapshot = self._monitor.snapshot()
+        machine = (
+            f"cpu={_metric(snapshot.cpu.usage_percent)} "
+            f"memory_available_mb={_metric(snapshot.memory.available_mb)}"
+        )
+        return IntelligenceContext(
+            objective=objective,
+            task=objective,
+            agents=agents,
+            workers=[item for item in workers if item.strip()],
+            tools=tools,
+            permissions=permissions,
+            machine=machine,
+            memory=self._bounded_memory(objective),
+            project=self._project.name,
+        )
+
+    def _bounded_memory(self, objective: str) -> str:
+        grant = AccessGrant({"project", "task"})
+        try:
+            records = self.memory.retrieve(
+                grant,
+                scope="project",
+                scope_key=self._project.name or "workspace",
+                query=objective,
+                limit=min(self._memory_limit, 5),
+            )
+        except MemoryAccessError:
+            return ""
+        notes = [record.content for record in records[:5]]
+        return "\n".join(notes)
 
     def compute_status(self) -> ResourceSnapshot:
         return self._monitor.snapshot()
@@ -919,7 +1104,7 @@ class OMNE:
     ) -> Task:
         matches = self._agents.by_capability(node.capability)
         agent = matches[0] if matches else None
-        model_id = self._select_model(node.capability, snapshot)
+        model_id, fallbacks = self._select_model(node.capability, snapshot)
         return Task(
             id=key_to_id[node.key],
             objective=node.objective,
@@ -937,34 +1122,45 @@ class OMNE:
                 "role": "child",
                 "key": node.key,
                 "exclusive": node.exclusive,
+                "model_fallbacks": fallbacks,
                 **extras,
             },
         )
 
-    def _select_model(self, capability: str, snapshot: ResourceSnapshot) -> str | None:
+    def _select_model(
+        self, capability: str, snapshot: ResourceSnapshot
+    ) -> tuple[str | None, list[str]]:
         if not self._models.enabled():
-            return None
-        required = _MODEL_CAPABILITY.get(capability, "reasoning")
-        if self._mode in {"testing", "development"}:
+            return None, []
+        required = _required_model_capability(capability)
+        available = self._available_model_ids()
+        route = self._route_for_mode()
+        if route == "mock":
             try:
-                route = self._router.select([required], snapshot)
+                selected = self._router.select([required], snapshot)
             except RoutingError:
-                return None
-            if route.model.id not in self._available_model_ids():
-                return None
-            return route.model.id
-        choice = self._router.choose(
+                return None, []
+            if selected.model.id not in available:
+                return None, []
+            return selected.model.id, []
+        chain = self._router.order(
             [required],
             snapshot,
-            mode=self._mode,
-            available=self._available_model_ids(),
+            route=route,
+            available=available,
+            allow_mock=self._mode != "production",
+            preferred_model=self._preferred_nvidia_model or None,
         )
-        if choice.model is None:
-            return None
-        chosen = choice.model.id
-        if chosen not in self._available_model_ids():
-            return None
-        return chosen
+        if not chain:
+            return None, []
+        return chain[0].id, [model.id for model in chain[1:]]
+
+    def _route_for_mode(self) -> str:
+        if self._mode in {"offline", "local"}:
+            return "local"
+        if self._mode == "testing":
+            return "mock"
+        return self._model_route
 
     def _on_event(self, event: Event) -> None:
         self._metrics.observe(event)

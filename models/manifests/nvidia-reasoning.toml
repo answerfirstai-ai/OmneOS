@@ -1,0 +1,22 @@
+id = "nvidia-reasoning"
+provider = "nvidia"
+model_name = "nvidia/nemotron-3-super-120b-a12b"
+capabilities = ["reasoning", "coding", "planning", "tool_use"]
+local = false
+priority = 20
+context_window = 1000000
+reasoning = true
+tool_calling = true
+vision = false
+coding = true
+latency = "unknown"
+cost_input = "unknown"
+cost_output = "unknown"
+
+[requirements]
+ram_mb = 0
+vram_mb = 0
+cpu_threads = 0
+disk_mb = 0
+ram_known = true
+vram_known = true

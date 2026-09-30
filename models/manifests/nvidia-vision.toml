@@ -1,0 +1,21 @@
+id = "nvidia-vision"
+provider = "nvidia"
+model_name = "meta/llama-3.2-11b-vision-instruct"
+capabilities = ["vision", "reasoning"]
+local = false
+priority = 35
+reasoning = true
+tool_calling = false
+vision = true
+coding = false
+latency = "unknown"
+cost_input = "unknown"
+cost_output = "unknown"
+
+[requirements]
+ram_mb = 0
+vram_mb = 0
+cpu_threads = 0
+disk_mb = 0
+ram_known = true
+vram_known = true

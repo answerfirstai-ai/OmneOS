@@ -18,6 +18,7 @@ from core.config.errors import ConfigurationError
 from omne.input.chords import canonical_shortcut
 
 EnvironmentName = Literal["development", "testing", "production"]
+ModelRoute = Literal["auto", "mock", "local", "nvidia"]
 ExecutionMode = Literal[
     "development",
     "testing",
@@ -46,6 +47,11 @@ ENV_TO_FIELD: dict[str, str] = {
     "OMNE_XAI_MODEL": "xai_model",
     "OMNE_XAI_TIMEOUT_SECONDS": "xai_timeout_seconds",
     "OMNE_XAI_MAX_RETRIES": "xai_max_retries",
+    "OMNE_NVIDIA_BASE_URL": "nvidia_base_url",
+    "OMNE_NVIDIA_MODEL": "nvidia_model",
+    "OMNE_NVIDIA_TIMEOUT_SECONDS": "nvidia_timeout_seconds",
+    "OMNE_NVIDIA_MAX_RETRIES": "nvidia_max_retries",
+    "OMNE_MODEL_ROUTE": "model_route",
     "OMNE_LOCAL_MODEL_BASE_URL": "local_model_base_url",
     "OMNE_BROWSER_COMMAND": "browser_command",
     "OMNE_AGENTS_DIR": "agents_dir",
@@ -86,6 +92,11 @@ class Settings(BaseModel):
     xai_model: str = "grok-4"
     xai_timeout_seconds: int = Field(default=30, ge=1, le=300)
     xai_max_retries: int = Field(default=2, ge=0, le=5)
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nvidia_model: str = "nvidia/nemotron-3-super-120b-a12b"
+    nvidia_timeout_seconds: int = Field(default=30, ge=1, le=300)
+    nvidia_max_retries: int = Field(default=2, ge=0, le=5)
+    model_route: ModelRoute = "auto"
     local_model_base_url: str = ""
     browser_command: str = ""
     agents_dir: Path = Path("agents")
@@ -105,16 +116,19 @@ class Settings(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _default_execution_mode(cls, value: object) -> object:
-        if not isinstance(value, dict) or value.get("execution_mode"):
+        if not isinstance(value, dict):
             return value
         data = dict(value)
         environment = str(data.get("environment", "development"))
-        mapped = {
-            "development": "development",
-            "testing": "testing",
-            "production": "production",
-        }
-        data["execution_mode"] = mapped.get(environment, "development")
+        if not data.get("execution_mode"):
+            mapped = {
+                "development": "development",
+                "testing": "testing",
+                "production": "production",
+            }
+            data["execution_mode"] = mapped.get(environment, "development")
+        if not data.get("model_route"):
+            data["model_route"] = "mock" if environment == "testing" else "auto"
         return data
 
     @field_validator("log_level", mode="before")
@@ -156,6 +170,22 @@ class Settings(BaseModel):
         stripped = value.strip()
         if not stripped:
             raise ValueError("xai_model must not be empty")
+        return stripped
+
+    @field_validator("nvidia_base_url")
+    @classmethod
+    def _validate_nvidia_base_url(cls, value: str) -> str:
+        stripped = value.strip().rstrip("/")
+        if not stripped.startswith("https://"):
+            raise ValueError("nvidia_base_url must start with https://")
+        return stripped
+
+    @field_validator("nvidia_model")
+    @classmethod
+    def _validate_nvidia_model(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("nvidia_model must not be empty")
         return stripped
 
     @field_validator(

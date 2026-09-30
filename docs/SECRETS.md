@@ -62,6 +62,13 @@ contain the value. A keyring that cannot be read back is treated as unavailable.
 `OMNE_SECRETS_DEV_FALLBACK=allow` is the only switch that enables the memory provider in
 development. `true`, `1`, and an omitted variable leave it off. Production ignores the switch.
 
+## NVIDIA
+
+`NVIDIA_API_KEY` is read in every environment when `model/nvidia` is not addressed to `core`. The
+variable is not an `OMNE_` setting and is not written to the configuration file. A missing value
+does not stop Core. `NVIDIA_MODEL` names a catalog id and is not a secret. After the key is
+accepted, later text is scrubbed the same way as other credentials.
+
 ## xAI
 
 `XAI_API_KEY` is still read in development and testing when `model/xai` is not addressed to `core`.
