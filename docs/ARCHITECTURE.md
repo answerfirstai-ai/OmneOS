@@ -148,7 +148,8 @@ different model or agent is used only when another enabled candidate exists.
 The gateway is still the only execution path. Command classes (READ_ONLY, MUTATING, PRIVILEGED,
 DESTRUCTIVE, NETWORK, PACKAGE_INSTALL, PROCESS_CONTROL, SYSTEM_CONFIGURATION) are attached to
 terminal and process decisions. The deny list is unchanged. Workers use the agent manifest grants
-for that call. They do not receive extra permissions because a mission exists.
+for that call. They do not receive extra permissions because a mission exists. After permission
+allows a call, the worker security profile can still deny it. See `docs/SECURITY_MODEL.md`.
 
 ## Model cache
 

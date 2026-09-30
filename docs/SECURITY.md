@@ -1,7 +1,9 @@
 # Security
 
 OMNE fails closed. A missing grant, an unknown tool, a policy exception, or an invalid decision is a
-denial.
+denial. The security boundary is a second gate: a permission allow does not open a protected path, a
+privileged command, another user's files, or a claim above the profile ceiling. Profiles and the
+worker sandbox are described in `docs/SECURITY_MODEL.md`.
 
 ## Secrets
 
