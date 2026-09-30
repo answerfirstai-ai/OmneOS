@@ -123,6 +123,31 @@ def test_model_confirmation_runs_the_read_only_after_approval(tmp_path: Path) ->
     assert child.observations[0]["outputs"][0]["output"]["content"] == "kept\n"
 
 
+def test_model_launch_opens_an_application_window_after_confirmation(tmp_path: Path) -> None:
+    omne = build_OMNE(runtime_settings(tmp_path))
+
+    waiting = omne.execute_sync("launch application Files")
+    assert waiting.status is TaskStatus.WAITING
+    assert not any(event.type == "application.launched" for event in omne.list_events())
+
+    finished = omne.confirm_sync(waiting.id, approved=True)
+    catalog = omne.applications_view()
+    applications = catalog["applications"]
+    files = next(item for item in applications if item["name"] == "Files")
+    views = omne.desktop_view()
+
+    assert finished.status is TaskStatus.COMPLETED
+    assert files["state"] == "focused"
+    assert files["windows"][0]["title"] == "Files"
+    assert files["commanded"] is False
+    assert any(event.type == "application.launched" for event in omne.list_events())
+    assert any(
+        item["decision"]["tools"] == ["application.launch"]
+        for item in views["activity"]
+        if item["decision"]
+    )
+
+
 def test_model_question_can_be_cancelled_without_a_tool(tmp_path: Path) -> None:
     omne = build_OMNE(runtime_settings(tmp_path))
 

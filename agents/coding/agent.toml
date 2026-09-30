@@ -22,6 +22,9 @@ tools = [
   "git.diff",
   "git.branch",
   "git.commit",
+  "application.launch",
+  "application.focus",
+  "application.close",
 ]
 max_workers = 2
 
@@ -30,6 +33,7 @@ filesystem = ["workspace"]
 terminal = ["workspace"]
 process = ["list", "start", "signal"]
 git = ["read", "commit"]
+application = ["launch", "focus", "close"]
 
 [lifecycle]
 persistent = false

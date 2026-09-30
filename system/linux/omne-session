@@ -15,7 +15,24 @@ import urllib.request
 from pathlib import Path
 
 _SHELL_URL = "http://127.0.0.1:4173/"
+_SHELL_SURFACE = "http://127.0.0.1:4173/?surface=desktop"
 _OWNED_APPLICATION = "/usr/lib/omne/applications/omne-hello"
+_SURFACE_CLIENTS = (
+    ("cog", ["cog", "-P", _SHELL_SURFACE]),
+    (
+        "chromium",
+        ["chromium", "--kiosk", "--ozone-platform=wayland", f"--app={_SHELL_SURFACE}"],
+    ),
+    (
+        "chromium-browser",
+        ["chromium-browser", "--kiosk", "--ozone-platform=wayland", f"--app={_SHELL_SURFACE}"],
+    ),
+    (
+        "google-chrome",
+        ["google-chrome", "--kiosk", "--ozone-platform=wayland", f"--app={_SHELL_SURFACE}"],
+    ),
+    ("firefox", ["firefox", "--kiosk", _SHELL_SURFACE]),
+)
 _REBOOT_SOCKET = "/run/omne-reboot.sock"
 
 
@@ -127,6 +144,29 @@ def _stop(process: subprocess.Popen[bytes]) -> None:
         process.wait(timeout=5)
 
 
+def shell_surface_argv(binaries: list[str]) -> list[str] | None:
+    """The Wayland client that maps the OMNE shell. Missing clients map nothing."""
+
+    available = {Path(item).name for item in binaries}
+    for name, argv in _SURFACE_CLIENTS:
+        if name in available:
+            return list(argv)
+    return None
+
+
+def shell_client_environment(
+    base: dict[str, str], *, runtime: str, display: str
+) -> dict[str, str]:
+    """Point the shell client at the labwc socket. The compositor stays on DRM."""
+
+    env = dict(base)
+    env["XDG_RUNTIME_DIR"] = runtime
+    env["WAYLAND_DISPLAY"] = display
+    env["MOZ_ENABLE_WAYLAND"] = "1"
+    env.pop("DISPLAY", None)
+    return env
+
+
 def launch_owned_application(argv: list[str], *, returncode: int) -> str | None:
     """The serial marker for the one OMNE-owned program. Desktop Exec lines stay refused."""
 
@@ -144,7 +184,28 @@ def _run_owned_application() -> None:
     print(marker, flush=True)
 
 
-def _launch(labwc: str, env: dict[str, str], socket_path: Path) -> int:
+def _client_binaries() -> list[str]:
+    root = Path("/usr/bin")
+    return [name for name, _argv in _SURFACE_CLIENTS if (root / name).is_file()]
+
+
+def _map_shell(env: dict[str, str], runtime: str, display: str) -> subprocess.Popen[bytes] | None:
+    argv = shell_surface_argv(_client_binaries())
+    if argv is None:
+        return None
+    try:
+        process = subprocess.Popen(
+            argv,
+            env=shell_client_environment(env, runtime=runtime, display=display),
+        )
+    except OSError as exc:
+        print(f"shell_surface_error={type(exc).__name__}: {exc}", flush=True)
+        return None
+    print("shell surface mapped", flush=True)
+    return process
+
+
+def _launch(labwc: str, env: dict[str, str], socket_path: Path, runtime: str, display: str) -> int:
     try:
         process = subprocess.Popen([labwc], env=env)
     except OSError as exc:
@@ -158,7 +219,9 @@ def _launch(labwc: str, env: dict[str, str], socket_path: Path) -> int:
         desktop_ready=desktop,
     ):
         print(line, flush=True)
+    client: subprocess.Popen[bytes] | None = None
     if ready:
+        client = _map_shell(env, runtime, display)
         try:
             _run_owned_application()
         except OSError as exc:
@@ -166,7 +229,10 @@ def _launch(labwc: str, env: dict[str, str], socket_path: Path) -> int:
     if not ready:
         _stop(process)
         return 1
-    return process.wait()
+    status = process.wait()
+    if client is not None:
+        _stop(client)
+    return status
 
 
 def main() -> int:
@@ -183,7 +249,7 @@ def main() -> int:
     for env in startup_environments(dict(os.environ), _device_names()):
         env["XDG_RUNTIME_DIR"] = runtime
         env["HOME"] = home
-        status = _launch(labwc, env, socket_path)
+        status = _launch(labwc, env, socket_path, runtime, display)
         if status != 1:
             return status
     print("labwc_error=wayland socket was not created", flush=True)
