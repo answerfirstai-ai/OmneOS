@@ -231,7 +231,7 @@ def test_stage_places_services_on_the_ubuntu_base(tmp_path: Path) -> None:
     assert "Requires=omne-core.service" in shell
     assert "WantedBy=multi-user.target" in target
     assert "omne-boot.service" in target
-    assert "omne-session.service" in target
+    assert "omne-session.service" not in target
     assert "omne-diag.service" not in target
     boot = (dest / "etc/systemd/system/omne-boot.service").read_text(encoding="utf-8")
     assert "Conflicts=getty@tty1.service" in boot
@@ -245,6 +245,7 @@ def test_stage_places_services_on_the_ubuntu_base(tmp_path: Path) -> None:
     assert "After=multi-user.target" in diag
     session = (dest / "etc/systemd/system/omne-session.service").read_text(encoding="utf-8")
     assert "After=multi-user.target" in session
+    assert "WAYLAND_DISPLAY" not in session
     assert "ExecStart=/usr/bin/omne-session" in session
     assert (dest / "usr/bin/omne-session").is_file()
     assert (dest / "usr/bin/omne-boot").is_file()

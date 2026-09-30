@@ -40,9 +40,22 @@ def test_renderer_falls_back_when_the_render_node_is_absent() -> None:
     assert session.renderer_environment(["card0", "renderD128"]) == {}
 
 
+def test_labwc_uses_drm_instead_of_a_nested_display() -> None:
+    env = session.labwc_environment(
+        {"WAYLAND_DISPLAY": "wayland-1", "DISPLAY": ":0", "HOME": "/var/lib/omne"},
+        ["card1", "renderD128"],
+    )
+    assert "WAYLAND_DISPLAY" not in env
+    assert "DISPLAY" not in env
+    assert env["WLR_BACKENDS"] == "drm"
+    assert "WLR_RENDERER" not in env
+    assert env["HOME"] == "/var/lib/omne"
+
+
 def test_session_unit_does_not_gate_multi_user() -> None:
     unit = Path("system/linux/omne-session.service").read_text(encoding="utf-8")
     target = Path("system/linux/omne.target").read_text(encoding="utf-8")
     assert "After=multi-user.target" in unit
-    assert "omne-session.service" in target
+    assert "omne-session.service" not in target
     assert "WantedBy=multi-user.target" in unit
+    assert "WAYLAND_DISPLAY" not in unit

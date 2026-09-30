@@ -36,6 +36,17 @@ def renderer_environment(device_names: list[str]) -> dict[str, str]:
     return {"WLR_RENDERER": "pixman"}
 
 
+def labwc_environment(base: dict[str, str], device_names: list[str]) -> dict[str, str]:
+    """Run labwc on DRM. A preset WAYLAND_DISPLAY would select the nested backend."""
+
+    env = dict(base)
+    env.pop("WAYLAND_DISPLAY", None)
+    env.pop("DISPLAY", None)
+    env["WLR_BACKENDS"] = "drm"
+    env.update(renderer_environment(device_names))
+    return env
+
+
 def _device_names() -> list[str]:
     directory = Path("/dev/dri")
     try:
@@ -85,12 +96,10 @@ def _stop(process: subprocess.Popen[bytes]) -> None:
 
 def main() -> int:
     runtime = os.environ.get("XDG_RUNTIME_DIR", "/run/omne")
-    display = os.environ.get("WAYLAND_DISPLAY", "wayland-0")
+    display = "wayland-0"
     labwc = os.environ.get("OMNE_LABWC", "/usr/bin/labwc")
-    env = os.environ.copy()
+    env = labwc_environment(dict(os.environ), _device_names())
     env["XDG_RUNTIME_DIR"] = runtime
-    env["WAYLAND_DISPLAY"] = display
-    env.update(renderer_environment(_device_names()))
     socket_path = Path(runtime) / display
     try:
         process = subprocess.Popen([labwc], env=env)

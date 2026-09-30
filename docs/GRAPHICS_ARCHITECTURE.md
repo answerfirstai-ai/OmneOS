@@ -77,8 +77,9 @@ mode, and an input device are all present. That flag does not start labwc.
 ## Before a graphical desktop can launch in a VM
 
 `omne-session.service` starts labwc after `multi-user.target`. `can_launch` is still only a report.
-The session uses the pixman renderer when `/dev/dri` has no `renderD*` node, and it loads
-`virtio-gpu` when that module is present. The guest still needs:
+The session sets `WLR_BACKENDS=drm` and does not pass `WAYLAND_DISPLAY` into labwc, so the
+compositor opens KMS instead of nesting. It uses the pixman renderer when `/dev/dri` has no
+`renderD*` node, and it loads `virtio-gpu` when that module is present. The guest still needs:
 
 1. A Linux guest with systemd. The UEFI disk from `scripts/linux/build-disk.sh` is the OMNE boot
    path. The kernel stays Ubuntu's `linux-image-generic`.

@@ -12,7 +12,6 @@ RuntimeDirectory=omne
 RuntimeDirectoryMode=0700
 WorkingDirectory=/var/lib/omne
 Environment=XDG_RUNTIME_DIR=/run/omne
-Environment=WAYLAND_DISPLAY=wayland-0
 Environment=LIBSEAT_BACKEND=seatd
 Environment=HOME=/var/lib/omne
 ExecStartPre=+/bin/sh -c '/sbin/modprobe virtio-gpu >/dev/null 2>&1 || true'
