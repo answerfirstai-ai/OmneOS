@@ -161,19 +161,29 @@ monitor_cmd() {
   python3 - "${monitor}" "$1" <<'PY'
 import socket
 import sys
-import time
 
 path, command = sys.argv[1], sys.argv[2]
 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-sock.settimeout(3)
+sock.settimeout(5)
 sock.connect(path)
 try:
     sock.recv(4096)
 except TimeoutError:
     pass
 sock.sendall((command + "\n").encode())
-time.sleep(0.2)
+# Read until the monitor prompt so the command is not cancelled by a short socket.
+buffer = b""
+while b"(qemu)" not in buffer:
+    try:
+        chunk = sock.recv(4096)
+    except TimeoutError:
+        break
+    if not chunk:
+        break
+    buffer += chunk
 sock.close()
+if b"(qemu)" not in buffer:
+    raise SystemExit(1)
 PY
 }
 
@@ -295,19 +305,27 @@ if [[ -f "${log}" ]]; then
   shutdown_before="$(grep -c "Reached target poweroff.target" "${log}" || true)"
 fi
 if kill -0 "${qemu_pid}" 2>/dev/null; then
-  monitor_cmd "system_powerdown" || true
-  deadline=$((SECONDS + 120))
+  sleep 2
+  deadline=$((SECONDS + 90))
   while (( SECONDS < deadline )); do
+    if ! kill -0 "${qemu_pid}" 2>/dev/null; then
+      break
+    fi
+    monitor_cmd "system_powerdown" || true
+    sleep 5
     clean_log
     shutdown_now="$(grep -c "Reached target poweroff.target" "${log}" || true)"
     if [[ "${shutdown_now}" -gt "${shutdown_before}" ]] && ! kill -0 "${qemu_pid}" 2>/dev/null; then
       shutdown_ok=1
       break
     fi
-    sleep 2
   done
 fi
 clean_log
+shutdown_now="$(grep -c "Reached target poweroff.target" "${log}" || true)"
+if [[ "${shutdown_now}" -gt "${shutdown_before}" ]] && ! kill -0 "${qemu_pid}" 2>/dev/null; then
+  shutdown_ok=1
+fi
 if [[ "${shutdown_ok}" -eq 1 ]]; then
   record shutdown pass "systemd reached poweroff.target and QEMU exited"
 else
