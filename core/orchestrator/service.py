@@ -63,6 +63,8 @@ from omne.audio.service import AudioService
 from omne.browser.select import browser_service
 from omne.browser.service import BrowserService
 from omne.display.select import diagnose_display
+from omne.hardware.capabilities import machine_capabilities
+from omne.hardware.model import HardwareInventory
 from omne.hardware.select import hardware_service
 from omne.hardware.service import HardwareService
 from omne.input.model import InputRequest
@@ -614,6 +616,7 @@ class OMNE:
 
     def resource_view(self) -> dict[str, object]:
         snapshot = self._monitor.snapshot()
+        hardware = self.hardware_capabilities()
         if self.resources is None:
             view: dict[str, object] = snapshot.model_dump()
             view["held"] = {
@@ -624,8 +627,16 @@ class OMNE:
                 "gpus": 0,
             }
             view["reservations"] = []
+            view["hardware"] = hardware
             return view
-        return self.resources.status(snapshot)
+        return self.resources.status(snapshot, hardware=hardware)
+
+    def hardware_capabilities(self) -> dict[str, object]:
+        """The capability registry for the machine discovery just read."""
+
+        with self._lock:
+            inventory = self._hardware_service().inventory()
+        return _capability_view(inventory)
 
     def display_view(self) -> dict[str, object]:
         return diagnose_display(self._environment).model_dump(mode="json")
@@ -663,7 +674,10 @@ class OMNE:
 
     def hardware_view(self) -> dict[str, object]:
         with self._lock:
-            return self._hardware_service().inventory().model_dump(mode="json")
+            inventory = self._hardware_service().inventory()
+        payload = inventory.model_dump(mode="json")
+        payload["capabilities"] = _capability_view(inventory)
+        return payload
 
     def _hardware_service(self) -> HardwareService:
         service = self._hardware
@@ -1671,6 +1685,10 @@ def _confirmation_command(pending: dict[str, Any], objective: str) -> str:
         if isinstance(argv, list) and argv and all(isinstance(item, str) for item in argv):
             return " ".join(argv)
     return objective
+
+
+def _capability_view(inventory: HardwareInventory) -> dict[str, object]:
+    return machine_capabilities(inventory).model_dump(mode="json")
 
 
 def mission_document(mission: Mission) -> dict[str, Any]:

@@ -26,6 +26,8 @@ DeviceType = Literal[
     "bluetooth",
     "audio",
     "camera",
+    "microphone",
+    "motherboard",
     "battery",
     "power",
 ]

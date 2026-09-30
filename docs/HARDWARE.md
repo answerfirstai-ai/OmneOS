@@ -9,17 +9,26 @@ Linux kernel drivers
 sysfs and proc
         │
         ▼
-omne.hardware provider   ← mock inventory, or a Linux read
+Hardware discovery       ← one inventory, whatever machine this is
         │
         ▼
-HardwareService          ← hotplug diff, then events
+Capability registry      ← cpu, gpu, memory, board, and peripherals
         │
         ▼
-OMNE Core                ← GET /hardware, OMNE hardware
+Resource manager         ← holds, plus that registry
+        │
+        ▼
+OMNE                     ← GET /hardware, OMNE hardware, OMNE compute
 ```
 
 Core imports `omne.hardware.select`. Discovery does not load a module, write sysfs, or run a
 configuration command. `drivers_modified` is false. There is no `POST /hardware`.
+
+The capability registry is derived from the inventory. A missing category is false. A category
+whose directory could not be read is null. CUDA is true only when the bound kernel driver is
+`nvidia`. A PCI vendor id such as `0x10de` stays on the device record. The registry may name a
+known id (`NVIDIA`) and still keeps `vendor_id`. Unknown ids are not renamed. VRAM text is
+rendered from `mem_info_vram_total` only. The registry does not call NVIDIA.
 
 ## What a device contains
 
@@ -28,7 +37,7 @@ configuration command. `drivers_modified` is false. There is no `POST /hardware`
 | Field           | Meaning                                                                                                                           |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `id`            | Stable name from the kernel path, such as `storage-vda` or `cpu-package-0`                                                        |
-| `type`          | cpu, memory, gpu, monitor, keyboard, mouse, input, usb, pci, storage, ethernet, wifi, bluetooth, audio, camera, battery, or power |
+| `type`          | cpu, memory, motherboard, gpu, monitor, keyboard, mouse, input, usb, pci, storage, ethernet, wifi, bluetooth, audio, microphone, camera, battery, or power |
 | `vendor`        | The vendor string or id Linux published. Null when the source has none                                                            |
 | `model`         | The product string or device id Linux published. Null when the source has none                                                    |
 | `driver`        | The driver symlink name. Null when the device has no bound driver                                                                 |
@@ -50,8 +59,9 @@ empty category, not a gap, and not a claim that the read failed.
 
 | Device    | Linux source                                                                   |
 | --------- | ------------------------------------------------------------------------------ |
-| CPU       | `/proc/cpuinfo`, `/sys/devices/system/cpu`                                     |
-| RAM       | `/proc/meminfo`                                                                |
+| CPU         | `/proc/cpuinfo`, `/sys/devices/system/cpu`                                         |
+| RAM         | `/proc/meminfo`                                                                    |
+| Motherboard | `/sys/class/dmi/id`, or `/sys/devices/virtual/dmi/id` when that class is absent    |
 | GPU       | `/sys/class/drm/cardN`                                                         |
 | VRAM      | `mem_info_vram_total` and `mem_info_vram_used` on that card                    |
 | Monitors  | DRM connectors whose `status` is `connected`                                   |
@@ -63,8 +73,9 @@ empty category, not a gap, and not a claim that the read failed.
 | Ethernet  | `/sys/class/net` interfaces with a parent device and no wireless directory     |
 | Wi-Fi     | The same tree when `wireless` or `phy80211` exists                             |
 | Bluetooth | `/sys/class/bluetooth`, with `/sys/class/rfkill` state when the name matches   |
-| Audio     | `/sys/class/sound/cardN`, or `/proc/asound/cards` when that class is absent    |
-| Cameras   | `/sys/class/video4linux` when it exists                                        |
+| Audio       | `/sys/class/sound/cardN`, or `/proc/asound/cards` when that class is absent        |
+| Microphone  | Capture PCM nodes under `/sys/class/sound`, or `/proc/asound/pcm`. The device is not opened |
+| Cameras     | `/sys/class/video4linux` when it exists                                            |
 | Battery   | `/sys/class/power_supply` entries whose type is `Battery`                      |
 | Mains     | Power-supply entries whose type is `Mains`, `USB`, or `UPS`                    |
 

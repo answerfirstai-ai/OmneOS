@@ -48,7 +48,7 @@ does not start a virtual machine. See `docs/VM_TEST.md`.
 Phase 16, physical hardware installation, has not been started. `omne.display` can report whether
 labwc, DRM, a render node, a connected monitor, and an input device are present. It does not start a
 Wayland session. `omne.windowing` records windows and workspaces for that session and does not
-command labwc. `omne.hardware` reads Linux device state and does not configure it. `omne.network`
+command labwc. `omne.hardware` reads Linux device state, derives a capability registry from that read, and does not configure it. `omne.network`
 reads the Linux network stack and does not replace systemd-networkd. `omne.audio` reads the Linux
 audio stack and does not open a microphone. `omne.input` reads configured shortcuts and published
 keyboards and mice and does not read the keyboard stream. `omne.storage` reads disks and mounts and
