@@ -11,6 +11,7 @@ from pathlib import Path
 
 from core.orchestrator.task import Task, TaskStatus, transition_task
 from core.sqlite import configure_sqlite
+from omne.secrets.redact import redact_object
 
 
 class TaskStore:
@@ -37,6 +38,7 @@ class TaskStore:
         self._cache: dict[str, Task] = {}
 
     def save(self, task: Task) -> Task:
+        task = Task.model_validate(redact_object(task.model_dump(mode="json")))
         document = json.dumps(task.model_dump(mode="json"), sort_keys=True)
         with self._lock:
             self._connection.execute(

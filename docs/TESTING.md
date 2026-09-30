@@ -38,6 +38,10 @@ Python:
   and a claim above the profile ceiling are denied. A permissive permission result does not bypass
   the boundary. The worker sandbox covers boot, credentials, other homes, and raw devices, and it
   does not remove host `/dev/null`.
+- Secrets. A credential addressed to one agent is not returned to another. Store, delete, and rotate
+  stay with `core` and are denied in production. A registered value is absent from logs, events,
+  traces, model context, and the SQLite task record. `XAI_API_KEY` still supplies development and is
+  not copied into settings.
 - Resource reservations. A fixed snapshot lets a 4-CPU, 4 GB worker run beside a GPU worker that
   needs 8 GB of VRAM. A second claim that does not fit waits until release. A request larger than
   the machine is denied and does not hold capacity. Unknown GPU, CPU, disk, and thermal readings

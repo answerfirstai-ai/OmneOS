@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from core.memory.database import MemoryDatabase
 from core.memory.retrieval import AccessGrant, like_pattern
+from omne.secrets.redact import redact_object, redact_text
 
 
 class MemoryRecord(BaseModel):
@@ -50,8 +51,8 @@ class MemoryStore:
             id=str(uuid4()),
             scope=scope,
             scope_key=scope_key,
-            content=content,
-            metadata=dict(metadata or {}),
+            content=redact_text(content),
+            metadata=redact_object(dict(metadata or {})),
             created_at=datetime.now(UTC),
             trace_id=trace_id,
             source=source,

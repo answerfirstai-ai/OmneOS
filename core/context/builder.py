@@ -7,6 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from omne.secrets.redact import redact_text
+
 
 class ContextItem(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -49,10 +51,11 @@ def build_context(
     """Rank a few relevant notes. The full memory database is never included."""
 
     del char_limit
+    request = redact_text(request)
     ranked: list[ContextItem] = []
     terms = {word.lower() for word in request.split() if len(word) > 2}
     for memory in memories:
-        content = str(memory.get("content", ""))
+        content = redact_text(str(memory.get("content", "")))
         overlap = sum(1 for term in terms if term in content.lower())
         if terms and overlap == 0:
             continue

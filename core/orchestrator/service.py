@@ -944,6 +944,7 @@ class OMNE:
                 "model.",
                 "compute.",
                 "security.",
+                "secret.",
             )
         ):
             self._world.invalidate()

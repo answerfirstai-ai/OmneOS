@@ -30,8 +30,9 @@ The core service runs as the system user `omne`, reads `/etc/omne/OMNE.toml`, an
 `127.0.0.1:8787`. State is `/var/lib/omne`. The shell service starts after the core and serves
 `127.0.0.1:4173`. Both units drop capabilities, use `SystemCallFilter=@system-service`, and keep
 boot and credential paths inaccessible. `omne-agent` and `omne-app` are separate `nologin` users.
-The target wants both services, so a boot reaches OMNE without a user launching it. See
-`docs/SECURITY_MODEL.md`.
+The target wants both services, so a boot reaches OMNE without a user launching it. Credentials use
+the kernel keyring through `libkeyutils` and are not written into `OMNE.toml`. See
+`docs/SECURITY_MODEL.md` and `docs/SECRETS.md`.
 
 `scripts/linux/install.sh` is still the user unit for a checkout. It is not the system install.
 

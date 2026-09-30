@@ -12,6 +12,7 @@ from core.permissions.policies import PermissionDecision, PermissionRequest
 from core.security.boundary import BoundaryDecision, admit_tool
 from core.tools.base import ToolContext, ToolError, ToolResult
 from core.tools.registry import ToolRegistry
+from omne.secrets.redact import redact_object, redact_text
 
 logger = get_logger("tools")
 
@@ -160,9 +161,13 @@ class ToolGateway:
             tool_id=tool_id,
             payload={"unavailable": unavailable},
         )
-        return ToolResult(ok=True, tool_id=tool_id, output=output, unavailable=unavailable)
+        scrubbed = redact_object(output)
+        if not isinstance(scrubbed, dict):
+            scrubbed = {}
+        return ToolResult(ok=True, tool_id=tool_id, output=scrubbed, unavailable=unavailable)
 
     def _fail(self, tool_id: str, context: ToolContext, *, code: str, message: str) -> ToolResult:
+        message = redact_text(message)
         self._events.publish(
             "tool.failed",
             task_id=context.task_id,

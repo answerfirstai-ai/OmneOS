@@ -13,6 +13,7 @@ local manifest sets `ram_known` and `vram_known` to false, so the allocator defe
 inventing hardware numbers. `ModelRuntime` is the load path. It uses an adapter, enforces the
 context window and the allocator, and does not download weights. See `docs/MODELS.md`.
 
-xAI calls `POST {base}/chat/completions`. A missing `XAI_API_KEY` raises `ProviderError` with code
-`configuration` before any HTTP request. Authentication failures are not retried. Timeouts, 429, and
-5xx responses retry up to `xai_max_retries`.
+xAI calls `POST {base}/chat/completions`. In development and testing, a missing `XAI_API_KEY` and a
+missing `model/xai` secret raise `ProviderError` with code `configuration` before any HTTP request.
+Production uses the stored secret and does not read the variable. Authentication failures are not
+retried. Timeouts, 429, and 5xx responses retry up to `xai_max_retries`. See `docs/SECRETS.md`.

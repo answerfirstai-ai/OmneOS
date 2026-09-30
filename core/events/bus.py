@@ -13,6 +13,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.trace import current_mission_id, current_trace_id
+from omne.secrets.redact import redact_object
 
 Subscriber = Callable[["Event"], None]
 
@@ -85,7 +86,7 @@ class EventBus:
             mission_id=current_mission_id() if mission_id is None else mission_id,
             worker_id=worker_id,
             source=source,
-            payload=dict(payload or {}),
+            payload=redact_object(dict(payload or {})),
         )
         with self._lock:
             self._events.append(event)

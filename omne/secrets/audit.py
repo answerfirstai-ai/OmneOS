@@ -1,4 +1,8 @@
-"""Append-only permission audit log."""
+"""Append-only record of secret access.
+
+An entry names the action, scope, name, agent, and decision. It has no field
+for the credential.
+"""
 
 from __future__ import annotations
 
@@ -6,44 +10,33 @@ import json
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from omne.secrets.redact import redact_object, redact_text
 
-
-class AuditEntry(BaseModel):
-    """One permission decision."""
+class SecretAuditEntry(BaseModel):
+    """One secret decision."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     timestamp: datetime
+    action: str
+    scope: str
+    name: str
+    agent_id: str
     decision: str
-    policy_id: str
     reason: str
-    tool_id: str
-    task_id: str | None
-    agent_id: str | None
-    user: str
-    arguments: dict[str, Any]
 
 
-class AuditLog:
-    """Record permission decisions in memory and, when configured, on disk."""
+class SecretAuditLog:
+    """Record secret decisions in memory and, when configured, on disk."""
 
     def __init__(self, path: Path | None = None) -> None:
         self._path = path
-        self._entries: list[AuditEntry] = []
+        self._entries: list[SecretAuditEntry] = []
         self._lock = threading.Lock()
 
-    def record(self, entry: AuditEntry) -> None:
-        entry = entry.model_copy(
-            update={
-                "reason": redact_text(entry.reason),
-                "arguments": redact_object(entry.arguments),
-            }
-        )
+    def record(self, entry: SecretAuditEntry) -> None:
         line = json.dumps(entry.model_dump(mode="json"), sort_keys=True)
         with self._lock:
             self._entries.append(entry)
@@ -53,7 +46,7 @@ class AuditLog:
             with path.open("a", encoding="utf-8") as handle:
                 handle.write(line + "\n")
 
-    def entries(self) -> list[AuditEntry]:
+    def entries(self) -> list[SecretAuditEntry]:
         with self._lock:
             return list(self._entries)
 

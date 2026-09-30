@@ -11,4 +11,5 @@ Application discovery reads desktop entries and does not start a shell.
 Browser integration keeps the application, automation, research, and rendering layers apart
 and does not import Playwright.
 Process inspection reads the process table and does not signal the host.
+Secret storage keeps credentials out of configuration, logs, and task records.
 """
