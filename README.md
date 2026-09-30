@@ -16,6 +16,18 @@ Debian and Ubuntu also need the `python3.12-venv` package.
 
 Verified locally with Python 3.12.3, Node.js 22.14.0, and npm 10.9.7.
 
+## Windows simulation
+
+On Windows 11, paste this into Command Prompt. It installs Git, Python 3.12, and Node.js 22, clones
+this branch into `%USERPROFILE%\OmneOS`, builds the shell, and opens the desktop. No API key is
+required.
+
+```bat
+curl.exe -fL --ssl-no-revoke -o %TEMP%\omne-install.cmd https://raw.githubusercontent.com/answerfirstai-ai/OmneOS/cursor/omne-desktop-windows-92cc/scripts/windows/install-simulation.cmd && %TEMP%\omne-install.cmd
+```
+
+The same steps are in `scripts/windows/install-simulation.cmd`.
+
 ## Setup
 
 ```bash
