@@ -168,6 +168,16 @@ def test_decision_engine_covers_the_execution_paths() -> None:
     assert denied.decision == "DENY"
     assert denied.trace_id == "t"
 
+    fallback = engine.decide(
+        intent.interpret("read file notes.txt"),
+        mode="production",
+        local_available=False,
+        cloud_available=False,
+        cpu_wait=False,
+        trace_id="t",
+    )
+    assert fallback.decision == "CLOUD_MODEL"
+
 
 def test_capability_registry_rejects_duplicates_and_malformed_manifests(tmp_path: Path) -> None:
     registry = CapabilityRegistry()

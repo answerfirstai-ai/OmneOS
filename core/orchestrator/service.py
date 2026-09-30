@@ -530,7 +530,7 @@ class OMNE:
             route=route,
             available=self._available_model_ids(),
             preferred_model=self._preferred_nvidia_model or None,
-            allow_mock=self._mode != "production",
+            allow_mock=True,
         )
 
     async def decide_for(self, task: Task) -> StructuredDecision:
@@ -553,7 +553,7 @@ class OMNE:
             worker_id=worker if isinstance(worker, str) else None,
             trace_id=trace if isinstance(trace, str) else None,
             preferred_model=self._preferred_nvidia_model or None,
-            allow_mock=self._mode != "production",
+            allow_mock=True,
         )
 
     def _intelligence_context(self, objective: str) -> IntelligenceContext:
@@ -1179,7 +1179,7 @@ class OMNE:
             snapshot,
             route=route,
             available=available,
-            allow_mock=self._mode != "production",
+            allow_mock=True,
             preferred_model=self._preferred_nvidia_model or None,
         )
         if not chain:
