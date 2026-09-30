@@ -1,7 +1,7 @@
 id = "browser"
 name = "Browser"
 version = "0.1.0"
-description = "Opens a configured browser command. Navigation is unavailable until one is set."
+description = "Opens a configured browser command. It does not automate pages, take screenshots, or complete authentication."
 capabilities = ["browser_navigation", "page_extraction"]
 tools = ["browser.open", "browser.search"]
 

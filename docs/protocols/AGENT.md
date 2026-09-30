@@ -6,12 +6,13 @@ shut down `after_task`. Unknown tool ids are rejected when the loader is given t
 
 Shipped agents:
 
-| id       | Capabilities                               | Tools                               |
-| -------- | ------------------------------------------ | ----------------------------------- |
-| system   | system and process inspection              | system telemetry and `process.list` |
-| coding   | development, analysis, testing, debugging  | filesystem, terminal, process, git  |
-| research | source collection, summarization, research | filesystem read and search          |
-| browser  | navigation and page extraction             | `browser.open` and `browser.search` |
+| id             | Capabilities                               | Tools                                |
+| -------------- | ------------------------------------------ | ------------------------------------ |
+| system         | system and process inspection              | system telemetry and `process.list`  |
+| coding         | development, analysis, testing, debugging  | filesystem, terminal, process, git   |
+| research       | source collection, summarization, research | filesystem read and search           |
+| browser        | navigation                                 | `browser.open` and `browser.search`  |
+| browser-worker | automation, research, rendering, handoff   | session tools, each behind its grant |
 
 Lifecycle edges are enforced. Illegal edges raise `InvalidAgentTransition`. Agents exchange
 `AgentMessage` values, which also publish `agent.message`.

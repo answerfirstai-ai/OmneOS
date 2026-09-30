@@ -68,6 +68,9 @@ Python:
 - Application lookup. The testing API uses Firefox and Files from the mock catalog. A Linux fixture
   reads desktop files, a process name, and a window snapshot, and it does not spawn a process. A
   shell `Exec` line is not launchable. `POST /applications` stays 404.
+- Browser layers. The testing API uses a simulated Firefox session and does not fetch a page. A
+  Linux fixture reads a browser desktop entry and a process name, and it does not spawn a process.
+  `browser.open` stays unavailable when no browser command is configured. `POST /browser` stays 404.
 
 TypeScript:
 

@@ -1,0 +1,30 @@
+id = "browser-worker"
+name = "Browser Worker"
+version = "0.1.0"
+description = "Future browser worker. Automation stays behind browser:automate and does not run until an engine is installed."
+capabilities = ["browser_automation", "browser_research", "browser_rendering", "authentication_handoff"]
+tools = [
+  "browser.launch",
+  "browser.navigate",
+  "browser.inspect",
+  "browser.research",
+  "browser.screenshot",
+  "browser.interact",
+  "browser.automate",
+]
+
+[permissions]
+browser = ["launch", "session", "inspect", "research", "render", "interact", "automate"]
+
+[lifecycle]
+persistent = false
+startup = "on_demand"
+shutdown = "after_task"
+
+[resources]
+ram_mb = 128
+vram_mb = 0
+cpu_threads = 1
+disk_mb = 0
+ram_known = true
+vram_known = true

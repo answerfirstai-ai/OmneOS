@@ -45,13 +45,15 @@ command labwc. `omne.hardware` reads Linux device state and does not configure i
 reads the Linux network stack and does not replace systemd-networkd. `omne.audio` reads the Linux
 audio stack and does not open a microphone. `omne.input` reads configured shortcuts and published
 keyboards and mice and does not read the keyboard stream. `omne.storage` reads disks and mounts and
-does not format them. `omne.applications` reads desktop entries and does not start a shell. The
-shell is still the web desktop. `docs/GRAPHICS_ARCHITECTURE.md` lists what a VM needs before that
-session can launch. `docs/WINDOWING.md` describes the window record. `docs/NETWORK.md` describes the
-network read. `docs/AUDIO_ARCHITECTURE.md` describes the audio read and the later voice path.
-`docs/INPUT_ARCHITECTURE.md` describes the shortcut configuration and the closed key stream.
-`docs/STORAGE.md` describes the disk read and the path classes. `docs/APPLICATIONS.md` describes the
-application lookup.
+does not format them. `omne.applications` reads desktop entries and does not start a shell.
+`omne.browser` separates the browser application from automation, research, and rendering, and it
+does not import Playwright. The shell is still the web desktop. `docs/GRAPHICS_ARCHITECTURE.md`
+lists what a VM needs before that session can launch. `docs/WINDOWING.md` describes the window
+record. `docs/NETWORK.md` describes the network read. `docs/AUDIO_ARCHITECTURE.md` describes the
+audio read and the later voice path. `docs/INPUT_ARCHITECTURE.md` describes the shortcut
+configuration and the closed key stream. `docs/STORAGE.md` describes the disk read and the path
+classes. `docs/APPLICATIONS.md` describes the application lookup. `docs/BROWSER.md` describes the
+four browser layers and the Playwright dependency.
 
 The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
 capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,

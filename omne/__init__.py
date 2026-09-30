@@ -8,4 +8,6 @@ Audio discovery reads PipeWire or ALSA and does not open a microphone.
 Input bindings come from configuration and do not read the keyboard stream.
 Storage inspection reads disks and mounts and does not format them.
 Application discovery reads desktop entries and does not start a shell.
+Browser integration keeps the application, automation, research, and rendering layers apart
+and does not import Playwright.
 """

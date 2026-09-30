@@ -86,7 +86,8 @@ devices Linux has already published and does not change drivers. `OMNE network` 
 network stack and does not change it. `OMNE audio` reports the Linux audio stack and does not open a
 microphone. `OMNE input` reports configured shortcuts and does not read the keyboard. `OMNE storage`
 reports disks and mounts and does not format them. `OMNE applications` reports installed desktop
-applications and does not start a shell. Physical hardware installation is not implemented.
+applications and does not start a shell. `OMNE browser` reports browser availability and does not
+launch a browser or import Playwright. Physical hardware installation is not implemented.
 
 ## License
 

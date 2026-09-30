@@ -48,6 +48,8 @@ from omne.applications.service import ApplicationService
 from omne.audio.model import AudioRequest
 from omne.audio.select import audio_service
 from omne.audio.service import AudioService
+from omne.browser.select import browser_service
+from omne.browser.service import BrowserService
 from omne.display.select import diagnose_display
 from omne.hardware.select import hardware_service
 from omne.hardware.service import HardwareService
@@ -124,6 +126,7 @@ class OMNE:
         cancel_shortcut: str = "",
         push_to_talk_shortcut: str = "",
         applications: ApplicationService | None = None,
+        browser: BrowserService | None = None,
     ) -> None:
         self._store = store
         self._scheduler = scheduler
@@ -163,6 +166,7 @@ class OMNE:
         self._input: InputService | None = None
         self._storage: StorageService | None = None
         self._applications = applications
+        self._browser = browser
         self._activation_shortcut = activation_shortcut
         self._cancel_shortcut = cancel_shortcut
         self._push_to_talk_shortcut = push_to_talk_shortcut
@@ -558,6 +562,14 @@ class OMNE:
                     "commanded": False,
                 }
             return service.catalog().model_dump(mode="json")
+
+    def browser_view(self) -> dict[str, object]:
+        with self._lock:
+            service = self._browser
+            if service is None:
+                service = browser_service(self._environment)
+                self._browser = service
+            return service.status().model_dump(mode="json")
 
     def voice_status(self) -> dict[str, object]:
         return self._voice.status()
