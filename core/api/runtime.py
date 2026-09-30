@@ -43,6 +43,13 @@ from omne.applications.select import application_service
 from omne.applications.service import ApplicationService
 from omne.browser.select import browser_service
 from omne.browser.service import BrowserService
+from omne.processes.select import process_service
+from omne.processes.service import (
+    ProcessService,
+    admit_resources,
+    application_id_for,
+    worker_id_for,
+)
 
 
 def build_OMNE(settings: Settings) -> OMNE:
@@ -61,10 +68,14 @@ def build_OMNE(settings: Settings) -> OMNE:
     evaluator = PermissionEvaluator()
     applications = _application_service(settings, events, evaluator)
     browser = _browser_service(settings, events, evaluator)
+    lifecycle = AgentLifecycle(events)
+    runtime = AgentRuntime(lifecycle, events=events)
+    processes = _process_service(settings, events, evaluator, monitor, runtime, applications)
     tools = build_registry(
         browser_command=settings.browser_command,
         applications=applications,
         browser=browser,
+        processes=processes,
     )
     gateway = ToolGateway(
         tools,
@@ -74,10 +85,8 @@ def build_OMNE(settings: Settings) -> OMNE:
     )
     agents = AgentRegistry()
     agents.discover(settings.agents_dir, known_tools=tools.ids())
-    lifecycle = AgentLifecycle(events)
     for manifest in agents.all():
         lifecycle.register(manifest.id)
-    runtime = AgentRuntime(lifecycle, events=events)
     models = ModelRegistry()
     models.discover(settings.models_dir)
     for model in models.enabled():
@@ -147,6 +156,7 @@ def build_OMNE(settings: Settings) -> OMNE:
         push_to_talk_shortcut=settings.push_to_talk_shortcut,
         applications=applications,
         browser=browser,
+        processes=processes,
     )
     executor._context_text = omne.context_for
     return omne
@@ -206,6 +216,59 @@ def _browser_service(
         return result.decision.value, result.reason
 
     return browser_service(settings.environment, sink=sink, authorize=authorize)
+
+
+def _process_service(
+    settings: Settings,
+    events: EventBus,
+    evaluator: PermissionEvaluator,
+    monitor: SystemMonitor,
+    runtime: AgentRuntime,
+    applications: ApplicationService,
+) -> ProcessService:
+    def sink(event_type: str, payload: dict[str, Any]) -> None:
+        events.publish(event_type, source="processes", payload=payload)
+
+    def authorize(
+        tool_id: str,
+        arguments: dict[str, object],
+        grants: Mapping[str, Sequence[str]],
+        environment: str,
+    ) -> tuple[str, str]:
+        result = evaluator.evaluate(
+            PermissionRequest(
+                tool_id=tool_id,
+                arguments=dict(arguments),
+                grants={key: list(value) for key, value in grants.items()},
+                environment=environment,
+                workspace_root=str(settings.workspace_root),
+            )
+        )
+        return result.decision.value, result.reason
+
+    def admit() -> tuple[str, str]:
+        snapshot = monitor.snapshot()
+        return admit_resources(snapshot.cpu.usage_percent, snapshot.memory.available_mb)
+
+    def worker_for(task_id: str | None) -> str | None:
+        rows = [
+            (worker.worker_id, worker.current_task, worker.status)
+            for worker in runtime.pool.list_workers()
+        ]
+        return worker_id_for(task_id, rows)
+
+    def application_for(program: str) -> str | None:
+        catalog = [(app.id, app.executable) for app in applications.catalog().applications]
+        return application_id_for(program, catalog)
+
+    return process_service(
+        settings.environment,
+        sink=sink,
+        authorize=authorize,
+        admit=admit,
+        worker_for=worker_for,
+        application_for=application_for,
+    )
 
 
 def _model_is_available(settings: Settings, provider: str) -> bool:

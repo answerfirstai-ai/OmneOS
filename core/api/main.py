@@ -84,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_applications(settings)
     if args.command == "browser":
         return _run_browser(settings)
+    if args.command == "processes":
+        return _run_processes(settings)
     return _run_inspection(settings, args)
 
 
@@ -123,6 +125,9 @@ def _build_parser() -> argparse.ArgumentParser:
     commands.add_parser("storage", help="print storage diagnostics without formatting a disk")
     commands.add_parser("applications", help="print installed applications without launching one")
     commands.add_parser("browser", help="print browser availability without launching one")
+    commands.add_parser(
+        "processes", help="print the process table without starting or signaling a process"
+    )
     mission = commands.add_parser("mission", help="inspect missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
     mission_commands.add_parser("list", help="list missions")
@@ -270,6 +275,11 @@ def _run_applications(settings: Settings) -> int:
 
 def _run_browser(settings: Settings) -> int:
     print(json.dumps(build_OMNE(settings).browser_view(), sort_keys=True))
+    return 0
+
+
+def _run_processes(settings: Settings) -> int:
+    print(json.dumps(build_OMNE(settings).processes_view(), sort_keys=True))
     return 0
 
 

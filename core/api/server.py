@@ -183,6 +183,7 @@ def _is_runtime_path(path: str) -> bool:
         "/storage",
         "/applications",
         "/browser",
+        "/processes",
         "/network",
         "/voice",
         "/desktop",

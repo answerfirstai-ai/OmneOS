@@ -52,6 +52,7 @@ _HIGH_CAPABILITIES = frozenset(
     {
         "terminal.execute",
         "process.stop",
+        "process.restart",
         "git.commit",
         "network.connect",
         "network.disconnect",

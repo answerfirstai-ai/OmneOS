@@ -81,7 +81,8 @@ configuration. The image does not grab the keyboard. See `docs/INPUT_ARCHITECTUR
 the layout Linux already published. The image does not format a disk. See `docs/STORAGE.md`.
 Installed applications are the desktop entries Linux already published. The image does not start
 those programs from the application reader. See `docs/APPLICATIONS.md`. Browser automation is not
-installed with the image. Playwright is documented and not imported. See `docs/BROWSER.md`.
+installed with the image. Playwright is documented and not imported. See `docs/BROWSER.md`. Process
+inspection reads `/proc` and does not signal a running process. See `docs/PROCESSES.md`.
 
 `omne-boot` is the tty1 program. It prints Hardware, Storage, Network, GPU, Core, and Models from
 the live machine and from `GET /health` and `GET /models`. A check is printed only when that probe

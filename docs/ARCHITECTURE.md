@@ -195,4 +195,8 @@ mice. It does not read the keyboard stream. See `docs/INPUT_ARCHITECTURE.md`. `o
 disks, partitions, and mounts and does not format them. See `docs/STORAGE.md`. `omne.applications`
 reads desktop entries and does not start a shell. See `docs/APPLICATIONS.md`. `omne.browser` keeps
 the browser application, automation, research, and rendering layers apart and does not import
-Playwright. See `docs/BROWSER.md`.
+Playwright. See `docs/BROWSER.md`. `omne.processes` reads the process table, including CPU, memory,
+owner, parent, children, state, start time, and limits. Command lines stay hidden unless
+`process:command` is granted. Start, stop, and restart pass through permissions and do not signal
+pid 1, kernel threads, system services, OMNE Core, security services, or the desktop session. See
+`docs/PROCESSES.md`.

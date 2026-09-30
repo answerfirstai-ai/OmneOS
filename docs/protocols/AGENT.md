@@ -14,5 +14,8 @@ Shipped agents:
 | browser        | navigation                                 | `browser.open` and `browser.search`  |
 | browser-worker | automation, research, rendering, handoff   | session tools, each behind its grant |
 
+The system agent can list processes. The coding agent can also start and stop one it owns. Neither
+manifest holds `process:command` or `process:restart`. See `docs/PROCESSES.md`.
+
 Lifecycle edges are enforced. Illegal edges raise `InvalidAgentTransition`. Agents exchange
 `AgentMessage` values, which also publish `agent.message`.

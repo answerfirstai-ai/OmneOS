@@ -59,6 +59,8 @@ from omne.input.service import InputService
 from omne.network.model import NetworkRequest
 from omne.network.select import network_service
 from omne.network.service import NetworkService
+from omne.processes.select import process_service
+from omne.processes.service import ProcessService
 from omne.storage.select import storage_service
 from omne.storage.service import StorageService
 from omne.windowing.model import WindowRequest
@@ -127,6 +129,7 @@ class OMNE:
         push_to_talk_shortcut: str = "",
         applications: ApplicationService | None = None,
         browser: BrowserService | None = None,
+        processes: ProcessService | None = None,
     ) -> None:
         self._store = store
         self._scheduler = scheduler
@@ -167,6 +170,7 @@ class OMNE:
         self._storage: StorageService | None = None
         self._applications = applications
         self._browser = browser
+        self._processes = processes
         self._activation_shortcut = activation_shortcut
         self._cancel_shortcut = cancel_shortcut
         self._push_to_talk_shortcut = push_to_talk_shortcut
@@ -569,6 +573,14 @@ class OMNE:
             if service is None:
                 service = browser_service(self._environment)
                 self._browser = service
+            return service.status().model_dump(mode="json")
+
+    def processes_view(self) -> dict[str, object]:
+        with self._lock:
+            service = self._processes
+            if service is None:
+                service = process_service(self._environment)
+                self._processes = service
             return service.status().model_dump(mode="json")
 
     def voice_status(self) -> dict[str, object]:

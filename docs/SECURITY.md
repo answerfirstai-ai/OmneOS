@@ -19,11 +19,13 @@ Every tool call goes through `ToolGateway`. The default policy:
 - Denies paths outside the workspace, `.git` paths, and recursive removal.
 - Denies `sudo`, `su`, `doas`, `pkexec`, shutdown, disk partitioning, firewall, and bootloader
   commands even when the caller has already approved a confirmation.
-- Requires confirmation for `terminal.execute`, `process.start`, `process.stop`, and `git.commit` in
-  development and testing.
+- Requires confirmation for `terminal.execute`, `process.start`, `process.stop`, `process.restart`,
+  and `git.commit` in development and testing.
 - Denies those high-risk tools in production.
 - Denies `voice.transmit`.
-- Denies signaling pid 1. The process tool also rejects pid 1 before a signal is sent.
+- Denies signaling pid 1. Shells and protected programs are denied before a process start is
+  recorded. `process:command` is required before a command line is returned, and that line is not
+  written onto a process event.
 
 Terminal and process-start decisions also record a command class: READ_ONLY, MUTATING, PRIVILEGED,
 DESTRUCTIVE, NETWORK, PACKAGE_INSTALL, PROCESS_CONTROL, or SYSTEM_CONFIGURATION. The class does not
@@ -48,8 +50,9 @@ authentication on the local API. Do not publish the port to an untrusted network
 CORS stays empty unless `cors_origins` lists the request origin. `POST /health` is method not
 allowed. Task routes accept a JSON body up to 1 MB.
 
-Terminal and process tools run with `shell=False`. The subprocess environment keeps `PATH`, `HOME`,
-`LANG`, `LC_ALL`, `TMPDIR`, and `SYSTEMROOT` only.
+Terminal tools run with `shell=False`. The subprocess environment keeps `PATH`, `HOME`, `LANG`,
+`LC_ALL`, `TMPDIR`, and `SYSTEMROOT` only. Process start, stop, and restart go through the process
+service. The Linux provider does not spawn or signal a process.
 
 ## Host changes
 
@@ -77,5 +80,8 @@ desktop `Exec` line that uses a shell is not launchable. The Linux provider does
 process. `POST /applications` is not a route. Browser launch, session navigation, inspection,
 research, screenshots, user control, and automation each require their own `browser:` grant. The
 shipped browser agent holds navigation only. Automation does not accept a secret, and Playwright is
-not imported. `POST /browser` is not a route. The ISO script does not write `OMNE-OS.iso`. No
-physical disk installation is performed.
+not imported. `POST /browser` is not a route. Process start, stop, and restart require
+`process:start`, `process:signal`, and `process:restart`. The Linux provider does not signal pid 1,
+a kernel thread, a system service, OMNE Core, a security service, or the desktop session. A command
+line requires `process:command` and is omitted from `GET /processes`. `POST /processes` is not a
+route. The ISO script does not write `OMNE-OS.iso`. No physical disk installation is performed.
