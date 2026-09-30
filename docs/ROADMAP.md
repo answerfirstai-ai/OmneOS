@@ -40,8 +40,10 @@ Phase 14 writes `OMNE-OS.iso` from `scripts/linux/build-iso.sh` on Ubuntu 24.04 
 script exits 2 when that environment is not present, and it does not install the image. See
 `docs/ISO_BUILD.md`. The UEFI disk from `scripts/linux/build-disk.sh` remains a separate artifact.
 
-Phase 15 starts a virtual machine only with `scripts/linux/vm-boot.sh --run` when the disk, QEMU,
-and OVMF are all present. Without them it exits 2 and does not start QEMU.
+Phase 15 boots the ISO in QEMU with OVMF, a virtual disk, virtio-net, virtio-vga, USB input, a null
+audio device, a serial log, and snapshots. `scripts/linux/vm-test.sh` is headless. It exits 0 only
+when every check passes, including the OMNE desktop. Without QEMU, OVMF, or an image it exits 2 and
+does not start a virtual machine. See `docs/VM_TEST.md`.
 
 Phase 16, physical hardware installation, has not been started. `omne.display` can report whether
 labwc, DRM, a render node, a connected monitor, and an input device are present. It does not start a
