@@ -10,8 +10,11 @@ Emitted types:
 - `permission.requested`, `permission.granted`, `permission.denied`
 - `agent.registered`, `agent.started`, `agent.completed`, `agent.failed`, `agent.unloaded`
 - `agent.message`
+- `model.loading`, `model.loaded`, `model.running`, `model.idle`, `model.unloading`,
+  `model.unloaded`, `model.failed`, `model.cancelled`
 
-`model.loaded` is not emitted. No model weights are loaded.
+`model.loaded` means a runtime reported the model resident. OMNE does not download weights to emit
+it. A task that never calls load, including an ordinary file write, does not emit `model.loaded`.
 
 `GET /events?after=<id>` returns events after that id. `list_events(limit=n)` returns the tail. The
 bus keeps the latest 1000 events in memory and appends them to `events.jsonl` under the data

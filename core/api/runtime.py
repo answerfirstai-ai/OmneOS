@@ -20,6 +20,8 @@ from core.memory.database import MemoryDatabase
 from core.memory.store import MemoryStore
 from core.mission.store import MissionStore
 from core.models.cache import ResponseCache
+from core.models.engines.mock import MockEngine
+from core.models.engines.openai_compatible import OpenAICompatibleEngine
 from core.models.lifecycle import ModelLifecycle
 from core.models.providers.base import ModelProvider
 from core.models.providers.local.provider import LocalProvider
@@ -27,6 +29,7 @@ from core.models.providers.mock.provider import MockProvider
 from core.models.providers.xai.provider import XAIProvider
 from core.models.registry import ModelRegistry
 from core.models.router import ModelRouter
+from core.models.runtime import ModelRuntime
 from core.orchestrator.executor.executor import TaskExecutor
 from core.orchestrator.scheduler import TaskScheduler
 from core.orchestrator.service import OMNE
@@ -38,6 +41,7 @@ from core.project.context import inspect_project
 from core.tools import build_registry
 from core.tools.gateway import ToolGateway
 from core.voice.service import VoiceService
+from core.workers.lifecycle import WorkerState
 from core.world.state import WorldStateService
 from omne.applications.select import application_service
 from omne.applications.service import ApplicationService
@@ -94,9 +98,14 @@ def build_OMNE(settings: Settings) -> OMNE:
     providers, model_names, provider_labels = _providers(settings, models)
     store = TaskStore(settings.data_dir / "tasks.sqlite")
     model_lifecycle = ModelLifecycle()
-    for model in models.enabled():
-        available = _model_is_available(settings, model.provider)
-        model_lifecycle.register(model, available=available)
+    model_runtime = _model_runtime(
+        settings,
+        models,
+        model_lifecycle,
+        monitor,
+        events,
+        runtime,
+    )
     executor = TaskExecutor(
         store=store,
         gateway=gateway,
@@ -157,6 +166,7 @@ def build_OMNE(settings: Settings) -> OMNE:
         applications=applications,
         browser=browser,
         processes=processes,
+        model_runtime=model_runtime,
     )
     executor._context_text = omne.context_for
     return omne
@@ -269,6 +279,44 @@ def _process_service(
         worker_for=worker_for,
         application_for=application_for,
     )
+
+
+def _model_runtime(
+    settings: Settings,
+    models: ModelRegistry,
+    lifecycle: ModelLifecycle,
+    monitor: SystemMonitor,
+    events: EventBus,
+    runtime: AgentRuntime,
+) -> ModelRuntime:
+    """Select adapters from configuration. Construction does not load a model."""
+
+    mock_engine = MockEngine()
+    for model in models.enabled():
+        if model.provider == "mock":
+            mock_engine.allow(model.model_name)
+    local_engine = OpenAICompatibleEngine(
+        base_url=settings.local_model_base_url,
+        timeout_seconds=settings.xai_timeout_seconds,
+    )
+    model_runtime = ModelRuntime(
+        registry=models,
+        lifecycle=lifecycle,
+        monitor=monitor,
+        events=events,
+        engines={"mock": mock_engine, "openai-compatible": local_engine},
+        workers=lambda worker_id: _worker_alive(runtime, worker_id),
+    )
+    model_runtime.prepare(available=lambda model: _model_is_available(settings, model.provider))
+    return model_runtime
+
+
+def _worker_alive(runtime: AgentRuntime, worker_id: str) -> bool:
+    try:
+        worker = runtime.pool.get(worker_id)
+    except KeyError:
+        return False
+    return worker.lifecycle not in {WorkerState.TERMINATED, WorkerState.FAILED}
 
 
 def _model_is_available(settings: Settings, provider: str) -> bool:

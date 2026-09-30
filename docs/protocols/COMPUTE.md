@@ -13,4 +13,6 @@ with unknown RAM is DEFER. A RAM request above available memory is USE_CLOUD whe
 allowed, otherwise DENY. CPU above 90 percent with two or more threads is WAIT.
 
 The model cache records id, size, last access, and location. `load` and `evict` return
-`performed: false` because this process does not load weights.
+`performed: false` because this process does not load weights. The model runtime is a separate path:
+it asks this allocator before mapping a model an engine already has, and it still does not download
+weights. See `docs/MODELS.md`.

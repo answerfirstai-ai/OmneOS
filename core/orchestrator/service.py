@@ -30,9 +30,10 @@ from core.memory.store import MemoryStore
 from core.metrics import ReliabilityLedger
 from core.mission.model import Mission, MissionError, MissionStatus, mission_event
 from core.mission.store import MissionStore
-from core.models.lifecycle import ModelLifecycle, ModelLifecycleState
+from core.models.lifecycle import LOADED_STATES, SELECTABLE_STATES, ModelLifecycle
 from core.models.registry import ModelRegistry
 from core.models.router import ModelRouter, RoutingError
+from core.models.runtime import ModelRuntime
 from core.orchestrator.planner.planner import PlanNode, plan_objective
 from core.orchestrator.scheduler import TaskScheduler
 from core.orchestrator.store import TaskStore
@@ -130,6 +131,7 @@ class OMNE:
         applications: ApplicationService | None = None,
         browser: BrowserService | None = None,
         processes: ProcessService | None = None,
+        model_runtime: ModelRuntime | None = None,
     ) -> None:
         self._store = store
         self._scheduler = scheduler
@@ -149,6 +151,7 @@ class OMNE:
         self._runtime = runtime
         self._capabilities = capabilities
         self._model_lifecycle = model_lifecycle
+        self.model_runtime = model_runtime
         self._project = project
         self._mode = execution_mode
         self._environment = environment
@@ -336,22 +339,49 @@ class OMNE:
         return views
 
     def model_views(self) -> list[dict[str, object]]:
-        return [
-            {
-                "id": model.id,
-                "provider": model.provider,
-                "model_name": model.model_name,
-                "local": model.local,
-                "priority": model.priority,
-                "capabilities": list(model.capabilities),
-                "cost_input": model.cost_input,
-                "cost_output": model.cost_output,
-                "latency": model.latency,
-                "lifecycle": self._model_lifecycle.state(model.id).value,
-                "loaded": self._model_lifecycle.state(model.id) is ModelLifecycleState.LOADED,
-            }
-            for model in self._models.enabled()
-        ]
+        views: list[dict[str, object]] = []
+        for model in self._models.enabled():
+            state = self._model_lifecycle.state(model.id)
+            views.append(
+                {
+                    "id": model.id,
+                    "provider": model.provider,
+                    "model_name": model.model_name,
+                    "local": model.local,
+                    "priority": model.priority,
+                    "capabilities": list(model.capabilities),
+                    "cost_input": model.cost_input,
+                    "cost_output": model.cost_output,
+                    "latency": model.latency,
+                    "lifecycle": state.value,
+                    "loaded": state in LOADED_STATES,
+                    "context_window": model.context_window,
+                    "ram_mb": model.requirements.ram_mb if model.requirements.ram_known else None,
+                    "vram_mb": model.requirements.vram_mb
+                    if model.requirements.vram_known
+                    else None,
+                    "gpu": "unknown",
+                    "engine": None,
+                    "resident": False,
+                    "healthy": state in SELECTABLE_STATES,
+                    "worker_id": None,
+                }
+            )
+        if self.model_runtime is None:
+            return views
+        for view in views:
+            model_id = view["id"]
+            if not isinstance(model_id, str):
+                continue
+            health = self.model_runtime.health(model_id)
+            view["loaded"] = health["loaded"]
+            view["gpu"] = health["gpu"]
+            view["engine"] = health["engine"]
+            view["resident"] = health["resident"]
+            view["healthy"] = health["healthy"]
+            view["worker_id"] = health["worker_id"]
+            view["lifecycle"] = health["lifecycle"]
+        return views
 
     def compute_status(self) -> ResourceSnapshot:
         return self._monitor.snapshot()
@@ -868,6 +898,8 @@ class OMNE:
                 route = self._router.select([required], snapshot)
             except RoutingError:
                 return None
+            if route.model.id not in self._available_model_ids():
+                return None
             return route.model.id
         choice = self._router.choose(
             [required],
@@ -877,11 +909,16 @@ class OMNE:
         )
         if choice.model is None:
             return None
-        return choice.model.id
+        chosen = choice.model.id
+        if chosen not in self._available_model_ids():
+            return None
+        return chosen
 
     def _on_event(self, event: Event) -> None:
         self._metrics.observe(event)
-        if event.type.startswith(("mission.", "task.", "worker.", "permission.", "verification.")):
+        if event.type.startswith(
+            ("mission.", "task.", "worker.", "permission.", "verification.", "model.")
+        ):
             self._world.invalidate()
 
     def _advance_mission(
@@ -1095,25 +1132,23 @@ class OMNE:
         return current
 
     def _local_available(self) -> bool:
-        return any(
-            model.local and self._model_lifecycle.state(model.id) is ModelLifecycleState.AVAILABLE
-            for model in self._models.enabled()
-        )
+        ready = self._available_model_ids()
+        return any(model.local and model.id in ready for model in self._models.enabled())
 
     def _cloud_available(self) -> bool:
+        ready = self._available_model_ids()
         return any(
-            (not model.local)
-            and model.provider != "mock"
-            and self._model_lifecycle.state(model.id) is ModelLifecycleState.AVAILABLE
+            (not model.local) and model.provider != "mock" and model.id in ready
             for model in self._models.enabled()
         )
 
     def _available_model_ids(self) -> set[str]:
+        if self.model_runtime is not None:
+            return self.model_runtime.available_ids()
         return {
             model.id
             for model in self._models.enabled()
-            if self._model_lifecycle.state(model.id)
-            in {ModelLifecycleState.AVAILABLE, ModelLifecycleState.LOADED, ModelLifecycleState.IDLE}
+            if self._model_lifecycle.state(model.id) in SELECTABLE_STATES
         }
 
     def _confirmation_target(self, task_id: str) -> tuple[Task, Task]:

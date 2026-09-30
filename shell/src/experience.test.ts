@@ -175,6 +175,9 @@ test("models hide provider names until inspection", () => {
   assert.equal(modelStateLabel({ local: true, lifecycle: "AVAILABLE" }), "Ready");
   assert.equal(modelStateLabel({ local: false, lifecycle: "AVAILABLE" }), "Available");
   assert.equal(modelStateLabel({ local: false, lifecycle: "UNAVAILABLE" }), "Unavailable");
+  assert.equal(modelStateLabel({ local: true, lifecycle: "RUNNING" }), "Running");
+  assert.equal(modelStateLabel({ local: true, lifecycle: "UNLOADING" }), "Unloading");
+  assert.equal(modelStateLabel({ local: true, lifecycle: "BUSY" }), "Busy");
   assert.equal(modelStateLabel({ local: false }), "Unknown");
   const cards = modelCards(
     [

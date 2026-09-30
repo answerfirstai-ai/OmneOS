@@ -94,7 +94,9 @@ DENY from the intent, execution mode, and declared availability. It does not map
 model id. The existing planner still builds the task graph for requests that are allowed to run.
 `select()` remains priority-first so development and testing keep the mock route. `choose()` drops
 mock in production and drops cloud models in offline and local modes. A local model with an empty
-URL is UNAVAILABLE. `load()` does not download or map weights and does not emit `model.loaded`.
+URL is UNAVAILABLE. `ModelRuntime.load` maps a model the selected engine already has. It does not
+download weights. A successful load emits `model.loaded`. Ordinary task execution does not call
+load, so a file write does not emit that event. See `docs/MODELS.md`.
 
 Execution mode is `OMNE_EXECUTION_MODE`. When it is omitted, development, testing, and production
 follow `OMNE_ENVIRONMENT`.

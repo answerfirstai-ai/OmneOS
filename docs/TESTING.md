@@ -43,6 +43,10 @@ Python:
   dry-run, command classes, and the new HTTP routes.
 - Worker lifecycle, reuse, cancellation, failure, resource limits, and concurrent slot limits. A
   hundred workers stay in-process records.
+- Model runtime. The mock engine loads, infers, streams, and cancels in memory. A local adapter with
+  an empty URL does not connect. A configured adapter loads only names the runtime already lists and
+  does not request a download. Memory and video-memory refusals leave the model unloaded. The health
+  record does not invent a GPU vendor.
 - Objective execution, dependency order, retry escalation, parallel work, and voice silence.
 - The installer refusing `/boot`, the Ubuntu 24.04 system tree, the three system packages, the
   rootfs and UEFI disk builders refusing to write without root, and the ISO and VM scripts exiting
