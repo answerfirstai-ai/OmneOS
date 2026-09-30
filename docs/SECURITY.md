@@ -61,5 +61,7 @@ refuses a display manager. Display diagnostics read DRM and input nodes and do n
 change the host session. Window mutations are not an HTTP route and are not sent to the host
 compositor. `window: own` covers windows that agent launched. `window: manage` does not apply in
 this revision. Hardware diagnostics only read sysfs and proc. They do not load drivers or write
-device configuration, and `POST /hardware` is not a route. The ISO script does not write
-`OMNE-OS.iso`. No physical disk installation is performed.
+device configuration, and `POST /hardware` is not a route. Network diagnostics only read sysfs and
+proc. Connect, disconnect, enable, and disable require `network:configure` and are not an HTTP
+route. A password is not stored on a network record or an event. `POST /network` is not a route. The
+ISO script does not write `OMNE-OS.iso`. No physical disk installation is performed.

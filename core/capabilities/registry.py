@@ -48,6 +48,19 @@ class CapabilityRegistry:
             raise KeyError(f"unknown capability: {capability_id}") from exc
 
 
+_HIGH_CAPABILITIES = frozenset(
+    {
+        "terminal.execute",
+        "process.stop",
+        "git.commit",
+        "network.connect",
+        "network.disconnect",
+        "network.enable",
+        "network.disable",
+    }
+)
+
+
 def build_capability_registry(
     agents: list[AgentManifest],
     models: list[ModelMetadata],
@@ -57,7 +70,7 @@ def build_capability_registry(
     registry = CapabilityRegistry()
     for tool_id, grant in sorted(TOOL_GRANTS.items()):
         domain, value = grant
-        risk = "high" if tool_id in {"terminal.execute", "process.stop", "git.commit"} else "low"
+        risk = "high" if tool_id in _HIGH_CAPABILITIES else "low"
         registry.register(
             Capability(
                 id=f"tool:{tool_id}",

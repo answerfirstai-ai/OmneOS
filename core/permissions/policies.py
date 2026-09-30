@@ -35,9 +35,25 @@ TOOL_GRANTS: dict[str, tuple[str, str]] = {
     "browser.open": ("browser", "navigate"),
     "browser.search": ("browser", "navigate"),
     "voice.transmit": ("voice", "transmit"),
+    "network.scan": ("network", "scan"),
+    "network.connect": ("network", "configure"),
+    "network.disconnect": ("network", "configure"),
+    "network.enable": ("network", "configure"),
+    "network.disable": ("network", "configure"),
 }
 
-HIGH_RISK_TOOLS = frozenset({"terminal.execute", "process.start", "process.stop", "git.commit"})
+HIGH_RISK_TOOLS = frozenset(
+    {
+        "terminal.execute",
+        "process.start",
+        "process.stop",
+        "git.commit",
+        "network.connect",
+        "network.disconnect",
+        "network.enable",
+        "network.disable",
+    }
+)
 FILESYSTEM_TOOLS = frozenset(
     {
         "filesystem.read",

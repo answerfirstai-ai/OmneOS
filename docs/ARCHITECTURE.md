@@ -187,3 +187,5 @@ does not link a compositor, and the diagnostics do not start one. See
 assignment on top of that choice. Close and move require a grant, and the record is not sent to
 labwc. See `docs/WINDOWING.md`. `omne.hardware` reads CPU, memory, buses, and peripherals from sysfs
 and proc. It does not load drivers or write device configuration. See `docs/HARDWARE.md`.
+`omne.network` reads interfaces, addresses, DNS, and routes from the Linux stack and does not
+replace systemd-networkd. See `docs/NETWORK.md`.
