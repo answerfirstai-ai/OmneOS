@@ -1,0 +1,18 @@
+[Unit]
+Description=OMNE boot proof
+After=omne-session.service omne-core.service network-online.target
+Wants=omne-session.service network-online.target
+
+[Service]
+Type=oneshot
+Environment=OMNE_ENVIRONMENT=production
+Environment=OMNE_CONFIG=/etc/omne/OMNE.toml
+ExecStart=/usr/bin/omne-prove
+TimeoutStartSec=180
+StandardOutput=journal+console
+StandardError=journal+console
+RemainAfterExit=yes
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

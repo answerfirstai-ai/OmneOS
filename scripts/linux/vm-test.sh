@@ -195,9 +195,10 @@ if wait_for "Reached target multi-user.target" "${timeout_seconds}"; then
   if ! wait_for "OMNE READY" 90; then
     wait_for "OMNE NOT READY" 60 || true
   fi
-  # labwc starts after multi-user.target. Give it time to open the socket.
-  wait_for "labwc running" 45 || true
-  sleep 3
+  # The session and the doctor start after multi-user.target.
+  wait_for "labwc running" 90 || true
+  wait_for "OMNE desktop ready" 90 || true
+  wait_for "SYSTEM STATUS:" 180 || true
 fi
 clean_log
 log="${work}/serial.clean"

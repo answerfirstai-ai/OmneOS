@@ -64,6 +64,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         return _run_check(settings)
+    if args.command == "doctor":
+        return _run_doctor(settings)
     if args.command == "serve":
         return _run_serve(settings)
     if args.command == "execute":
@@ -113,6 +115,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("check", help="load configuration, prepare directories, and exit")
+    commands.add_parser("doctor", help="print a system diagnostic without calling NVIDIA")
     serve = commands.add_parser("serve", help="serve the local core HTTP API")
     serve.add_argument("--host", default=None, help="override the configured bind host")
     serve.add_argument("--port", type=int, default=None, help="override the configured bind port")
@@ -185,6 +188,18 @@ def _with_bind_overrides(settings: Settings, *, host: str | None, port: int | No
     if port is not None:
         updates["port"] = port
     return override_settings(settings, updates)
+
+
+def _run_doctor(settings: Settings) -> int:
+    from omne.doctor import diagnose, render
+
+    report = diagnose(
+        build_OMNE(settings),
+        data_dir=settings.data_dir,
+        workspace=settings.workspace_root,
+    )
+    print(render(report), end="")
+    return 0 if report.ready else 1
 
 
 def _run_check(settings: Settings) -> int:

@@ -68,6 +68,8 @@ def test_installed_machine_keeps_the_operator_after_reboot(
     assert 'id="desktop"' in shell
     assert (wants / "omne.target").is_symlink()
     assert (wants / "omne-session.service").is_symlink()
+    assert (wants / "omne-doctor.service").is_symlink()
+    assert (root / "usr" / "bin" / "omne-prove").is_file()
     assert not (root / "boot").exists()
     assert "network.scan" in (
         root / "usr" / "lib" / "omne" / "agents" / "coding" / "agent.toml"

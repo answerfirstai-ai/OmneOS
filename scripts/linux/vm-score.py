@@ -36,7 +36,7 @@ GRAPH: Graph = (
 )
 
 _GRAPHICAL = re.compile(r"Reached target graphical\.target|labwc running|\[labwc\]")
-_RECOVERY = re.compile(r"SAFE_MODE|recovery state RECOVERY")
+_RECOVERY = re.compile(r"SAFE_MODE|recovery state RECOVERY|\[PASS\] Recovery")
 _DIAG = re.compile(r"@@omne-diag ([a-z]+)@@\n(.*?)@@omne-diag end \1@@", re.DOTALL)
 
 _SLICES: dict[str, tuple[str, ...]] = {

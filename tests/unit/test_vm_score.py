@@ -160,6 +160,44 @@ def test_a_complete_log_is_os_ready() -> None:
     assert all(check["status"] == "PASS" for check in summary["checks"])
 
 
+def test_doctor_recovery_pass_counts_as_recovery() -> None:
+    log = _log(
+        "Linux version 6.8",
+        "root=LABEL=OMNE",
+        "Reached target local-fs.target",
+        "Started systemd-networkd.service",
+        "Reached target network.target",
+        "virtio_net",
+        "Started omne-core.service",
+        "Reached target omne.target",
+        "Reached target multi-user.target",
+        "ipc ok",
+        "OMNE READY",
+        "labwc running",
+        "wayland display ready",
+        "OMNE desktop ready",
+        "application launched",
+        "agent task completed",
+        "model runtime ready",
+        "[PASS] Recovery",
+        "SYSTEM STATUS: READY",
+        "Reached target reboot.target",
+        "Linux version 6.8",
+        "Reached target multi-user.target",
+        "Reached target poweroff.target",
+    )
+    summary = vm_score.score(
+        log,
+        run_id="doctor",
+        elapsed_ms=1000,
+        guest_exited=True,
+        snapshot_ok=True,
+    )
+
+    assert summary["os_ready"] is True
+    assert _by_name(summary)["recovery"]["status"] == "PASS"
+
+
 def test_diag_frames_land_in_their_logs(tmp_path: Path) -> None:
     log = _log(
         "@@omne-diag ipc@@",

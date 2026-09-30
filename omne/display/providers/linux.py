@@ -52,6 +52,8 @@ class LinuxDisplayProvider:
             monitors=monitors,
             entry=entry,
         )
+        # labwc launches on a DRM card with pixman when the device has no render node.
+        launch = [item for item in missing if item != "render node"]
         return Display(
             provider="labwc",
             platform=sys.platform,
@@ -75,7 +77,7 @@ class LinuxDisplayProvider:
                 fullscreen=False,
                 uri=DESKTOP_URI,
             ),
-            can_launch=not missing,
+            can_launch=not launch,
             missing=missing,
         )
 

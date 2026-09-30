@@ -96,6 +96,22 @@ def test_linux_provider_can_launch_without_starting_a_session(tmp_path: Path) ->
     assert report.windows == []
 
 
+def test_linux_provider_launches_with_pixman_when_the_render_node_is_absent(
+    tmp_path: Path,
+) -> None:
+    _card(tmp_path, "card0")
+    _connector(tmp_path, "card0-Virtual-1", status="connected", modes="1280x800\n")
+    _event(tmp_path, "event0")
+    _labwc(tmp_path)
+
+    report = LinuxDisplayProvider(root=tmp_path, environ={}).diagnose()
+
+    assert report.can_launch is True
+    assert report.gpu_acceleration == "absent"
+    assert report.missing == ["render node"]
+    assert report.drm == "present"
+
+
 def test_linux_provider_reads_several_monitors_and_refresh(tmp_path: Path) -> None:
     _card(tmp_path, "card0")
     _render(tmp_path, "renderD128")

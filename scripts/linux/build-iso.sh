@@ -228,6 +228,14 @@ if [[ -e "${rootfs}/usr/lib/systemd/system/systemd-networkd.service" ]]; then
   ln -sfn /usr/lib/systemd/system/systemd-networkd.service \
     "${rootfs}/etc/systemd/system/multi-user.target.wants/systemd-networkd.service"
 fi
+if [[ -e "${rootfs}/usr/lib/systemd/system/systemd-networkd-wait-online.service" ]]; then
+  mkdir -p "${rootfs}/etc/systemd/system/network-online.target.wants"
+  ln -sfn /usr/lib/systemd/system/systemd-networkd-wait-online.service \
+    "${rootfs}/etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service"
+fi
+# shellcheck disable=SC1091
+source "${script_root}/scripts/linux/enable-units.sh"
+enable_omne_units "${rootfs}"
 cat > "${rootfs}/etc/systemd/network/20-omne-dhcp.network" <<'EOF'
 [Match]
 Name=en* eth*
@@ -279,6 +287,10 @@ fi
 for required in \
   "${rootfs}/usr/bin/OMNE" \
   "${rootfs}/usr/bin/labwc" \
+  "${rootfs}/usr/bin/omne-session" \
+  "${rootfs}/usr/bin/omne-prove" \
+  "${rootfs}/etc/systemd/system/multi-user.target.wants/omne-session.service" \
+  "${rootfs}/etc/systemd/system/multi-user.target.wants/omne-doctor.service" \
   "${rootfs}/usr/lib/systemd/systemd" \
   "${rootfs}/usr/share/omne/shell/dist/main.js" \
   "${rootfs}/usr/lib/omne/python/omne/recovery/service.py"
