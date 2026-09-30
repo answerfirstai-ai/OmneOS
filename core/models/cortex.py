@@ -185,8 +185,8 @@ class Cortex:
                 provider=answered,
                 model=response.model or external,
             )
-            checked, _rejected = validate_tool_requests(decision, self._known_tools)
-            return checked
+            checked, rejected = validate_tool_requests(decision, self._known_tools)
+            return checked.model_copy(update={"rejected_tools": rejected})
         if last is not None:
             raise last
         raise ProviderError("no model provider was configured", code="unavailable", provider=route)

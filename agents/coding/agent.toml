@@ -2,7 +2,13 @@ id = "coding"
 name = "Coding"
 version = "0.1.0"
 description = "Writes and reviews files inside the workspace."
-capabilities = ["software_development", "code_analysis", "testing", "debugging"]
+capabilities = [
+  "software_development",
+  "code_analysis",
+  "testing",
+  "debugging",
+  "conversation",
+]
 tools = [
   "filesystem.read",
   "filesystem.write",

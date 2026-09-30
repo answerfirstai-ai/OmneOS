@@ -216,6 +216,7 @@ def build_OMNE(settings: Settings) -> OMNE:
         nvidia_configured=nvidia_key is not None,
     )
     executor._context_text = omne.context_for
+    executor._decider = omne.decide_for
     return omne
 
 
