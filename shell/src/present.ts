@@ -45,6 +45,15 @@ export function statusWord(status: string): string {
       return "COMPLETE";
     case "IDLE":
       return "IDLE";
+    case "SPAWNED":
+      return "STARTING";
+    case "PAUSED":
+      return "PAUSED";
+    case "TERMINATED":
+      return "STOPPED";
+    case "DISCOVERED":
+    case "AVAILABLE":
+      return "READY";
     case "WAITING":
     case "QUEUED":
       return "WAITING";
@@ -193,7 +202,9 @@ export function modelLines(card: ModelCard, level: DetailLevel): string[] {
 export interface AgentBoard {
   definitions: { id: string; name: string; state: string; enabled: boolean }[];
   active: NamedWorker[];
+  paused: NamedWorker[];
   idle: NamedWorker[];
+  stopped: NamedWorker[];
 }
 
 export function agentBoard(
@@ -209,7 +220,9 @@ export function agentBoard(
       enabled: agent.enabled,
     })),
     active: named.filter((worker) => isActiveWorker(worker.status)),
-    idle: named.filter((worker) => !isActiveWorker(worker.status)),
+    paused: named.filter((worker) => worker.status === "PAUSED"),
+    idle: named.filter((worker) => isIdleWorker(worker.status)),
+    stopped: named.filter((worker) => isStoppedWorker(worker.status)),
   };
 }
 
@@ -290,10 +303,19 @@ export function markGlyph(mark: StageMark): string {
 function isActiveWorker(status: string): boolean {
   return (
     status === "RUNNING" ||
+    status === "SPAWNED" ||
     status === "WAITING" ||
     status === "RECOVERING" ||
     status === "VERIFYING"
   );
+}
+
+function isIdleWorker(status: string): boolean {
+  return status === "IDLE" || status === "DISCOVERED" || status === "AVAILABLE";
+}
+
+function isStoppedWorker(status: string): boolean {
+  return status === "FAILED" || status === "TERMINATED";
 }
 
 function findStage(stages: readonly LifecycleStage[], id: string): LifecycleStage | undefined {
@@ -386,8 +408,12 @@ function workerLineMark(status: string): StageMark {
   if (status === "FAILED") {
     return "failed";
   }
+  if (status === "PAUSED") {
+    return "waiting";
+  }
   if (
     status === "RUNNING" ||
+    status === "SPAWNED" ||
     status === "RECOVERING" ||
     status === "WAITING" ||
     status === "VERIFYING"

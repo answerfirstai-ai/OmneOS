@@ -55,7 +55,7 @@ voice path. `docs/INPUT_ARCHITECTURE.md` describes the shortcut configuration an
 stream. `docs/STORAGE.md` describes the disk read and the path classes. `docs/APPLICATIONS.md`
 describes the application lookup. `docs/BROWSER.md` describes the four browser layers and the
 Playwright dependency. `docs/PROCESSES.md` describes the process table and the closed host signal
-path.
+path. `docs/WORKERS.md` describes agent definitions and in-memory workers.
 
 The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
 capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,

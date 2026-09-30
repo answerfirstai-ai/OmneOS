@@ -101,11 +101,19 @@ follow `OMNE_ENVIRONMENT`.
 
 ## Agents and workers
 
-An agent is a manifest: identity, capabilities, tools, permissions, and `max_workers` (default 1).
-The coding agent allows two workers. A worker is one running slot with a task, mission, model, and
-trace. `admit_worker` denies a start at `max_workers` and waits when a measured CPU percent is at
-least 95. Unknown CPU does not count as free or busy capacity. Discovery loads `agent.toml` and
-`manifest.toml` only, so `tools.toml` and `permissions.toml` cannot grant anything by existing.
+An agent is a capability definition: identity, tools, permissions, resources, and `max_workers`. A
+worker is one in-memory instance of that definition. It carries its own id, parent agent, task,
+capabilities, model, tools, permissions, resource allocation, context, lifecycle, and trace. The
+worker lifecycle is DISCOVERED, AVAILABLE, SPAWNED, RUNNING, IDLE, PAUSED, TERMINATED, or FAILED.
+The agent definition keeps its own states. Creating a worker does not create an operating-system
+process.
+
+The pool reuses an idle or paused worker for the same agent. It refuses a new instance at
+`max_workers`, when measured CPU is at least 95, or when the declared memory budget cannot hold
+another allocation. Unknown CPU does not count as free or busy capacity. The runtime pool budget is
+8192 MB. On-demand agents terminate idle workers after the task. Persistent agents keep them for the
+next task. See `docs/WORKERS.md`. Discovery loads `agent.toml` and `manifest.toml` only, so
+`tools.toml` and `permissions.toml` cannot grant anything by existing.
 
 ## Capabilities, context, memory, and verification
 

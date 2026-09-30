@@ -1,4 +1,8 @@
-"""Enforced agent lifecycle transitions."""
+"""Enforced lifecycle transitions for an agent definition.
+
+These states describe the definition, not a worker instance. A worker has its
+own lifecycle in ``core.workers``.
+"""
 
 from __future__ import annotations
 

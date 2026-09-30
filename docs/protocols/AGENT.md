@@ -17,5 +17,8 @@ Shipped agents:
 The system agent can list processes. The coding agent can also start and stop one it owns. Neither
 manifest holds `process:command` or `process:restart`. See `docs/PROCESSES.md`.
 
+An agent manifest is a definition. A worker is a runtime instance of that definition, with its own
+lifecycle. See `docs/WORKERS.md`.
+
 Lifecycle edges are enforced. Illegal edges raise `InvalidAgentTransition`. Agents exchange
 `AgentMessage` values, which also publish `agent.message`.
