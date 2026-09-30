@@ -60,6 +60,18 @@ def test_labwc_uses_drm_instead_of_a_nested_display() -> None:
     assert env["HOME"] == "/var/lib/omne"
 
 
+def test_owned_application_marker_requires_the_fixed_program() -> None:
+    assert (
+        session.launch_owned_application(["/usr/lib/omne/applications/omne-hello"], returncode=0)
+        == "application launched"
+    )
+    assert session.launch_owned_application(["/usr/bin/firefox"], returncode=0) is None
+    assert (
+        session.launch_owned_application(["/usr/lib/omne/applications/omne-hello"], returncode=1)
+        is None
+    )
+
+
 def test_session_unit_does_not_gate_multi_user() -> None:
     unit = Path("system/linux/omne-session.service").read_text(encoding="utf-8")
     target = Path("system/linux/omne.target").read_text(encoding="utf-8")

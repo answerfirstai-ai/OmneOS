@@ -131,6 +131,13 @@ if [[ "${want_system}" -eq 1 ]]; then
   cp "${root}/system/linux/omne-session.service" "${dest}/etc/systemd/system/omne-session.service"
   cp "${root}/system/linux/omne-session" "${dest}/usr/bin/omne-session"
   chmod 755 "${dest}/usr/bin/omne-session"
+  mkdir -p "${dest}/usr/lib/omne/applications"
+  cp "${root}/system/linux/omne-hello" "${dest}/usr/lib/omne/applications/omne-hello"
+  chmod 755 "${dest}/usr/lib/omne/applications/omne-hello"
+  cp "${root}/system/linux/request-reboot" "${dest}/usr/lib/omne/request-reboot"
+  chmod 755 "${dest}/usr/lib/omne/request-reboot"
+  cp "${root}/system/linux/omne-reboot.socket" "${dest}/etc/systemd/system/omne-reboot.socket"
+  cp "${root}/system/linux/omne-reboot@.service" "${dest}/etc/systemd/system/omne-reboot@.service"
   cp "${root}/LICENSE" "${dest}/usr/share/doc/omne-system/copyright"
 fi
 

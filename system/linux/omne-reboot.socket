@@ -1,0 +1,13 @@
+[Unit]
+Description=OMNE reboot request
+After=multi-user.target
+
+[Socket]
+ListenStream=/run/omne-reboot.sock
+SocketMode=0660
+SocketUser=root
+SocketGroup=omne
+Accept=yes
+
+[Install]
+WantedBy=multi-user.target

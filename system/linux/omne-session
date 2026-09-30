@@ -15,6 +15,8 @@ import urllib.request
 from pathlib import Path
 
 _SHELL_URL = "http://127.0.0.1:4173/"
+_OWNED_APPLICATION = "/usr/lib/omne/applications/omne-hello"
+_REBOOT_SOCKET = "/run/omne-reboot.sock"
 
 
 def session_markers(*, alive: bool, socket_ready: bool, desktop_ready: bool) -> list[str]:
@@ -68,6 +70,11 @@ def _write_config(home: str) -> None:
         "  <core>\n"
         "    <xwayland>no</xwayland>\n"
         "  </core>\n"
+        "  <keyboard>\n"
+        '    <keybind key="C-A-Delete">\n'
+        '      <action name="Execute" command="/usr/lib/omne/request-reboot" />\n'
+        "    </keybind>\n"
+        "  </keyboard>\n"
         "</labwc_config>\n",
         encoding="utf-8",
     )
@@ -120,6 +127,23 @@ def _stop(process: subprocess.Popen[bytes]) -> None:
         process.wait(timeout=5)
 
 
+def launch_owned_application(argv: list[str], *, returncode: int) -> str | None:
+    """The serial marker for the one OMNE-owned program. Desktop Exec lines stay refused."""
+
+    if argv != [_OWNED_APPLICATION] or returncode != 0:
+        return None
+    return "application launched"
+
+
+def _run_owned_application() -> None:
+    completed = subprocess.run([_OWNED_APPLICATION], check=False, timeout=10)
+    marker = launch_owned_application([_OWNED_APPLICATION], returncode=completed.returncode)
+    if marker is None:
+        print(f"application_error=exit {completed.returncode}", flush=True)
+        return
+    print(marker, flush=True)
+
+
 def _launch(labwc: str, env: dict[str, str], socket_path: Path) -> int:
     try:
         process = subprocess.Popen([labwc], env=env)
@@ -134,6 +158,11 @@ def _launch(labwc: str, env: dict[str, str], socket_path: Path) -> int:
         desktop_ready=desktop,
     ):
         print(line, flush=True)
+    if ready:
+        try:
+            _run_owned_application()
+        except OSError as exc:
+            print(f"application_error={type(exc).__name__}: {exc}", flush=True)
     if not ready:
         _stop(process)
         return 1

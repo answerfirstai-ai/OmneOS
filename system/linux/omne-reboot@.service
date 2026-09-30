@@ -1,0 +1,8 @@
+[Unit]
+Description=OMNE reboot
+
+[Service]
+ExecStart=/usr/bin/systemctl reboot
+StandardInput=socket
+StandardOutput=journal+console
+StandardError=journal+console

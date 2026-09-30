@@ -248,6 +248,8 @@ def test_stage_places_services_on_the_ubuntu_base(tmp_path: Path) -> None:
     assert "WAYLAND_DISPLAY" not in session
     assert "ExecStart=/usr/bin/omne-session" in session
     assert (dest / "usr/bin/omne-session").is_file()
+    assert (dest / "usr/lib/omne/applications/omne-hello").is_file()
+    assert (dest / "etc/systemd/system/omne-reboot.socket").is_file()
     assert (dest / "usr/bin/omne-boot").is_file()
     assert (dest / "usr/bin/omne-diag").is_file()
     assert (dest / "usr/lib/omne/agents/coding/agent.toml").is_file()
