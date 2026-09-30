@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from omne.bootproof import lifecycles_from, markers, task_status_from
+from omne.bootproof import health_ready, lifecycles_from, markers, task_status_from
 
 
 def test_completed_task_and_available_model_are_marked() -> None:
@@ -15,6 +15,12 @@ def test_a_failed_task_and_an_unavailable_model_stay_unmarked() -> None:
     lines = markers(task_status="FAILED", lifecycles=["UNAVAILABLE"])
 
     assert lines == []
+
+
+def test_health_requires_the_core_payload() -> None:
+    assert health_ready({"status": "ok", "service": "OMNE-core"}) is True
+    assert health_ready({"status": "ok", "service": "other"}) is False
+    assert health_ready(None) is False
 
 
 def test_readers_ignore_a_missing_core() -> None:

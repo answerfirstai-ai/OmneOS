@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
@@ -53,21 +54,43 @@ def lifecycles_from(payload: object) -> list[str]:
     return found
 
 
+def health_ready(payload: object) -> bool:
+    """True when GET /health returned the running core."""
+
+    body = _mapping(payload)
+    return body.get("status") == "ok" and body.get("service") == "OMNE-core"
+
+
 def main() -> int:
     """Ask the running core for proof, then print the doctor report."""
 
-    task = _request(f"{_CORE}/tasks", {"objective": _OBJECTIVE})
-    models = _request(f"{_CORE}/models", None)
-    for line in markers(
-        task_status=task_status_from(task),
-        lifecycles=lifecycles_from(models),
-    ):
-        print(line, flush=True)
+    if _wait_for_health(45):
+        task = _request(f"{_CORE}/tasks", {"objective": _OBJECTIVE}, timeout=45)
+        models = _request(f"{_CORE}/models", None, timeout=10)
+        status = task_status_from(task)
+        cycles = lifecycles_from(models)
+        for line in markers(task_status=status, lifecycles=cycles):
+            print(line, flush=True)
+        if status != "COMPLETED":
+            print(f"boot_proof_task={status or 'absent'}", flush=True)
+        if not any(isinstance(item, str) and item in _USABLE for item in cycles):
+            print("boot_proof_models=absent", flush=True)
+    else:
+        print("boot_proof_error=core health was not ready", flush=True)
     completed = subprocess.run(["/usr/bin/OMNE", "doctor"], check=False)
     return int(completed.returncode)
 
 
-def _request(url: str, body: dict[str, str] | None) -> object:
+def _wait_for_health(seconds: float) -> bool:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if health_ready(_request(f"{_CORE}/health", None, timeout=2)):
+            return True
+        time.sleep(0.5)
+    return health_ready(_request(f"{_CORE}/health", None, timeout=2))
+
+
+def _request(url: str, body: dict[str, str] | None, *, timeout: float = 60) -> object:
     data = None if body is None else json.dumps(body).encode("utf-8")
     request = urllib.request.Request(
         url,
@@ -76,7 +99,7 @@ def _request(url: str, body: dict[str, str] | None) -> object:
         headers={"Content-Type": "application/json"} if data is not None else {},
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = response.read()
     except (OSError, urllib.error.URLError, TimeoutError, ValueError):
         return None
