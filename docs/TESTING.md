@@ -61,6 +61,10 @@ Python:
   defaults, and a capture stream. An ALSA fixture leaves volume null. `POST /audio` stays 404.
 - Input bindings. The testing API uses an empty mock device list and no configured chord. A Linux
   fixture supplies a keyboard and a mouse and drops the key bitmap. `POST /input` stays 404.
+- Storage inspection. The testing API uses an empty mock layout. A Linux fixture supplies disks,
+  partitions, mounts, read-only state, and removable media, and it does not gain files during the
+  read. Filesystem tools deny traversal, symlinks, unauthorized paths, inaccessible paths, and
+  protected system locations. `POST /storage` stays 404.
 
 TypeScript:
 

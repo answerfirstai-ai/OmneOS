@@ -84,8 +84,9 @@ OVMF are present. `OMNE display` reports DRM and labwc readiness and does not st
 `OMNE windowing` reports the window record and does not command labwc. `OMNE hardware` reports
 devices Linux has already published and does not change drivers. `OMNE network` reports the Linux
 network stack and does not change it. `OMNE audio` reports the Linux audio stack and does not open a
-microphone. `OMNE input` reports configured shortcuts and does not read the keyboard. Physical
-hardware installation is not implemented.
+microphone. `OMNE input` reports configured shortcuts and does not read the keyboard. `OMNE storage`
+reports disks and mounts and does not format them. Physical hardware installation is not
+implemented.
 
 ## License
 

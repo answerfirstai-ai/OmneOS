@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from core.permissions.policies import resolve_inside_workspace
 from core.tools.base import ToolContext, ToolError
+from omne.storage.classify import classify_path
 
 _MAX_BYTES = 1_000_000
 _MAX_SEARCH_RESULTS = 200
@@ -48,10 +48,10 @@ class _FilesystemTool:
         raw = arguments.get("path", ".")
         if not isinstance(raw, str) or not raw:
             raise ToolError("path must be a non-empty string", code="invalid_input")
-        try:
-            return resolve_inside_workspace(context.workspace_root, raw)
-        except ValueError as exc:
-            raise ToolError(str(exc), code="path_denied") from exc
+        verdict = classify_path(raw, workspace=context.workspace_root)
+        if not verdict.allowed:
+            raise ToolError(verdict.reason, code="path_denied")
+        return Path(verdict.resolved)
 
 
 class ReadTool(_FilesystemTool):

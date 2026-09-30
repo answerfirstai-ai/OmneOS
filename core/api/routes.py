@@ -43,6 +43,8 @@ def route_get(
         return HTTPStatus.OK, {"audio": runtime.audio_view()}
     if path == "/input":
         return HTTPStatus.OK, {"input": runtime.input_view()}
+    if path == "/storage":
+        return HTTPStatus.OK, {"storage": runtime.storage_view()}
     if path == "/voice":
         return HTTPStatus.OK, {"voice": runtime.voice_status()}
     if path == "/missions":

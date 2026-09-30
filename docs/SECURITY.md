@@ -68,5 +68,8 @@ Audio diagnostics only read the published stack. Volume, mute, and the default d
 `audio:configure` and are not an HTTP route. Microphone audio is not captured or transmitted, and
 `voice.transmit` stays denied. `POST /audio` is not a route. Input diagnostics report configured
 chords and device names. They do not read keystrokes. `input:bind` does not install a host grab.
-`POST /input` is not a route. The ISO script does not write `OMNE-OS.iso`. No physical disk
+`POST /input` is not a route. Storage diagnostics only read sysfs and the mount table. They do not
+format a disk, open a raw device, or write a bootloader. Filesystem tools may use an OMNE workspace
+path and deny system, boot, and device paths, including a symlink or `..` that reaches one.
+`POST /storage` is not a route. The ISO script does not write `OMNE-OS.iso`. No physical disk
 installation is performed.

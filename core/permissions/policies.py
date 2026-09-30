@@ -13,6 +13,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.security.commands import classify_command
+from omne.storage.classify import classify_path
 
 TOOL_GRANTS: dict[str, tuple[str, str]] = {
     "filesystem.read": ("filesystem", "workspace"),
@@ -83,9 +84,15 @@ _ALWAYS_DENY_COMMANDS = frozenset(
         "poweroff",
         "halt",
         "mkfs",
+        "mkfs.btrfs",
         "mkfs.ext4",
+        "mkfs.vfat",
+        "mkfs.xfs",
         "fdisk",
+        "sfdisk",
+        "gdisk",
         "parted",
+        "wipefs",
         "dd",
         "iptables",
         "nft",
@@ -93,6 +100,7 @@ _ALWAYS_DENY_COMMANDS = frozenset(
         "efibootmgr",
         "grub-install",
         "update-grub",
+        "bootctl",
     }
 )
 _PACKAGE_MANAGERS = frozenset({"apt", "apt-get", "dnf", "yum", "pacman", "apk"})
@@ -208,11 +216,10 @@ def _filesystem_decision(request: PermissionRequest) -> PermissionResult | None:
     raw = request.arguments.get("path", ".")
     if not isinstance(raw, str) or not raw:
         return _deny("filesystem path must be a non-empty string")
-    try:
-        resolved = resolve_inside_workspace(Path(request.workspace_root), raw)
-    except ValueError as exc:
-        return _deny(str(exc))
-    if ".git" in resolved.parts:
+    verdict = classify_path(raw, workspace=Path(request.workspace_root))
+    if not verdict.allowed:
+        return _deny(verdict.reason)
+    if ".git" in Path(verdict.resolved).parts:
         return _deny("filesystem access inside .git is denied")
     return None
 

@@ -78,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_audio(settings)
     if args.command == "input":
         return _run_input(settings)
+    if args.command == "storage":
+        return _run_storage(settings)
     return _run_inspection(settings, args)
 
 
@@ -114,6 +116,7 @@ def _build_parser() -> argparse.ArgumentParser:
     commands.add_parser("network", help="print network state without changing the host stack")
     commands.add_parser("audio", help="print audio diagnostics without opening a microphone")
     commands.add_parser("input", help="print input bindings without reading the keyboard")
+    commands.add_parser("storage", help="print storage diagnostics without formatting a disk")
     mission = commands.add_parser("mission", help="inspect missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
     mission_commands.add_parser("list", help="list missions")
@@ -246,6 +249,11 @@ def _run_audio(settings: Settings) -> int:
 
 def _run_input(settings: Settings) -> int:
     print(json.dumps(build_OMNE(settings).input_view(), sort_keys=True))
+    return 0
+
+
+def _run_storage(settings: Settings) -> int:
+    print(json.dumps(build_OMNE(settings).storage_view(), sort_keys=True))
     return 0
 
 
