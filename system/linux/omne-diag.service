@@ -1,6 +1,6 @@
 [Unit]
 Description=OMNE boot diagnostics
-After=omne-core.service omne-shell.service omne-boot.service
+After=multi-user.target omne-boot.service
 Wants=omne-core.service
 
 [Service]
@@ -26,4 +26,4 @@ CapabilityBoundingSet=
 InaccessiblePaths=-/boot -/efi -/etc/shadow -/etc/gshadow -/etc/sudoers -/etc/ssh
 
 [Install]
-WantedBy=omne.target
+WantedBy=multi-user.target

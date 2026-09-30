@@ -44,6 +44,7 @@ def _services() -> str:
         "omne-shell.service",
         "omne-boot.service",
         "omne-diag.service",
+        "omne-session.service",
     ]
     shown = _command(
         [
@@ -88,7 +89,26 @@ def _display() -> str:
         except OSError:
             found = ["unreadable"]
         names.append(f"{directory}={' '.join(found) if found else 'absent'}")
+    drm = Path("/sys/class/drm")
+    if drm.is_dir():
+        for path in sorted(drm.iterdir()):
+            status = _read_text(path / "status")
+            enabled = _read_text(path / "enabled")
+            if status or enabled:
+                names.append(
+                    f"{path.name} status={status or 'absent'} enabled={enabled or 'absent'}"
+                )
+    names.append(
+        _command(["systemctl", "status", "omne-session.service", "--no-pager", "--lines=40"])
+    )
     return "\n".join(names) + "\n"
+
+
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return ""
 
 
 def _shell() -> str:

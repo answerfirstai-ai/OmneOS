@@ -195,6 +195,8 @@ if wait_for "Reached target multi-user.target" "${timeout_seconds}"; then
   if ! wait_for "OMNE READY" 90; then
     wait_for "OMNE NOT READY" 60 || true
   fi
+  # labwc starts after multi-user.target. Give it time to open the socket.
+  wait_for "labwc running" 45 || true
   sleep 3
 fi
 clean_log

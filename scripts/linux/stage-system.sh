@@ -128,6 +128,9 @@ if [[ "${want_system}" -eq 1 ]]; then
   cp "${root}/system/linux/omne-diag.service" "${dest}/etc/systemd/system/omne-diag.service"
   cp "${root}/system/linux/omne-diag" "${dest}/usr/bin/omne-diag"
   chmod 755 "${dest}/usr/bin/omne-diag"
+  cp "${root}/system/linux/omne-session.service" "${dest}/etc/systemd/system/omne-session.service"
+  cp "${root}/system/linux/omne-session" "${dest}/usr/bin/omne-session"
+  chmod 755 "${dest}/usr/bin/omne-session"
   cp "${root}/LICENSE" "${dest}/usr/share/doc/omne-system/copyright"
 fi
 

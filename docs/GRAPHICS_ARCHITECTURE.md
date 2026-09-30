@@ -42,8 +42,8 @@ binary is there. An empty window list means the provider has not queried a compo
 `http://127.0.0.1:4173/?surface=desktop`
 
 The TypeScript shell still draws its own windows in the page. A later host can map that URL as a
-Wayland layer. This revision does not replace the shell and does not start labwc. The ISO installs
-the labwc package and leaves it stopped. See `docs/ISO_BUILD.md`.
+Wayland layer. The display provider does not start labwc. `omne-session.service` does, after
+`multi-user.target`, with no display manager. See `docs/ISO_BUILD.md`.
 
 ## Providers
 
@@ -76,8 +76,9 @@ mode, and an input device are all present. That flag does not start labwc.
 
 ## Before a graphical desktop can launch in a VM
 
-`can_launch` has to be true inside the guest, and a future session unit has to start labwc. This
-revision does not start that unit. All of the following have to exist first:
+`omne-session.service` starts labwc after `multi-user.target`. `can_launch` is still only a report.
+The session uses the pixman renderer when `/dev/dri` has no `renderD*` node, and it loads
+`virtio-gpu` when that module is present. The guest still needs:
 
 1. A Linux guest with systemd. The UEFI disk from `scripts/linux/build-disk.sh` is the OMNE boot
    path. The kernel stays Ubuntu's `linux-image-generic`.

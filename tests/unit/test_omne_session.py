@@ -1,0 +1,48 @@
+"""The session reports labwc only after the Wayland socket exists."""
+
+from __future__ import annotations
+
+import importlib.util
+from importlib.machinery import SourceFileLoader
+from pathlib import Path
+from types import ModuleType
+
+from tests.conftest import ROOT
+
+
+def _session_module() -> ModuleType:
+    path = ROOT / "system" / "linux" / "omne-session"
+    loader = SourceFileLoader("omne_session", str(path))
+    spec = importlib.util.spec_from_loader("omne_session", loader)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+session = _session_module()
+
+
+def test_markers_stay_empty_until_the_socket_exists() -> None:
+    assert session.session_markers(alive=True, socket_ready=False, desktop_ready=True) == []
+    assert session.session_markers(alive=False, socket_ready=True, desktop_ready=True) == []
+
+
+def test_markers_follow_the_socket_and_the_shell() -> None:
+    running = session.session_markers(alive=True, socket_ready=True, desktop_ready=False)
+    assert running == ["labwc running", "wayland display ready"]
+    ready = session.session_markers(alive=True, socket_ready=True, desktop_ready=True)
+    assert ready == ["labwc running", "wayland display ready", "OMNE desktop ready"]
+
+
+def test_renderer_falls_back_when_the_render_node_is_absent() -> None:
+    assert session.renderer_environment(["card0"]) == {"WLR_RENDERER": "pixman"}
+    assert session.renderer_environment(["card0", "renderD128"]) == {}
+
+
+def test_session_unit_does_not_gate_multi_user() -> None:
+    unit = Path("system/linux/omne-session.service").read_text(encoding="utf-8")
+    target = Path("system/linux/omne.target").read_text(encoding="utf-8")
+    assert "After=multi-user.target" in unit
+    assert "omne-session.service" in target
+    assert "WantedBy=multi-user.target" in unit

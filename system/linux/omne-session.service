@@ -1,0 +1,41 @@
+[Unit]
+Description=OMNE Wayland session
+After=multi-user.target seatd.service omne-shell.service
+Wants=seatd.service
+
+[Service]
+Type=simple
+User=omne
+Group=omne
+SupplementaryGroups=video render input
+RuntimeDirectory=omne
+RuntimeDirectoryMode=0700
+WorkingDirectory=/var/lib/omne
+Environment=XDG_RUNTIME_DIR=/run/omne
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=LIBSEAT_BACKEND=seatd
+Environment=HOME=/var/lib/omne
+ExecStartPre=+/bin/sh -c '/sbin/modprobe virtio-gpu >/dev/null 2>&1 || true'
+ExecStart=/usr/bin/omne-session
+Restart=on-failure
+RestartSec=2
+TimeoutStartSec=30
+StandardOutput=journal+console
+StandardError=journal+console
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/omne
+# A leading '-' skips a path that is not on this image. /efi is absent on the live ISO.
+InaccessiblePaths=-/boot -/efi -/root -/etc/shadow -/etc/gshadow -/etc/sudoers -/etc/ssh
+
+[Install]
+WantedBy=multi-user.target

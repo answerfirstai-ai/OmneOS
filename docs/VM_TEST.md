@@ -5,8 +5,8 @@ virtual machine headlessly and records whether it is OS-ready. Neither script op
 a block device, `/dev`, `/boot`, or `/efi`.
 
 The test exits 0 only when every check passes. A build is not OS-ready unless the virtual machine
-reaches the OMNE desktop. The current ISO boots to `multi-user.target` and does not start labwc, so
-the desktop checks fail closed and the result stays `OS-ready: no`.
+reaches the OMNE desktop. `omne-session` starts labwc after `multi-user.target`. The desktop checks
+fail closed unless that process creates a Wayland socket and the log contains `labwc running`.
 
 ## Virtual hardware
 
