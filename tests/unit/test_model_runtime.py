@@ -323,7 +323,7 @@ def test_token_estimate_is_zero_for_empty_text() -> None:
 
 
 def test_runtime_sources_do_not_spawn_or_download() -> None:
-    banned = ("subprocess", "os.kill", "os.fork", "huggingface", "nvidia", "/api/pull")
+    banned = ("subprocess", "os.kill", "os.fork", "huggingface", "nvidia-smi", "/api/pull")
     for path in Path("core/models").rglob("*.py"):
         text = path.read_text(encoding="utf-8")
         for word in banned:

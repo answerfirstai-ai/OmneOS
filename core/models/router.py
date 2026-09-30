@@ -138,6 +138,69 @@ class ModelRouter:
             decision="WAIT" if notes and all("WAIT" in note for note in notes) else "DENY",
         )
 
+    def order(
+        self,
+        capabilities: list[str],
+        snapshot: ResourceSnapshot,
+        *,
+        route: str,
+        available: set[str] | None = None,
+        allow_mock: bool = True,
+        preferred_model: str | None = None,
+    ) -> list[ModelMetadata]:
+        """Return models for ``route`` that fit the snapshot.
+
+        ``auto`` prefers NVIDIA, then a local model, then mock. An explicit
+        route does not substitute a different provider.
+        """
+
+        if route not in {"auto", "mock", "local", "nvidia"}:
+            raise RoutingError(f"unknown model route {route}")
+        required = set(capabilities)
+        candidates = [
+            model for model in self._registry.enabled() if required <= set(model.capabilities)
+        ]
+        if available is not None:
+            candidates = [model for model in candidates if model.id in available]
+        if route == "mock":
+            candidates = [model for model in candidates if model.provider == "mock"]
+        elif route == "local":
+            candidates = [model for model in candidates if model.provider == "local"]
+        elif route == "nvidia":
+            candidates = [model for model in candidates if model.provider == "nvidia"]
+        else:
+            allowed = {"nvidia", "local", "mock"} if allow_mock else {"nvidia", "local"}
+            candidates = [model for model in candidates if model.provider in allowed]
+        preferred_known = bool(
+            preferred_model
+            and any(
+                model.provider == "nvidia" and model.model_name == preferred_model
+                for model in candidates
+            )
+        )
+        ranked = sorted(
+            candidates,
+            key=lambda model: _route_key(
+                model,
+                route=route,
+                preferred_model=preferred_model,
+                preferred_known=preferred_known,
+            ),
+        )
+        fitted: list[ModelMetadata] = []
+        for model in ranked:
+            decision, _reason = allocate(
+                snapshot,
+                AllocationRequest(
+                    requirements=model.requirements,
+                    local=model.local,
+                    cloud_available=any(not item.local for item in ranked),
+                ),
+            )
+            if decision is AllocationDecision.ALLOW:
+                fitted.append(model)
+        return fitted
+
 
 def _choice(
     model: ModelMetadata,
@@ -155,6 +218,23 @@ def _choice(
         estimated_cost=model.cost_input,
         decision=decision,
     )
+
+
+def _route_key(
+    model: ModelMetadata,
+    *,
+    route: str,
+    preferred_model: str | None,
+    preferred_known: bool,
+) -> tuple[int, int, int, str]:
+    provider_rank = {"nvidia": 0, "local": 1, "mock": 2}.get(model.provider, 9)
+    if route != "auto":
+        provider_rank = 0
+    preferred = bool(preferred_model) and model.provider == "nvidia"
+    named = model.model_name == preferred_model
+    fallback = not preferred_known and model.id == "nvidia-reasoning"
+    name_rank = 0 if preferred and (named or fallback) else 1
+    return (provider_rank, name_rank, model.priority, model.id)
 
 
 def _first_cloud(candidates: list[ModelMetadata]) -> ModelMetadata | None:

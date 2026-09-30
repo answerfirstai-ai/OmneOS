@@ -41,6 +41,11 @@ Development settings listen on `http://127.0.0.1:8787`. `GET /health` returns st
 runs an objective. `OMNE execute` prints JSON `{"id","status"}` and exits 0 when the task completes,
 3 when it is waiting for confirmation, and 1 when it fails.
 
+`NVIDIA_API_KEY` selects the NVIDIA NIM provider when it is present. OMNE still starts, and
+`OMNE check` still passes, when the variable is absent. `OMNE models` shows whether NVIDIA is
+configured. `OMNE models test nvidia` runs one short completion only when the key is set. The key
+is not stored in the repository. See `docs/MODELS.md`.
+
 `XAI_API_KEY` is read in development and testing when the xAI provider is called and no stored
 `model/xai` secret is addressed to core. Production does not read that variable. The default route
 uses the mock provider, so execute works offline. See `docs/SECRETS.md`.

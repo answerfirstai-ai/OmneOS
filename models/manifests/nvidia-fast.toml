@@ -1,0 +1,21 @@
+id = "nvidia-fast"
+provider = "nvidia"
+model_name = "nvidia/nemotron-3.5-lightning-30b-a3b"
+capabilities = ["reasoning", "coding", "tool_use"]
+local = false
+priority = 40
+reasoning = true
+tool_calling = true
+vision = false
+coding = true
+latency = "unknown"
+cost_input = "unknown"
+cost_output = "unknown"
+
+[requirements]
+ram_mb = 0
+vram_mb = 0
+cpu_threads = 0
+disk_mb = 0
+ram_known = true
+vram_known = true

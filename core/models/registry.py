@@ -6,11 +6,11 @@ import tomllib
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from core.compute.requirements import ResourceRequirements
 
-ProviderName = Literal["mock", "xai", "local"]
+ProviderName = Literal["mock", "xai", "local", "nvidia"]
 
 
 class ModelMetadata(BaseModel):
@@ -32,6 +32,29 @@ class ModelMetadata(BaseModel):
     context_window: int | None = None
     modalities: list[str] = Field(default_factory=lambda: ["text"])
     priority: int = 100
+    reasoning: bool = False
+    tool_calling: bool = False
+    vision: bool = False
+    coding: bool = False
+    availability: str = "unknown"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _capability_flags(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        data = dict(value)
+        capabilities = data.get("capabilities")
+        names = set(capabilities) if isinstance(capabilities, list) else set()
+        if not data.get("reasoning") and "reasoning" in names:
+            data["reasoning"] = True
+        if not data.get("tool_calling") and ("tool_use" in names or "tool_calling" in names):
+            data["tool_calling"] = True
+        if not data.get("vision") and "vision" in names:
+            data["vision"] = True
+        if not data.get("coding") and "coding" in names:
+            data["coding"] = True
+        return data
 
     @field_validator("cost_input", "cost_output", "latency")
     @classmethod
@@ -51,6 +74,15 @@ class ModelMetadata(BaseModel):
         if not stripped:
             raise ValueError("model_name must not be empty")
         return stripped
+
+    def resource_class(self) -> str:
+        """Local weights can reserve VRAM. Cloud inference does not."""
+
+        if self.provider == "mock":
+            return "NONE"
+        if self.local:
+            return "LOCAL_MODEL_RESOURCE"
+        return "CLOUD_MODEL_RESOURCE"
 
 
 class ModelRegistry:

@@ -24,6 +24,7 @@ from core.compute.requirements import ResourceRequirements
 from core.events.bus import EventBus
 
 ReservationKind = Literal["task", "worker", "model"]
+ResourceClass = Literal["LOCAL_MODEL_RESOURCE", "CLOUD_MODEL_RESOURCE", "OTHER"]
 
 
 class ReservationState(StrEnum):
@@ -57,9 +58,18 @@ class Reservation(BaseModel):
     kind: ReservationKind
     requirements: ResourceRequirements
     local: bool
+    resource_class: ResourceClass = "OTHER"
     state: ReservationState
     decision: AllocationDecision
     reason: str
+
+
+def _resource_class(kind: ReservationKind, local: bool) -> ResourceClass:
+    if kind != "model":
+        return "OTHER"
+    if local:
+        return "LOCAL_MODEL_RESOURCE"
+    return "CLOUD_MODEL_RESOURCE"
 
 
 _HOLDS = frozenset({ReservationState.RESERVE, ReservationState.RUN})
@@ -93,11 +103,17 @@ class ResourceManager:
         """Record a REQUEST. ALLOW moves it to RESERVE and holds the capacity."""
 
         current = snapshot or self._monitor.snapshot()
+        resource_class = _resource_class(kind, local)
+        effective = requirements
+        if resource_class == "CLOUD_MODEL_RESOURCE":
+            effective = requirements.model_copy(
+                update={"vram_mb": 0, "gpu": False, "vram_known": True}
+            )
         with self._lock:
             decision, reason = allocate(
                 current,
                 AllocationRequest(
-                    requirements=requirements,
+                    requirements=effective,
                     local=local,
                     cloud_available=cloud_available,
                 ),
@@ -112,8 +128,9 @@ class ResourceManager:
                 id=str(uuid4()),
                 owner=owner,
                 kind=kind,
-                requirements=requirements,
+                requirements=effective,
                 local=local,
+                resource_class=resource_class,
                 state=state,
                 decision=decision,
                 reason=reason,
@@ -208,6 +225,7 @@ class ResourceManager:
                 "reservation_id": reservation.id,
                 "owner": reservation.owner,
                 "kind": reservation.kind,
+                "resource_class": reservation.resource_class,
                 "state": reservation.state.value,
                 "decision": reservation.decision.value,
                 "reason": reservation.reason,

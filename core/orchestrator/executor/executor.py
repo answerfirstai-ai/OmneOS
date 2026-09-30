@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from pathlib import Path
 from typing import Any
 
@@ -12,12 +13,25 @@ from core.agents.runtime import AgentRuntime
 from core.events.bus import EventBus
 from core.models.cache import CacheContext, ResponseCache
 from core.models.providers.base import ModelProvider
-from core.models.types import GenerateRequest, ToolCallRequest
+from core.models.types import GenerateRequest, ProviderError, ToolCallRequest
 from core.orchestrator.store import TaskStore
 from core.orchestrator.task import PlannedCall, Task, TaskStatus
 from core.tools.base import ToolContext, ToolResult
 from core.tools.gateway import ToolGateway
 from core.verify.verifier import verify_observations
+from omne.secrets.redact import redact_text
+
+_FALLBACK_CODES = frozenset(
+    {
+        "configuration",
+        "unavailable",
+        "connection_error",
+        "timeout",
+        "rate_limited",
+        "authentication",
+        "invalid_response",
+    }
+)
 
 
 class ExecutionFailure(Exception):
@@ -248,30 +262,115 @@ class TaskExecutor:
         return await asyncio.to_thread(self._invoke, task, tool_id, arguments, manifest)
 
     async def _generate(self, task: Task, prompt: str) -> str:
-        provider = self._provider(task)
         context_note = ""
         if self._context_text is not None:
             context_note = str(self._context_text(task))
         full_prompt = f"{context_note}\n\n{prompt}" if context_note else prompt
-        request = GenerateRequest(model=self._external_model_name(task), prompt=full_prompt)
-        label = self._provider_labels.get(task.assigned_model or "", task.assigned_model or "")
-        revision = task.metadata.get("world_revision", 0)
-        context = CacheContext(
-            world_revision=int(revision) if isinstance(revision, int) else 0,
-            context_revision=len(context_note),
-        )
-        if task.metadata.get("cache") == "bypass":
-            self._responses.bypass(reason="task requested a fresh model call")
-            response = await provider.generate(request)
+        chain = _model_chain(task)
+        last: ProviderError | None = None
+        for index, model_id in enumerate(chain):
+            provider = self._providers.get(model_id)
+            if provider is None:
+                continue
+            label = self._provider_labels.get(model_id, model_id)
+            external = self._model_names.get(model_id, model_id)
+            request = GenerateRequest(model=external, prompt=full_prompt)
+            revision = task.metadata.get("world_revision", 0)
+            context = CacheContext(
+                world_revision=int(revision) if isinstance(revision, int) else 0,
+                context_revision=len(context_note),
+            )
+            if index == 0 and task.metadata.get("cache") == "bypass":
+                self._responses.bypass(reason="task requested a fresh model call")
+            elif index == 0:
+                cached = self._responses.get(label, request, context=context)
+                if cached is not None:
+                    self._events.publish("cache.hit", task_id=task.id, model_id=model_id)
+                    return cached.text
+                self._events.publish("cache.miss", task_id=task.id, model_id=model_id)
+            started = time.perf_counter()
+            self._emit_model(task, "model.requested", model_id, label, external, latency=None)
+            self._emit_model(task, "model.started", model_id, label, external, latency=None)
+            try:
+                response = await provider.generate(request)
+            except ProviderError as exc:
+                last = exc
+                latency = _latency(started)
+                self._emit_model(
+                    task,
+                    "model.failed",
+                    model_id,
+                    label,
+                    external,
+                    latency=latency,
+                    code=exc.code,
+                )
+                if index + 1 < len(chain) and exc.code in _FALLBACK_CODES:
+                    nxt = chain[index + 1]
+                    self._emit_model(
+                        task,
+                        "model.fallback",
+                        model_id,
+                        label,
+                        external,
+                        latency=latency,
+                        code=exc.code,
+                        fallback_provider=self._provider_labels.get(nxt, nxt),
+                        fallback_model=self._model_names.get(nxt, nxt),
+                    )
+                    continue
+                raise ExecutionFailure(redact_text(str(exc)), code="model_unavailable") from exc
+            latency = _latency(started)
+            answered = response.provider or label
+            self._emit_model(
+                task,
+                "model.completed",
+                model_id,
+                answered,
+                response.model or external,
+                latency=latency,
+            )
+            if index == 0:
+                self._responses.put(label, request, response, context=context)
             return response.text
-        cached = self._responses.get(label, request, context=context)
-        if cached is not None:
-            self._events.publish("cache.hit", task_id=task.id, model_id=task.assigned_model)
-            return cached.text
-        self._events.publish("cache.miss", task_id=task.id, model_id=task.assigned_model)
-        response = await provider.generate(request)
-        self._responses.put(label, request, response, context=context)
-        return response.text
+        if last is not None:
+            raise ExecutionFailure(redact_text(str(last)), code="model_unavailable")
+        raise ExecutionFailure("model provider is not available", code="model_unavailable")
+
+    def _emit_model(
+        self,
+        task: Task,
+        event_type: str,
+        model_id: str,
+        provider: str,
+        model_name: str,
+        *,
+        latency: int | None,
+        code: str | None = None,
+        fallback_provider: str | None = None,
+        fallback_model: str | None = None,
+    ) -> None:
+        worker = task.metadata.get("worker_id")
+        trace = task.metadata.get("trace_id")
+        payload: dict[str, Any] = {
+            "provider": provider,
+            "model": model_name,
+            "latency": latency,
+        }
+        if code is not None:
+            payload["code"] = code
+        if fallback_provider is not None:
+            payload["fallback_provider"] = fallback_provider
+            payload["fallback_model"] = fallback_model or ""
+        self._events.publish(
+            event_type,
+            source="models",
+            task_id=task.id,
+            model_id=model_id,
+            worker_id=worker if isinstance(worker, str) else None,
+            trace_id=trace if isinstance(trace, str) else None,
+            payload=payload,
+        )
 
     def _begin_worker(self, manifest: AgentManifest, task: Task) -> None:
         mission = task.metadata.get("mission_id")
@@ -315,3 +414,16 @@ class TaskExecutor:
         if manifest is None:
             return
         self._runtime.release(manifest)
+
+
+def _model_chain(task: Task) -> list[str]:
+    primary = task.assigned_model or ""
+    chain = [primary] if primary else []
+    stored = task.metadata.get("model_fallbacks")
+    if isinstance(stored, list):
+        chain.extend(item for item in stored if isinstance(item, str) and item not in chain)
+    return chain
+
+
+def _latency(started: float) -> int:
+    return max(0, int((time.perf_counter() - started) * 1000))

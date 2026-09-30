@@ -20,13 +20,15 @@ from core.memory.database import MemoryDatabase
 from core.memory.store import MemoryStore
 from core.mission.store import MissionStore
 from core.models.cache import ResponseCache
-from core.models.credentials import xai_api_key
+from core.models.cortex import Cortex
+from core.models.credentials import nvidia_api_key, preferred_nvidia_model, xai_api_key
 from core.models.engines.mock import MockEngine
 from core.models.engines.openai_compatible import OpenAICompatibleEngine
 from core.models.lifecycle import ModelLifecycle
 from core.models.providers.base import ModelProvider
 from core.models.providers.local.provider import LocalProvider
 from core.models.providers.mock.provider import MockProvider
+from core.models.providers.nvidia.provider import NvidiaProvider
 from core.models.providers.xai.provider import XAIProvider
 from core.models.registry import ModelRegistry
 from core.models.router import ModelRouter
@@ -109,7 +111,18 @@ def build_OMNE(settings: Settings) -> OMNE:
     for model in models.enabled():
         cache.register(model.id, size_bytes=None, requirements=model.requirements)
     credential = xai_api_key(settings, secrets)
-    providers, model_names, provider_labels = _providers(settings, models, credential)
+    nvidia_key = nvidia_api_key(settings, secrets)
+    nvidia_model = preferred_nvidia_model(settings)
+    providers, model_names, provider_labels, nvidia_provider = _providers(
+        settings, models, credential, nvidia_key, nvidia_model
+    )
+    _announce_providers(
+        events,
+        nvidia_configured=nvidia_key is not None,
+        nvidia_model=nvidia_model,
+        xai_configured=credential is not None,
+        local_configured=bool(settings.local_model_base_url),
+    )
     store = TaskStore(settings.data_dir / "tasks.sqlite")
     model_lifecycle = ModelLifecycle()
     model_runtime = _model_runtime(
@@ -121,6 +134,7 @@ def build_OMNE(settings: Settings) -> OMNE:
         runtime,
         resources,
         xai_configured=credential is not None,
+        nvidia_configured=nvidia_key is not None,
     )
     executor = TaskExecutor(
         store=store,
@@ -185,6 +199,21 @@ def build_OMNE(settings: Settings) -> OMNE:
         model_runtime=model_runtime,
         resources=resources,
         data_dir=settings.data_dir,
+        model_route=settings.model_route,
+        preferred_nvidia_model=nvidia_model,
+        providers=providers,
+        model_names=model_names,
+        provider_labels=provider_labels,
+        nvidia_provider=nvidia_provider,
+        cortex=Cortex(
+            router=ModelRouter(models),
+            providers=providers,
+            model_names=model_names,
+            provider_labels=provider_labels,
+            events=events,
+            known_tools=set(tools.ids()),
+        ),
+        nvidia_configured=nvidia_key is not None,
     )
     executor._context_text = omne.context_for
     return omne
@@ -309,6 +338,7 @@ def _model_runtime(
     resources: ResourceManager,
     *,
     xai_configured: bool,
+    nvidia_configured: bool,
 ) -> ModelRuntime:
     """Select adapters from configuration. Construction does not load a model."""
 
@@ -331,7 +361,10 @@ def _model_runtime(
     )
     model_runtime.prepare(
         available=lambda model: _model_is_available(
-            settings, model.provider, xai_configured=xai_configured
+            settings,
+            model.provider,
+            xai_configured=xai_configured,
+            nvidia_configured=nvidia_configured,
         )
     )
     return model_runtime
@@ -345,8 +378,14 @@ def _worker_alive(runtime: AgentRuntime, worker_id: str) -> bool:
     return worker.lifecycle not in {WorkerState.TERMINATED, WorkerState.FAILED}
 
 
-def _model_is_available(settings: Settings, provider: str, *, xai_configured: bool) -> bool:
-    """Report availability from configuration. This does not load weights."""
+def _model_is_available(
+    settings: Settings,
+    provider: str,
+    *,
+    xai_configured: bool,
+    nvidia_configured: bool,
+) -> bool:
+    """Report availability from configuration. This does not load weights or call NVIDIA."""
 
     if provider == "mock":
         return True
@@ -354,6 +393,8 @@ def _model_is_available(settings: Settings, provider: str, *, xai_configured: bo
         return bool(settings.local_model_base_url)
     if provider == "xai":
         return xai_configured
+    if provider == "nvidia":
+        return nvidia_configured
     return False
 
 
@@ -361,7 +402,9 @@ def _providers(
     settings: Settings,
     models: ModelRegistry,
     xai_key: str | None,
-) -> tuple[dict[str, ModelProvider], dict[str, str], dict[str, str]]:
+    nvidia_key: str | None,
+    nvidia_model: str,
+) -> tuple[dict[str, ModelProvider], dict[str, str], dict[str, str], NvidiaProvider]:
     mock: ModelProvider = MockProvider()
     xai: ModelProvider = XAIProvider(
         api_key=xai_key,
@@ -369,19 +412,56 @@ def _providers(
         timeout_seconds=settings.xai_timeout_seconds,
         max_retries=settings.xai_max_retries,
     )
+    nvidia = NvidiaProvider(
+        api_key=nvidia_key,
+        base_url=settings.nvidia_base_url,
+        timeout_seconds=settings.nvidia_timeout_seconds,
+        max_retries=settings.nvidia_max_retries,
+    )
     local: ModelProvider = LocalProvider(
         base_url=settings.local_model_base_url,
         timeout_seconds=settings.xai_timeout_seconds,
     )
-    by_provider = {"mock": mock, "xai": xai, "local": local}
+    by_provider: dict[str, ModelProvider] = {
+        "mock": mock,
+        "xai": xai,
+        "local": local,
+        "nvidia": nvidia,
+    }
     providers: dict[str, ModelProvider] = {}
     names: dict[str, str] = {}
     labels: dict[str, str] = {}
     for model in models.enabled():
         providers[model.id] = by_provider[model.provider]
         names[model.id] = model.model_name
+        if model.id == "nvidia-reasoning" and nvidia_model != model.model_name:
+            names[model.id] = nvidia_model
         labels[model.id] = model.provider
-    return providers, names, labels
+    return providers, names, labels, nvidia
+
+
+def _announce_providers(
+    events: EventBus,
+    *,
+    nvidia_configured: bool,
+    nvidia_model: str,
+    xai_configured: bool,
+    local_configured: bool,
+) -> None:
+    """Record which providers can be called. This does not open a connection."""
+
+    rows = (
+        ("nvidia", nvidia_configured, nvidia_model),
+        ("xai", xai_configured, ""),
+        ("local", local_configured, ""),
+        ("mock", True, "mock"),
+    )
+    for provider, configured, model in rows:
+        events.publish(
+            "model.provider.available" if configured else "model.provider.unavailable",
+            source="models",
+            payload={"provider": provider, "model": model, "latency": None},
+        )
 
 
 def _apply_recovery(

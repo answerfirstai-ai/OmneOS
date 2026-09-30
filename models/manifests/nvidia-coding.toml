@@ -1,0 +1,21 @@
+id = "nvidia-coding"
+provider = "nvidia"
+model_name = "mistralai/mistral-nemotron"
+capabilities = ["coding", "reasoning", "tool_use"]
+local = false
+priority = 30
+reasoning = true
+tool_calling = true
+vision = false
+coding = true
+latency = "unknown"
+cost_input = "unknown"
+cost_output = "unknown"
+
+[requirements]
+ram_mb = 0
+vram_mb = 0
+cpu_threads = 0
+disk_mb = 0
+ram_known = true
+vram_known = true
