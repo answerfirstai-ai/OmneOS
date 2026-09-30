@@ -40,6 +40,14 @@ def test_renderer_falls_back_when_the_render_node_is_absent() -> None:
     assert session.renderer_environment(["card0", "renderD128"]) == {}
 
 
+def test_gpu_attempt_falls_back_to_pixman() -> None:
+    environments = session.startup_environments({"HOME": "/var/lib/omne"}, ["card1", "renderD128"])
+    assert environments[0]["WLR_BACKENDS"] == "drm"
+    assert "WLR_RENDERER" not in environments[0]
+    assert environments[1]["WLR_RENDERER"] == "pixman"
+    assert "WAYLAND_DISPLAY" not in environments[1]
+
+
 def test_labwc_uses_drm_instead_of_a_nested_display() -> None:
     env = session.labwc_environment(
         {"WAYLAND_DISPLAY": "wayland-1", "DISPLAY": ":0", "HOME": "/var/lib/omne"},

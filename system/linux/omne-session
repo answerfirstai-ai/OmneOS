@@ -47,6 +47,32 @@ def labwc_environment(base: dict[str, str], device_names: list[str]) -> dict[str
     return env
 
 
+def startup_environments(base: dict[str, str], device_names: list[str]) -> list[dict[str, str]]:
+    """Prefer the GPU renderer, then pixman when EGL cannot create a screen."""
+
+    primary = labwc_environment(base, device_names)
+    environments = [primary]
+    if "WLR_RENDERER" not in primary:
+        fallback = dict(primary)
+        fallback["WLR_RENDERER"] = "pixman"
+        environments.append(fallback)
+    return environments
+
+
+def _write_config(home: str) -> None:
+    directory = Path(home) / ".config" / "labwc"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "rc.xml").write_text(
+        '<?xml version="1.0"?>\n'
+        "<labwc_config>\n"
+        "  <core>\n"
+        "    <xwayland>no</xwayland>\n"
+        "  </core>\n"
+        "</labwc_config>\n",
+        encoding="utf-8",
+    )
+
+
 def _device_names() -> list[str]:
     directory = Path("/dev/dri")
     try:
@@ -94,13 +120,7 @@ def _stop(process: subprocess.Popen[bytes]) -> None:
         process.wait(timeout=5)
 
 
-def main() -> int:
-    runtime = os.environ.get("XDG_RUNTIME_DIR", "/run/omne")
-    display = "wayland-0"
-    labwc = os.environ.get("OMNE_LABWC", "/usr/bin/labwc")
-    env = labwc_environment(dict(os.environ), _device_names())
-    env["XDG_RUNTIME_DIR"] = runtime
-    socket_path = Path(runtime) / display
+def _launch(labwc: str, env: dict[str, str], socket_path: Path) -> int:
     try:
         process = subprocess.Popen([labwc], env=env)
     except OSError as exc:
@@ -116,9 +136,29 @@ def main() -> int:
         print(line, flush=True)
     if not ready:
         _stop(process)
-        print("labwc_error=wayland socket was not created", flush=True)
         return 1
     return process.wait()
+
+
+def main() -> int:
+    runtime = os.environ.get("XDG_RUNTIME_DIR", "/run/omne")
+    home = os.environ.get("HOME", "/var/lib/omne")
+    display = "wayland-0"
+    labwc = os.environ.get("OMNE_LABWC", "/usr/bin/labwc")
+    try:
+        _write_config(home)
+    except OSError as exc:
+        print(f"labwc_config_error={type(exc).__name__}: {exc}", flush=True)
+    socket_path = Path(runtime) / display
+    status = 1
+    for env in startup_environments(dict(os.environ), _device_names()):
+        env["XDG_RUNTIME_DIR"] = runtime
+        env["HOME"] = home
+        status = _launch(labwc, env, socket_path)
+        if status != 1:
+            return status
+    print("labwc_error=wayland socket was not created", flush=True)
+    return status
 
 
 if __name__ == "__main__":
