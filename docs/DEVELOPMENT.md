@@ -27,7 +27,8 @@ selects `configs/testing/OMNE.toml`. `OMNE_ENVIRONMENT=production` selects
 `configs/production/OMNE.toml`.
 
 Set `XAI_API_KEY` in the environment only when you intend to call xAI. Leave
-`OMNE_LOCAL_MODEL_BASE_URL` empty to keep the local provider disconnected. Leave
+`OMNE_LOCAL_MODEL_BASE_URL` empty to keep the local provider disconnected. When that URL is set,
+OMNE talks to models the server already has and does not download weights. Leave
 `OMNE_BROWSER_COMMAND` empty to keep browser tools unavailable.
 
 ## Run

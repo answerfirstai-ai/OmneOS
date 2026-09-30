@@ -88,7 +88,8 @@ microphone. `OMNE input` reports configured shortcuts and does not read the keyb
 reports disks and mounts and does not format them. `OMNE applications` reports installed desktop
 applications and does not start a shell. `OMNE browser` reports browser availability and does not
 launch a browser or import Playwright. `OMNE processes` reports the process table and does not
-signal a process. Physical hardware installation is not implemented.
+signal a process. `OMNE models` reports the model registry and does not download weights. Physical
+hardware installation is not implemented.
 
 ## License
 

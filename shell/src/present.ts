@@ -138,8 +138,14 @@ export function modelStateLabel(model: { local: boolean; lifecycle?: string }): 
   if (lifecycle === "LOADING") {
     return "Loading";
   }
+  if (lifecycle === "RUNNING") {
+    return "Running";
+  }
   if (lifecycle === "BUSY") {
     return "Busy";
+  }
+  if (lifecycle === "UNLOADING") {
+    return "Unloading";
   }
   if (lifecycle === "LOADED" || lifecycle === "IDLE") {
     return "Ready";
@@ -185,7 +191,9 @@ export function modelCards(
   return {
     local: cards.filter((card) => card.place === "Local"),
     cloud: cards.filter((card) => card.place === "Cloud"),
-    active: cards.filter((card) => card.work !== null || card.state === "Busy"),
+    active: cards.filter(
+      (card) => card.work !== null || card.state === "Busy" || card.state === "Running",
+    ),
   };
 }
 

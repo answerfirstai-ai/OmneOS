@@ -10,7 +10,8 @@ Manifests live in `models/manifests/*.toml`. Fields are `id`, `provider` (`mock`
 The router keeps models that declare every requested capability, sorts by priority, and accepts the
 first ALLOW decision. The shipped mock manifest uses priority 0, so offline runs select it. The
 local manifest sets `ram_known` and `vram_known` to false, so the allocator defers it instead of
-inventing hardware numbers.
+inventing hardware numbers. `ModelRuntime` is the load path. It uses an adapter, enforces the
+context window and the allocator, and does not download weights. See `docs/MODELS.md`.
 
 xAI calls `POST {base}/chat/completions`. A missing `XAI_API_KEY` raises `ProviderError` with code
 `configuration` before any HTTP request. Authentication failures are not retried. Timeouts, 429, and
