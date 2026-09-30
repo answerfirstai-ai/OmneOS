@@ -41,6 +41,7 @@ OMNE compute
 OMNE world
 OMNE mission list
 OMNE capabilities
+OMNE input
 ```
 
 `OMNE_EXECUTION_MODE` selects development, testing, offline, local, online, hybrid, or production.

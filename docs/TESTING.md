@@ -59,11 +59,13 @@ Python:
 - Audio diagnostics. The testing API uses an empty mock session and keeps voice denied. A Linux
   fixture supplies a PipeWire dump with speakers, a microphone, Bluetooth audio, volume, mute,
   defaults, and a capture stream. An ALSA fixture leaves volume null. `POST /audio` stays 404.
+- Input bindings. The testing API uses an empty mock device list and no configured chord. A Linux
+  fixture supplies a keyboard and a mouse and drops the key bitmap. `POST /input` stays 404.
 
 TypeScript:
 
-- Health parsing, core URL selection, the windowing state parser, and the network and audio tray
-  parsers.
+- Health parsing, core URL selection, the windowing state parser, and the network, audio, and input
+  tray parsers.
 - Character states, including a missing asset and mission-driven analyzing, verifying, and waiting.
 - Environment state, lifecycle stages, mission inspection, permission copy, verification evidence,
   error summaries, notifications, graph layout, the current-mission graph, command copy, detail
@@ -82,5 +84,7 @@ core: an unavailable GPU is not a check. Display launch readiness is tested agai
 tree. Window commands are tested against the in-memory record and a snapshot file. Hardware
 discovery is tested against a fixture sysfs tree. Network state is tested against an in-memory
 session and a fixture route table. Audio state is tested against an in-memory mixer and fixture ALSA
-and PipeWire records. The default suite does not run `debootstrap`, QEMU, or labwc. Live xAI, a
-physical GPU workload, and hardware installation are outside the default suite.
+and PipeWire records. Input bindings are tested against configuration, an in-memory device list, and
+a fixture device table that includes a key bitmap the record must drop. The default suite does not
+run `debootstrap`, QEMU, or labwc. Live xAI, a physical GPU workload, and hardware installation are
+outside the default suite.

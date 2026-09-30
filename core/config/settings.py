@@ -15,6 +15,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from core.config.errors import ConfigurationError
+from omne.input.chords import canonical_shortcut
 
 EnvironmentName = Literal["development", "testing", "production"]
 ExecutionMode = Literal[
@@ -56,6 +57,9 @@ ENV_TO_FIELD: dict[str, str] = {
     "OMNE_MEMORY_RETRIEVE_LIMIT": "memory_retrieve_limit",
     "OMNE_CACHE_TTL_SECONDS": "cache_ttl_seconds",
     "OMNE_VERIFICATION_REQUIRED": "verification_required",
+    "OMNE_ACTIVATION_SHORTCUT": "activation_shortcut",
+    "OMNE_CANCEL_SHORTCUT": "cancel_shortcut",
+    "OMNE_PUSH_TO_TALK_SHORTCUT": "push_to_talk_shortcut",
 }
 
 KNOWN_ENVIRONMENT_VARIABLES: frozenset[str] = frozenset(ENV_TO_FIELD) | {"OMNE_CONFIG"}
@@ -92,6 +96,9 @@ class Settings(BaseModel):
     memory_retrieve_limit: int = Field(default=20, ge=1, le=200)
     cache_ttl_seconds: float = Field(default=0, ge=0, le=86400)
     verification_required: bool = True
+    activation_shortcut: str = ""
+    cancel_shortcut: str = ""
+    push_to_talk_shortcut: str = ""
 
     @model_validator(mode="before")
     @classmethod
@@ -148,6 +155,15 @@ class Settings(BaseModel):
         if not stripped:
             raise ValueError("xai_model must not be empty")
         return stripped
+
+    @field_validator(
+        "activation_shortcut", "cancel_shortcut", "push_to_talk_shortcut", mode="before"
+    )
+    @classmethod
+    def _shortcut(cls, value: object) -> str:
+        if not isinstance(value, str):
+            raise ValueError("shortcut must be a string")
+        return canonical_shortcut(value)
 
     @field_validator("local_model_base_url", "browser_command")
     @classmethod

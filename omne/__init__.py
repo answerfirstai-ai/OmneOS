@@ -5,4 +5,5 @@ Window changes stay behind a grant and are not sent to the compositor.
 Hardware discovery reads Linux sysfs and proc and does not configure devices.
 Network discovery reads the Linux stack and does not replace it.
 Audio discovery reads PipeWire or ALSA and does not open a microphone.
+Input bindings come from configuration and do not read the keyboard stream.
 """

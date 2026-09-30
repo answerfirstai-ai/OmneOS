@@ -60,6 +60,7 @@ _HIGH_CAPABILITIES = frozenset(
         "audio.set_default",
         "audio.set_volume",
         "audio.set_mute",
+        "input.bind",
     }
 )
 

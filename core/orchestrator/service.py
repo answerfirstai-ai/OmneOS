@@ -50,6 +50,9 @@ from omne.audio.service import AudioService
 from omne.display.select import diagnose_display
 from omne.hardware.select import hardware_service
 from omne.hardware.service import HardwareService
+from omne.input.model import InputRequest
+from omne.input.select import input_service
+from omne.input.service import InputService
 from omne.network.model import NetworkRequest
 from omne.network.select import network_service
 from omne.network.service import NetworkService
@@ -114,6 +117,9 @@ class OMNE:
         context_char_limit: int,
         memory_retrieve_limit: int,
         workspace_root: Path,
+        activation_shortcut: str = "",
+        cancel_shortcut: str = "",
+        push_to_talk_shortcut: str = "",
     ) -> None:
         self._store = store
         self._scheduler = scheduler
@@ -150,6 +156,10 @@ class OMNE:
         self._hardware: HardwareService | None = None
         self._network: NetworkService | None = None
         self._audio: AudioService | None = None
+        self._input: InputService | None = None
+        self._activation_shortcut = activation_shortcut
+        self._cancel_shortcut = cancel_shortcut
+        self._push_to_talk_shortcut = push_to_talk_shortcut
         self._events.subscribe(self._on_event)
         self._world.bind(self.build_world)
 
@@ -464,6 +474,54 @@ class OMNE:
 
         service = audio_service(self._environment, sink=sink, authorize=authorize)
         self._audio = service
+        return service
+
+    def input_view(self) -> dict[str, object]:
+        with self._lock:
+            return self._input_service().inspect().model_dump(mode="json")
+
+    def apply_input(self, request: InputRequest, grants: dict[str, list[str]]) -> dict[str, object]:
+        with self._lock:
+            return (
+                self._input_service()
+                .apply(request, grants, self._environment)
+                .model_dump(mode="json")
+            )
+
+    def _input_service(self) -> InputService:
+        service = self._input
+        if service is not None:
+            return service
+
+        def sink(event_type: str, payload: dict[str, Any]) -> None:
+            self._events.publish(event_type, source="input", payload=payload)
+
+        def authorize(
+            tool_id: str,
+            arguments: dict[str, object],
+            grants: Mapping[str, Sequence[str]],
+            environment: str,
+        ) -> tuple[str, str]:
+            result = PermissionEvaluator().evaluate(
+                PermissionRequest(
+                    tool_id=tool_id,
+                    arguments=dict(arguments),
+                    grants={key: list(value) for key, value in grants.items()},
+                    environment=environment,
+                    workspace_root=str(self._workspace),
+                )
+            )
+            return result.decision.value, result.reason
+
+        service = input_service(
+            self._environment,
+            activation=self._activation_shortcut,
+            cancel=self._cancel_shortcut,
+            push_to_talk=self._push_to_talk_shortcut,
+            sink=sink,
+            authorize=authorize,
+        )
+        self._input = service
         return service
 
     def voice_status(self) -> dict[str, object]:

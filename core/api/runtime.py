@@ -129,6 +129,9 @@ def build_OMNE(settings: Settings) -> OMNE:
         context_char_limit=settings.context_char_limit,
         memory_retrieve_limit=settings.memory_retrieve_limit,
         workspace_root=settings.workspace_root,
+        activation_shortcut=settings.activation_shortcut,
+        cancel_shortcut=settings.cancel_shortcut,
+        push_to_talk_shortcut=settings.push_to_talk_shortcut,
     )
     executor._context_text = omne.context_for
     return omne

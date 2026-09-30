@@ -254,6 +254,7 @@ input:focus-visible {
 }
 
 #status,
+#input-status,
 #audio-status,
 #network-status,
 #tray-status,
@@ -270,6 +271,7 @@ input:focus-visible {
 }
 
 #status[data-state="ok"],
+#input-status[data-state="ready"],
 #audio-status[data-state="present"],
 #network-status[data-state="up"],
 #tray-status[data-state="ok"],
@@ -277,6 +279,7 @@ input:focus-visible {
   color: var(--ok);
 }
 
+#input-status[data-state="command"],
 #audio-status[data-state="active"],
 #status[data-state="checking"],
 #tray-status[data-state="checking"],
@@ -294,6 +297,8 @@ input:focus-visible {
 }
 
 #status[data-state="unavailable"],
+#input-status[data-state="unbound"],
+#input-status[data-state="unknown"],
 #audio-status[data-state="muted"],
 #audio-status[data-state="absent"],
 #audio-status[data-state="unknown"],
@@ -469,6 +474,7 @@ input {
 }
 
 #character,
+#input-status,
 #audio-status,
 #network-status,
 #tray-status,

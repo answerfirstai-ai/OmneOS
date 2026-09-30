@@ -43,10 +43,12 @@ labwc, DRM, a render node, a connected monitor, and an input device are present.
 Wayland session. `omne.windowing` records windows and workspaces for that session and does not
 command labwc. `omne.hardware` reads Linux device state and does not configure it. `omne.network`
 reads the Linux network stack and does not replace systemd-networkd. `omne.audio` reads the Linux
-audio stack and does not open a microphone. The shell is still the web desktop.
+audio stack and does not open a microphone. `omne.input` reads configured shortcuts and published
+keyboards and mice and does not read the keyboard stream. The shell is still the web desktop.
 `docs/GRAPHICS_ARCHITECTURE.md` lists what a VM needs before that session can launch.
 `docs/WINDOWING.md` describes the window record. `docs/NETWORK.md` describes the network read.
 `docs/AUDIO_ARCHITECTURE.md` describes the audio read and the later voice path.
+`docs/INPUT_ARCHITECTURE.md` describes the shortcut configuration and the closed key stream.
 
 The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
 capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,
