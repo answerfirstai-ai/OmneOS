@@ -49,6 +49,7 @@ class LinuxHardwareProvider:
         for reader in (
             _cpus,
             _memory,
+            _motherboard,
             _gpus,
             _monitors,
             _inputs,
@@ -58,6 +59,7 @@ class LinuxHardwareProvider:
             _networks,
             _bluetooth,
             _audio,
+            _microphones,
             _cameras,
             _power,
         ):
@@ -173,6 +175,53 @@ def _memory(root: Path) -> tuple[list[_Seen], str | None]:
         ),
     )
     return [_Seen(device, [])], None
+
+
+_DMI_FIELDS = (
+    "sys_vendor",
+    "product_name",
+    "product_version",
+    "board_vendor",
+    "board_name",
+    "board_version",
+    "bios_vendor",
+    "bios_version",
+)
+_CAPTURE = re.compile(r"^pcmC(\d+)D(\d+)c$")
+
+
+def _motherboard(root: Path) -> tuple[list[_Seen], str | None]:
+    candidates = (
+        root / "sys" / "class" / "dmi" / "id",
+        root / "sys" / "devices" / "virtual" / "dmi" / "id",
+    )
+    directory = next((path for path in candidates if path.is_dir()), None)
+    if directory is None:
+        if any(path.exists() for path in candidates):
+            return [], "motherboard"
+        return [], None
+    values = {name: _optional(directory / name) for name in _DMI_FIELDS}
+    if all(value is None for value in values.values()):
+        if any((directory / name).exists() for name in _DMI_FIELDS):
+            return [], "motherboard"
+        return [], None
+    vendor = values["board_vendor"] or values["sys_vendor"] or values["bios_vendor"]
+    model = values["board_name"] or values["product_name"]
+    capabilities = [
+        f"{name}:{value}"
+        for name, value in values.items()
+        if value is not None and name not in {"board_vendor", "board_name"}
+    ]
+    device = HardwareDevice(
+        id="motherboard",
+        type="motherboard",
+        vendor=vendor,
+        model=model,
+        driver=None,
+        state="present",
+        capabilities=capabilities,
+    )
+    return [_Seen(device, [directory])], None
 
 
 def _gpus(root: Path) -> tuple[list[_Seen], str | None]:
@@ -465,6 +514,61 @@ def _audio_proc(root: Path) -> list[_Seen]:
                     model=match.group(4).strip() or None,
                     driver=match.group(3),
                     state="present",
+                ),
+                [],
+            )
+        )
+    return seen
+
+
+def _microphones(root: Path) -> tuple[list[_Seen], str | None]:
+    """Capture nodes from sysfs. The PCM device is not opened."""
+
+    directory = root / "sys" / "class" / "sound"
+    listed = _list_dir(directory)
+    if listed is None:
+        return [], "microphone"
+    seen: list[_Seen] = []
+    for path in listed:
+        if _CAPTURE.fullmatch(path.name) is None:
+            continue
+        device = HardwareDevice(
+            id=f"microphone-{path.name}",
+            type="microphone",
+            vendor=None,
+            model=_optional(path / "pcm_class") or path.name,
+            driver=_driver(path / "device"),
+            state="present",
+            capabilities=["capture"],
+        )
+        seen.append(_Seen(device, _paths(path, _resolve(path / "device"))))
+    if seen or directory.exists():
+        return seen, None
+    return _microphone_proc(root), None
+
+
+def _microphone_proc(root: Path) -> list[_Seen]:
+    text = _optional(root / "proc" / "asound" / "pcm")
+    if text is None:
+        return []
+    seen: list[_Seen] = []
+    for line in text.splitlines():
+        if "capture" not in line:
+            continue
+        match = re.match(r"\s*(\d+)-(\d+):", line)
+        if match is None:
+            continue
+        card, device = str(int(match.group(1))), str(int(match.group(2)))
+        seen.append(
+            _Seen(
+                HardwareDevice(
+                    id=f"microphone-pcmC{card}D{device}c",
+                    type="microphone",
+                    vendor=None,
+                    model=line.split(":", 1)[-1].strip() or None,
+                    driver=None,
+                    state="present",
+                    capabilities=["capture"],
                 ),
                 [],
             )

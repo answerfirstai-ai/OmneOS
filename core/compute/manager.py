@@ -165,8 +165,17 @@ class ResourceManager:
         with self._lock:
             return self._held_locked()
 
-    def status(self, snapshot: ResourceSnapshot | None = None) -> dict[str, object]:
-        """Telemetry plus holds. Null measurements stay null."""
+    def status(
+        self,
+        snapshot: ResourceSnapshot | None = None,
+        *,
+        hardware: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        """Telemetry plus holds. Null measurements stay null.
+
+        ``hardware`` is the capability registry for the discovered machine.
+        It is omitted from allocation decisions and is not invented here.
+        """
 
         current = snapshot or self._monitor.snapshot()
         with self._lock:
@@ -187,6 +196,7 @@ class ResourceManager:
                 "gpus": ledger.gpus,
             },
             "reservations": reservations,
+            "hardware": hardware,
         }
 
     def _held_locked(self) -> ResourceLedger:

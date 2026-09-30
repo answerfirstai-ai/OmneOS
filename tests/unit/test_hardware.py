@@ -81,6 +81,8 @@ def test_linux_fixture_reports_present_hardware_only(tmp_path: Path) -> None:
         "bluetooth-hci0",
         "audio-card0",
         "camera-video0",
+        "microphone-pcmC0D0c",
+        "motherboard",
         "power-BAT0",
         "power-ADP0",
     }
@@ -128,6 +130,10 @@ def test_linux_fixture_reports_present_hardware_only(tmp_path: Path) -> None:
     assert by_id["audio-card0"].model == "PCH"
     assert by_id["audio-card0"].driver == "snd_hda_intel"
     assert by_id["camera-video0"].model == "Integrated Camera"
+    assert by_id["microphone-pcmC0D0c"].type == "microphone"
+    assert by_id["microphone-pcmC0D0c"].capabilities == ["capture"]
+    assert by_id["motherboard"].vendor == "TestBoard"
+    assert by_id["motherboard"].model == "OMNE Board"
     battery = by_id["power-BAT0"]
     assert battery.type == "battery"
     assert battery.state == "Discharging"
@@ -220,6 +226,14 @@ def test_testing_api_is_read_only_mock(tmp_path: Path) -> None:
     assert hardware["drivers_modified"] is False
     assert hardware["devices"] == []
     assert hardware["gaps"] == []
+    capabilities = hardware["capabilities"]
+    assert isinstance(capabilities, dict)
+    assert capabilities["observed"] is True
+    assert capabilities["gpu"] is False
+    assert capabilities["wifi"] is False
+    assert capabilities["microphone"] is False
+    assert capabilities["drivers"]["known"] is True
+    assert capabilities["drivers"]["bound"] == []
     posted, payload = route_post(omne, "/hardware", {"action": "configure"})
     assert posted.value == 404
     assert payload["error"] == "not_found"
@@ -340,6 +354,13 @@ def _fixture(root: Path) -> None:
     _text(audio / "id", "PCH")
     _link(audio / "device" / "driver", "snd_hda_intel")
     _text(root / "sys" / "class" / "sound" / "pcmC0D0p" / "pcm_class", "playback")
+    capture = root / "sys" / "class" / "sound" / "pcmC0D0c"
+    _text(capture / "pcm_class", "generic")
+    _link(capture / "device" / "driver", "snd_hda_intel")
+    board = root / "sys" / "class" / "dmi" / "id"
+    _text(board / "board_vendor", "TestBoard")
+    _text(board / "board_name", "OMNE Board")
+    _text(board / "bios_vendor", "TestBIOS")
     camera = root / "sys" / "class" / "video4linux" / "video0"
     _text(camera / "name", "Integrated Camera")
     _link(camera / "device" / "driver", "uvcvideo")
