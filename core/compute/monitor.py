@@ -23,6 +23,7 @@ class CpuTelemetry(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     usage_percent: float | None = None
+    count: int | None = None
 
 
 class MemoryTelemetry(BaseModel):
@@ -37,9 +38,18 @@ class GpuTelemetry(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     available: bool | None = None
+    count: int | None = None
     usage_percent: float | None = None
     vram_used_mb: float | None = None
     vram_total_mb: float | None = None
+
+
+class ThermalTelemetry(BaseModel):
+    """A temperature reading. Null means the sensor was not available."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    celsius: float | None = None
 
 
 class DiskTelemetry(BaseModel):
@@ -75,6 +85,7 @@ class ResourceSnapshot(BaseModel):
     gpu: GpuTelemetry
     disk: DiskTelemetry
     network: NetworkTelemetry
+    thermal: ThermalTelemetry = Field(default_factory=ThermalTelemetry)
 
 
 class SystemMonitor:
@@ -116,26 +127,33 @@ class SystemMonitor:
             gpu=self.gpu(),
             disk=self.disk(disk_path),
             network=self.network(),
+            thermal=self.thermal(),
         )
 
     def cpu(self) -> CpuTelemetry:
         now = time.monotonic()
         current = _read_cpu_times(self._root)
         if current is None:
-            return CpuTelemetry(usage_percent=None)
+            return self._cpu(None)
         with self._lock:
             prior = self._cpu_sample
         if prior is not None and now - prior[0] >= self._sample_seconds:
             with self._lock:
                 self._cpu_sample = (time.monotonic(), current)
-            return CpuTelemetry(usage_percent=usage_from_samples(prior[1], current))
+            return self._cpu(usage_from_samples(prior[1], current))
         time.sleep(self._sample_seconds)
         second = _read_cpu_times(self._root)
         if second is None:
-            return CpuTelemetry(usage_percent=None)
+            return self._cpu(None)
         with self._lock:
             self._cpu_sample = (time.monotonic(), second)
-        return CpuTelemetry(usage_percent=usage_from_samples(current, second))
+        return self._cpu(usage_from_samples(current, second))
+
+    def _cpu(self, usage_percent: float | None) -> CpuTelemetry:
+        return CpuTelemetry(usage_percent=usage_percent, count=_cpu_count(self._root))
+
+    def thermal(self) -> ThermalTelemetry:
+        return ThermalTelemetry(celsius=_read_thermal(self._root))
 
     def memory(self) -> MemoryTelemetry:
         info = _read_meminfo(self._root)
@@ -156,7 +174,7 @@ class SystemMonitor:
     def gpu(self) -> GpuTelemetry:
         command = self._nvidia_binary()
         if command is None:
-            return GpuTelemetry(available=False)
+            return GpuTelemetry(available=False, count=0)
         try:
             completed = subprocess.run(
                 [
@@ -175,13 +193,16 @@ class SystemMonitor:
             return GpuTelemetry(available=None)
         if completed.returncode != 0 or not completed.stdout.strip():
             logger.info("nvidia-smi returned no gpu telemetry")
-            return GpuTelemetry(available=False)
-        line = completed.stdout.strip().splitlines()[0]
-        parts = [part.strip() for part in line.split(",")]
+            return GpuTelemetry(available=False, count=0)
+        lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
+        if not lines:
+            return GpuTelemetry(available=False, count=0)
+        parts = [part.strip() for part in lines[0].split(",")]
         if len(parts) != 3:
-            return GpuTelemetry(available=True)
+            return GpuTelemetry(available=True, count=len(lines))
         return GpuTelemetry(
             available=True,
+            count=len(lines),
             usage_percent=_optional_float(parts[0]),
             vram_used_mb=_optional_float(parts[1]),
             vram_total_mb=_optional_float(parts[2]),
@@ -239,6 +260,47 @@ def usage_from_samples(first: tuple[int, int], second: tuple[int, int]) -> float
     busy = total_delta - idle_delta
     percent = 100.0 * busy / total_delta
     return round(max(0.0, min(100.0, percent)), 1)
+
+
+def _cpu_count(root: Path) -> int | None:
+    path = root / "proc" / "stat"
+    if not path.is_file():
+        return None
+    count = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("cpu") and len(line) > 3 and line[3].isdigit():
+            count += 1
+    if count == 0:
+        return None
+    return count
+
+
+def _read_thermal(root: Path) -> float | None:
+    """Return a CPU zone temperature. Missing or unrelated zones stay null."""
+
+    base = root / "sys" / "class" / "thermal"
+    if not base.is_dir():
+        return None
+    for zone in sorted(base.glob("thermal_zone*")):
+        type_path = zone / "type"
+        temp_path = zone / "temp"
+        if not type_path.is_file() or not temp_path.is_file():
+            continue
+        try:
+            kind = type_path.read_text(encoding="utf-8").strip().lower()
+            raw = temp_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if not any(
+            token in kind for token in ("cpu", "x86_pkg", "coretemp", "k10temp", "zenpower")
+        ):
+            continue
+        try:
+            milli = int(raw)
+        except ValueError:
+            continue
+        return round(milli / 1000, 1)
+    return None
 
 
 def _read_cpu_times(root: Path) -> tuple[int, int] | None:

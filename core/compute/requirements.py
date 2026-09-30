@@ -19,5 +19,6 @@ class ResourceRequirements(BaseModel):
     vram_mb: int = Field(default=0, ge=0)
     cpu_threads: int = Field(default=1, ge=0)
     disk_mb: int = Field(default=0, ge=0)
+    gpu: bool = False
     ram_known: bool = True
     vram_known: bool = True

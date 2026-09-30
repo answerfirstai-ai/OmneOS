@@ -48,6 +48,7 @@ class TaskScheduler:
         self._max_parallel = max_parallel
         self._models = models
         self._mode = execution_mode
+        self._holds: dict[str, str] = {}
 
     async def execute_parent(self, parent_id: str) -> Task:
         parent = self._store.get(parent_id)
@@ -98,6 +99,9 @@ class TaskScheduler:
                 await asyncio.gather(*(self._run_child(child) for child in batch))
 
     async def _run_child(self, task: Task) -> Task:
+        hold = self._holds.get(task.id)
+        if hold is not None:
+            self._compute.run(hold)
         try:
             while True:
                 task = self._store.get(task.id)
@@ -178,7 +182,9 @@ class TaskScheduler:
         finally:
             current = self._store.get(task.id)
             self._abandon(current)
-            self._compute.release(current.required_resources)
+            reservation_id = self._holds.pop(task.id, None)
+            if reservation_id is not None:
+                self._compute.release_id(reservation_id)
 
     def _select_batch(self, ready: list[Task]) -> list[Task]:
         batch: list[Task] = []
@@ -199,14 +205,17 @@ class TaskScheduler:
                 cpu_percent=snapshot.cpu.usage_percent,
             ):
                 continue
-            decision = self._compute.request(
+            reservation = self._compute.open(
                 child.required_resources,
+                owner=child.id,
+                kind="task",
                 local=True,
                 cloud_available=False,
                 snapshot=snapshot,
             )
-            if decision is not AllocationDecision.ALLOW:
+            if reservation.decision is not AllocationDecision.ALLOW:
                 continue
+            self._holds[child.id] = reservation.id
             batch.append(child)
             if agent_id:
                 used_agents[agent_id] = used_agents.get(agent_id, 0) + 1

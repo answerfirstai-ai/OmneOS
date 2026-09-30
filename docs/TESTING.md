@@ -34,6 +34,10 @@ Python:
   connect.
 - Routing to the mock model, live host telemetry, a reused snapshot, allocator decisions, and a
   model cache that does not load weights.
+- Resource reservations. A fixed snapshot lets a 4-CPU, 4 GB worker run beside a GPU worker that
+  needs 8 GB of VRAM. A second claim that does not fit waits until release. A request larger than
+  the machine is denied and does not hold capacity. Unknown GPU, CPU, disk, and thermal readings
+  stay unknown and do not name a vendor.
 - `GET /desktop` returns the shell panels, including activity, confirmations, questions, and
   project, and does not include a compute sample.
 - The same model prompt and cache context reuse one response. A later mission changes the world

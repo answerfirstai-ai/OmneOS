@@ -17,6 +17,7 @@ from core.agents.lifecycle import AgentLifecycle, AgentState
 from core.agents.registry import AgentRegistry
 from core.agents.runtime import AgentRuntime
 from core.capabilities.registry import CapabilityRegistry
+from core.compute.manager import ResourceManager
 from core.compute.model_cache import ModelCache
 from core.compute.monitor import ResourceSnapshot, SystemMonitor
 from core.context.builder import build_context
@@ -132,6 +133,7 @@ class OMNE:
         browser: BrowserService | None = None,
         processes: ProcessService | None = None,
         model_runtime: ModelRuntime | None = None,
+        resources: ResourceManager | None = None,
     ) -> None:
         self._store = store
         self._scheduler = scheduler
@@ -152,6 +154,7 @@ class OMNE:
         self._capabilities = capabilities
         self._model_lifecycle = model_lifecycle
         self.model_runtime = model_runtime
+        self.resources = resources
         self._project = project
         self._mode = execution_mode
         self._environment = environment
@@ -385,6 +388,21 @@ class OMNE:
 
     def compute_status(self) -> ResourceSnapshot:
         return self._monitor.snapshot()
+
+    def resource_view(self) -> dict[str, object]:
+        snapshot = self._monitor.snapshot()
+        if self.resources is None:
+            view: dict[str, object] = snapshot.model_dump()
+            view["held"] = {
+                "cpu_threads": 0,
+                "ram_mb": 0,
+                "vram_mb": 0,
+                "disk_mb": 0,
+                "gpus": 0,
+            }
+            view["reservations"] = []
+            return view
+        return self.resources.status(snapshot)
 
     def display_view(self) -> dict[str, object]:
         return diagnose_display(self._environment).model_dump(mode="json")
@@ -917,7 +935,7 @@ class OMNE:
     def _on_event(self, event: Event) -> None:
         self._metrics.observe(event)
         if event.type.startswith(
-            ("mission.", "task.", "worker.", "permission.", "verification.", "model.")
+            ("mission.", "task.", "worker.", "permission.", "verification.", "model.", "compute.")
         ):
             self._world.invalidate()
 
