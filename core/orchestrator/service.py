@@ -525,6 +525,29 @@ class OMNE:
             allow_mock=self._mode != "production",
         )
 
+    async def decide_for(self, task: Task) -> StructuredDecision:
+        """Ask the routed model for this task. The caller runs tools."""
+
+        if self._cortex is None:
+            raise RuntimeError("intelligence layer is not configured")
+        text = " ".join(task.objective.split())
+        if not text:
+            raise ValueError("objective must not be empty")
+        worker = task.metadata.get("worker_id")
+        trace = task.metadata.get("trace_id")
+        return await self._cortex.complete(
+            self._intelligence_context(text),
+            self._monitor.snapshot(),
+            capability="reasoning",
+            route=self._route_for_mode(),
+            available=self._available_model_ids(),
+            task_id=task.id,
+            worker_id=worker if isinstance(worker, str) else None,
+            trace_id=trace if isinstance(trace, str) else None,
+            preferred_model=self._preferred_nvidia_model or None,
+            allow_mock=self._mode != "production",
+        )
+
     def _intelligence_context(self, objective: str) -> IntelligenceContext:
         agents = [
             f"{manifest.id} ({', '.join(manifest.capabilities[:4])})"
@@ -1164,6 +1187,24 @@ class OMNE:
 
     def _on_event(self, event: Event) -> None:
         self._metrics.observe(event)
+        if event.type == "task.question":
+            question = event.payload.get("question")
+            options = event.payload.get("options")
+            if isinstance(question, str) and question:
+                self._questions.append(
+                    {
+                        "question_id": event.id,
+                        "trace_id": event.trace_id,
+                        "mission_id": event.mission_id,
+                        "task_id": event.task_id,
+                        "question": question,
+                        "options": [item for item in options if isinstance(item, str)]
+                        if isinstance(options, list)
+                        else [],
+                        "required": True,
+                        "default": None,
+                    }
+                )
         if event.type.startswith(
             (
                 "mission.",

@@ -34,6 +34,7 @@ class StructuredDecision(BaseModel):
     confirmation_required: bool = False
     final_response: str = ""
     reasoning_summary: str = ""
+    rejected_tools: list[str] = Field(default_factory=list)
     provider: str = ""
     model: str = ""
 

@@ -21,6 +21,34 @@ class VerificationResult(BaseModel):
     timestamp: datetime
 
 
+def _verify_decision_reads(
+    observation: dict[str, Any],
+    workspace: Path,
+    checks: list[str],
+    evidence: list[str],
+    errors: list[str],
+) -> None:
+    outputs = observation.get("outputs")
+    if not isinstance(outputs, list):
+        return
+    for item in outputs:
+        if not isinstance(item, dict) or item.get("tool_id") != "filesystem.read":
+            continue
+        output = item.get("output")
+        if not isinstance(output, dict) or "content" not in output:
+            continue
+        relative = str(output.get("path", ""))
+        path = workspace / relative
+        checks.append("read file matches observation")
+        if not relative or not path.is_file():
+            errors.append(f"missing file {relative or path.name}")
+            continue
+        content = path.read_text(encoding="utf-8")
+        evidence.append(f"read {relative}")
+        if str(output.get("content", "")) != content:
+            errors.append(f"{relative} does not match the observation")
+
+
 def verify_observations(
     verification_id: str,
     observations: list[dict[str, Any]],
@@ -49,6 +77,10 @@ def verify_observations(
                 errors.append(f"{path.name} does not contain the written text")
             if "<html" not in content.lower():
                 errors.append(f"{path.name} does not contain html")
+        if kind == "decision":
+            _verify_decision_reads(observation, workspace, checks, evidence, errors)
+            if checks and checks[-1] == "read file matches observation":
+                saw_file = True
         if kind == "tool" and observation.get("tool_id") == "filesystem.write":
             saw_file = True
             output = observation.get("output")

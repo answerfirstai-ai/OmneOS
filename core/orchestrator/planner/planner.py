@@ -106,7 +106,7 @@ def plan_objective(objective: str) -> list[PlanNode]:
             key="respond",
             objective=text,
             capability="conversation",
-            calls=[PlannedCall(kind="model", prompt=text)],
+            calls=[PlannedCall(kind="decide", prompt=text)],
         )
     ]
 

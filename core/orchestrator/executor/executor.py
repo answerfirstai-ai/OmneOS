@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +15,7 @@ from core.agents.runtime import AgentRuntime
 from core.events.bus import EventBus
 from core.models.cache import CacheContext, ResponseCache
 from core.models.providers.base import ModelProvider
+from core.models.structured import StructuredDecision
 from core.models.types import GenerateRequest, ProviderError, ToolCallRequest
 from core.orchestrator.store import TaskStore
 from core.orchestrator.task import PlannedCall, Task, TaskStatus
@@ -20,6 +23,8 @@ from core.tools.base import ToolContext, ToolResult
 from core.tools.gateway import ToolGateway
 from core.verify.verifier import verify_observations
 from omne.secrets.redact import redact_text
+
+DecisionSource = Callable[[Task], Awaitable[StructuredDecision]]
 
 _FALLBACK_CODES = frozenset(
     {
@@ -42,6 +47,13 @@ class ExecutionFailure(Exception):
         self.code = code
 
 
+@dataclass(frozen=True)
+class DecisionHold:
+    """The model asked a question. No tool has run."""
+
+    question: str
+
+
 class TaskExecutor:
     """Execute one task's calls. Models cannot reach the host except through the gateway."""
 
@@ -62,6 +74,7 @@ class TaskExecutor:
         provider_labels: dict[str, str] | None = None,
         context_text: Any | None = None,
         verification_required: bool = True,
+        decider: DecisionSource | None = None,
     ) -> None:
         self._store = store
         self._gateway = gateway
@@ -73,6 +86,7 @@ class TaskExecutor:
         self._responses = responses or ResponseCache()
         self._provider_labels = provider_labels or {}
         self._context_text = context_text
+        self._decider = decider
         self._verification_required = verification_required
         self._environment = environment
         self._workspace = workspace_root
@@ -100,6 +114,15 @@ class TaskExecutor:
         try:
             for call in task.calls[len(observations) :]:
                 outcome = await self._execute_call(task, call, manifest)
+                task = self._store.get(task.id)
+                if isinstance(outcome, DecisionHold):
+                    self._release_for_confirmation(manifest)
+                    return self._store.transition(
+                        task,
+                        TaskStatus.WAITING,
+                        observations=observations,
+                        pending_confirmation=None,
+                    )
                 if isinstance(outcome, ToolResult):
                     if not outcome.confirmation_required:
                         raise ExecutionFailure(
@@ -163,7 +186,7 @@ class TaskExecutor:
         task: Task,
         call: PlannedCall,
         manifest: AgentManifest | None,
-    ) -> dict[str, Any] | ToolResult:
+    ) -> dict[str, Any] | ToolResult | DecisionHold:
         if call.kind == "tool":
             result = await self._call_tool(task, call.tool_id, call.arguments, manifest)
             if result.confirmation_required:
@@ -184,6 +207,8 @@ class TaskExecutor:
                 "source": "external",
                 "message": "External research sources are not configured.",
             }
+        if call.kind == "decide":
+            return await self._decide(task, manifest)
         if call.kind == "model":
             return {"kind": "model", "text": await self._generate(task, call.prompt)}
         if call.kind == "model_then_write":
@@ -227,12 +252,140 @@ class TaskExecutor:
             return {"kind": "verify_file", "ok": True}
         raise ExecutionFailure(f"unknown call kind {call.kind}", code="invalid_plan")
 
+    async def _decide(
+        self,
+        task: Task,
+        manifest: AgentManifest | None,
+    ) -> dict[str, Any] | ToolResult | DecisionHold:
+        """Ask for a structured decision, then run accepted tools through the gateway."""
+
+        decision = self._stored_decision(task)
+        if decision is None:
+            if self._decider is None:
+                raise ExecutionFailure(
+                    "decision model is not configured",
+                    code="model_unavailable",
+                )
+            try:
+                decision = await self._decider(task)
+            except ProviderError as exc:
+                raise ExecutionFailure(
+                    redact_text(str(exc)),
+                    code="model_unavailable",
+                ) from exc
+            except RuntimeError as exc:
+                raise ExecutionFailure(str(exc), code="model_unavailable") from exc
+            task = self._store_decision(task, decision, outputs=[], cursor=0)
+        if decision.clarification_required:
+            question = decision.final_response or "OMNE needs a more specific request."
+            trace = task.metadata.get("trace_id")
+            mission = task.metadata.get("mission_id")
+            self._events.publish(
+                "task.question",
+                task_id=task.id,
+                agent_id=task.assigned_agent,
+                trace_id=trace if isinstance(trace, str) else None,
+                mission_id=mission if isinstance(mission, str) else None,
+                payload={"question": question, "options": []},
+            )
+            return DecisionHold(question=question)
+        requests = list(decision.tool_requests)
+        anchor_id = requests[0].name if requests else "decision"
+        anchor_args = dict(requests[0].arguments) if requests else {}
+        if decision.confirmation_required and not self._decision_confirmed(
+            task, anchor_id, anchor_args
+        ):
+            self._store_decision(task, decision, outputs=_stored_outputs(task), cursor=0)
+            return ToolResult(
+                ok=False,
+                tool_id=anchor_id,
+                confirmation_required=True,
+                output={"arguments": anchor_args},
+                error={
+                    "code": "confirmation_required",
+                    "message": "model requested confirmation",
+                },
+            )
+        outputs = _stored_outputs(task)
+        cursor = _stored_cursor(task)
+        confirmed = bool(requests) and self._decision_confirmed(
+            task, requests[0].name, requests[0].arguments
+        )
+        for index, request in enumerate(requests):
+            if index < cursor:
+                continue
+            result = await self._call_tool(
+                task,
+                request.name,
+                dict(request.arguments),
+                manifest,
+                approved=True if confirmed else None,
+            )
+            if result.confirmation_required:
+                self._store_decision(task, decision, outputs=outputs, cursor=index)
+                return result
+            if not result.ok:
+                message = result.error["message"] if result.error else "tool failed"
+                raise ExecutionFailure(message, code="tool_failed")
+            outputs.append(
+                {
+                    "tool_id": request.name,
+                    "output": result.output,
+                    "unavailable": result.unavailable,
+                }
+            )
+            cursor = index + 1
+            task = self._store_decision(task, decision, outputs=outputs, cursor=cursor)
+        return {
+            "kind": "decision",
+            "provider": decision.provider,
+            "model": decision.model,
+            "intent": decision.intent,
+            "plan": list(decision.plan),
+            "final_response": decision.final_response,
+            "reasoning_summary": decision.reasoning_summary,
+            "tools": [request.name for request in requests],
+            "rejected_tools": list(decision.rejected_tools),
+            "outputs": outputs,
+        }
+
+    def _stored_decision(self, task: Task) -> StructuredDecision | None:
+        stored = task.metadata.get("structured_decision")
+        if not isinstance(stored, dict):
+            return None
+        return StructuredDecision.model_validate(stored)
+
+    def _store_decision(
+        self,
+        task: Task,
+        decision: StructuredDecision,
+        *,
+        outputs: list[dict[str, Any]],
+        cursor: int,
+    ) -> Task:
+        metadata = dict(task.metadata)
+        metadata["structured_decision"] = decision.model_dump(mode="json")
+        metadata["decision_outputs"] = outputs
+        metadata["decision_cursor"] = cursor
+        return self._store.save(task.model_copy(update={"metadata": metadata}))
+
+    def _decision_confirmed(self, task: Task, tool_id: str, arguments: dict[str, Any]) -> bool:
+        pending = task.pending_confirmation or {}
+        stored = pending.get("arguments")
+        return bool(
+            pending.get("approved") is True
+            and pending.get("tool_id") == tool_id
+            and isinstance(stored, dict)
+            and stored == arguments
+        )
+
     def _invoke(
         self,
         task: Task,
         tool_id: str,
         arguments: dict[str, Any],
         manifest: AgentManifest | None,
+        approved_override: bool | None = None,
     ) -> ToolResult:
         pending = task.pending_confirmation or {}
         stored = pending.get("arguments")
@@ -242,7 +395,16 @@ class TaskExecutor:
             and isinstance(stored, dict)
             and (stored == arguments or pending.get("requested") == arguments)
         )
-        invoke_arguments = stored if approved and isinstance(stored, dict) else arguments
+        if approved_override is True:
+            approved = True
+        matches_pending = (
+            pending.get("tool_id") == tool_id
+            and isinstance(stored, dict)
+            and (stored == arguments or pending.get("requested") == arguments)
+        )
+        invoke_arguments = arguments
+        if approved and matches_pending and isinstance(stored, dict):
+            invoke_arguments = stored
         return self._gateway.invoke(
             tool_id=tool_id,
             arguments=invoke_arguments,
@@ -258,8 +420,10 @@ class TaskExecutor:
         tool_id: str,
         arguments: dict[str, Any],
         manifest: AgentManifest | None,
+        *,
+        approved: bool | None = None,
     ) -> ToolResult:
-        return await asyncio.to_thread(self._invoke, task, tool_id, arguments, manifest)
+        return await asyncio.to_thread(self._invoke, task, tool_id, arguments, manifest, approved)
 
     async def _generate(self, task: Task, prompt: str) -> str:
         context_note = ""
@@ -414,6 +578,20 @@ class TaskExecutor:
         if manifest is None:
             return
         self._runtime.release(manifest)
+
+
+def _stored_outputs(task: Task) -> list[dict[str, Any]]:
+    stored = task.metadata.get("decision_outputs")
+    if not isinstance(stored, list):
+        return []
+    return [item for item in stored if isinstance(item, dict)]
+
+
+def _stored_cursor(task: Task) -> int:
+    stored = task.metadata.get("decision_cursor")
+    if isinstance(stored, int) and stored >= 0:
+        return stored
+    return 0
 
 
 def _model_chain(task: Task) -> list[str]:
