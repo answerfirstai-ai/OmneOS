@@ -224,7 +224,7 @@ fi
 args=(
   "${qemu_bin}"
   -name omne
-  -machine "q35,accel=${OMNE_QEMU_ACCEL:-kvm:tcg}"
+  -machine "q35,accel=${OMNE_QEMU_ACCEL:-kvm:tcg},i8042=on"
   -cpu "${OMNE_QEMU_CPU:-qemu64}"
   -m "${memory}"
   -smp "${cpus}"
@@ -241,9 +241,13 @@ args=(
   -audiodev none,id=snd0
   -device ich9-intel-hda
   -device hda-duplex,audiodev=snd0
+  -chardev "socket,id=reboot0,path=${work}/reboot.sock,server=on,wait=off"
+  -device virtio-serial-pci
+  -device "virtserialport,chardev=reboot0,name=omne-reboot"
 )
 if [[ "${headless}" -eq 1 ]]; then
-  args+=(-display none)
+  # A display backend is required for monitor sendkey. The socket is not a TCP port.
+  args+=(-vnc "unix:${work}/vnc.sock")
 else
   args+=(-display gtk)
 fi

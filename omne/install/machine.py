@@ -26,6 +26,7 @@ _UNITS = (
     "omne.target",
     "omne-reboot.socket",
     "omne-reboot@.service",
+    "omne-reboot-listen.service",
     "omne-doctor.service",
 )
 _EXECUTABLES = (
@@ -35,6 +36,7 @@ _EXECUTABLES = (
     ("omne-prove", "usr/bin/omne-prove"),
     ("OMNE", "usr/bin/OMNE"),
     ("request-reboot", "usr/lib/omne/request-reboot"),
+    ("omne-reboot-listen", "usr/bin/omne-reboot-listen"),
     ("omne-hello", "usr/lib/omne/applications/omne-hello"),
 )
 _TARGET_WANTS = ("omne-core.service", "omne-shell.service", "omne-boot.service")
@@ -165,6 +167,11 @@ def _write(source: Path, dest: Path, record: InstallRecord) -> None:
         units / "multi-user.target.wants",
         "omne-diag.service",
         "../omne-diag.service",
+    )
+    _link(
+        units / "multi-user.target.wants",
+        "omne-reboot-listen.service",
+        "../omne-reboot-listen.service",
     )
     for name in _TARGET_WANTS:
         _link(units / "omne.target.wants", name, f"../{name}")

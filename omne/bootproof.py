@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from typing import Any
 
 _CORE = "http://127.0.0.1:8787"
-_OBJECTIVE = "remember this sentence"
+_OBJECTIVE = "write file boot.txt with content OMNE"
 _USABLE = frozenset({"AVAILABLE", "LOADED", "BUSY", "IDLE"})
 
 
@@ -35,9 +35,24 @@ def markers(*, task_status: object, lifecycles: object) -> list[str]:
 def task_status_from(payload: object) -> str | None:
     """Read the status field from a ``/tasks`` response."""
 
-    task = _mapping(payload).get("task")
-    status = _mapping(task).get("status")
+    status = _mapping(_mapping(payload).get("task")).get("status")
     return status if isinstance(status, str) else None
+
+
+def task_failure(payload: object) -> str:
+    """The first error on a task response. Empty when the task did not fail."""
+
+    errors = _mapping(_mapping(payload).get("task")).get("errors")
+    if not isinstance(errors, list) or not errors:
+        return ""
+    first = _mapping(errors[0])
+    code = first.get("code")
+    message = first.get("message")
+    if not isinstance(code, str):
+        return ""
+    detail = message if isinstance(message, str) else ""
+    text = f"{code}: {detail}".replace("\n", " ").strip()
+    return text[:180]
 
 
 def lifecycles_from(payload: object) -> list[str]:
@@ -72,7 +87,9 @@ def main() -> int:
         for line in markers(task_status=status, lifecycles=cycles):
             print(line, flush=True)
         if status != "COMPLETED":
-            print(f"boot_proof_task={status or 'absent'}", flush=True)
+            detail = task_failure(task)
+            suffix = f" {detail}" if detail else ""
+            print(f"boot_proof_task={status or 'absent'}{suffix}", flush=True)
         if not any(isinstance(item, str) and item in _USABLE for item in cycles):
             print("boot_proof_models=absent", flush=True)
     else:

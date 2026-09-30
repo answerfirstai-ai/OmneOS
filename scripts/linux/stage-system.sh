@@ -143,6 +143,10 @@ if [[ "${want_system}" -eq 1 ]]; then
   chmod 755 "${dest}/usr/lib/omne/request-reboot"
   cp "${root}/system/linux/omne-reboot.socket" "${dest}/etc/systemd/system/omne-reboot.socket"
   cp "${root}/system/linux/omne-reboot@.service" "${dest}/etc/systemd/system/omne-reboot@.service"
+  cp "${root}/system/linux/omne-reboot-listen.service" \
+    "${dest}/etc/systemd/system/omne-reboot-listen.service"
+  cp "${root}/system/linux/omne-reboot-listen" "${dest}/usr/bin/omne-reboot-listen"
+  chmod 755 "${dest}/usr/bin/omne-reboot-listen"
   cp "${root}/LICENSE" "${dest}/usr/share/doc/omne-system/copyright"
 fi
 

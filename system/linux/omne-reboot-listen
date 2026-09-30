@@ -1,0 +1,20 @@
+#!/bin/sh
+# Reboot when the virtual machine channel sends the word reboot.
+# A missing channel is a physical machine. This exits without rebooting.
+set -eu
+port=/dev/virtio-ports/omne-reboot
+i=0
+while [ ! -e "${port}" ] && [ "${i}" -lt 50 ]; do
+  i=$((i + 1))
+  sleep 0.2
+done
+if [ ! -e "${port}" ]; then
+  exit 0
+fi
+line=$(head -n 1 "${port}" || true)
+line=${line%$'\r'}
+if [ "${line}" = "reboot" ]; then
+  printf '%s\n' "reboot requested"
+  exec /usr/bin/systemctl reboot
+fi
+exit 0

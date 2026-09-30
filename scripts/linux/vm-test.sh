@@ -212,7 +212,19 @@ if [[ -f "${log}" ]]; then
 fi
 reboot_ok=0
 if [[ "${boot_ok}" -eq 1 ]] && kill -0 "${qemu_pid}" 2>/dev/null; then
-  monitor_cmd "sendkey ctrl-alt-delete" || true
+  if [[ -S "${work}/reboot.sock" ]]; then
+    python3 - "${work}/reboot.sock" <<'PY' || true
+import socket
+import sys
+
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+sock.settimeout(5)
+sock.connect(sys.argv[1])
+sock.sendall(b"reboot\n")
+sock.close()
+PY
+  fi
+  monitor_cmd "sendkey ctrl-alt-delete 100" || true
   if wait_for "Reached target reboot.target" 120; then
     reboot_ok=1
   fi

@@ -270,6 +270,7 @@ def test_stage_places_services_on_the_ubuntu_base(tmp_path: Path) -> None:
     assert "ExecStart=/usr/bin/omne-session" in session
     assert (dest / "usr/bin/omne-session").is_file()
     assert (dest / "usr/bin/omne-prove").is_file()
+    assert (dest / "usr/bin/omne-reboot-listen").is_file()
     assert (dest / "etc/systemd/system/omne-doctor.service").is_file()
     assert (dest / "usr/lib/modules-load.d/omne.conf").read_text(encoding="utf-8").find(
         "virtio_gpu"

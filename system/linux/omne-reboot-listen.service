@@ -1,0 +1,13 @@
+[Unit]
+Description=OMNE virtual machine reboot channel
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/omne-reboot-listen
+Restart=on-failure
+RestartSec=2
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target
