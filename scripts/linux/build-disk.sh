@@ -168,6 +168,14 @@ if [[ -e "${work}/root/usr/lib/systemd/system/systemd-networkd.service" ]]; then
   ln -sfn /usr/lib/systemd/system/systemd-networkd.service \
     "${work}/root/etc/systemd/system/multi-user.target.wants/systemd-networkd.service"
 fi
+if [[ -e "${work}/root/usr/lib/systemd/system/systemd-networkd-wait-online.service" ]]; then
+  mkdir -p "${work}/root/etc/systemd/system/network-online.target.wants"
+  ln -sfn /usr/lib/systemd/system/systemd-networkd-wait-online.service \
+    "${work}/root/etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service"
+fi
+# shellcheck disable=SC1091
+source "${script_root}/scripts/linux/enable-units.sh"
+enable_omne_units "${work}/root"
 cat > "${work}/root/etc/systemd/network/20-omne-dhcp.network" <<'EOF'
 [Match]
 Name=en* eth*

@@ -121,7 +121,6 @@ echo "input: usb-keyboard usb-tablet"
 echo "audio: ich9-hda"
 echo "serial: file"
 echo "snapshot: available"
-echo "desktop: not started"
 
 if [[ ! -f "${image}" ]]; then
   echo "image not found: ${image}; no virtual machine was started" >&2
@@ -132,47 +131,57 @@ if [[ -n "${disk_path}" && -e "${disk_path}" && ! -f "${disk_path}" ]]; then
   exit 2
 fi
 
-if [[ "${dry_run}" -eq 1 || "${run}" -eq 0 ]]; then
+if [[ "${dry_run}" -eq 1 ]]; then
+  echo "desktop: not started"
   echo "dry-run: no virtual machine was started"
   exit 0
 fi
 
-if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
+echo "desktop: automatic"
+echo "boot chain: QEMU -> UEFI -> systemd-boot -> Linux -> systemd -> OMNE services -> graphical session -> OMNE Shell"
+
+qemu_bin="${OMNE_QEMU_BIN:-qemu-system-x86_64}"
+qemu_img="${OMNE_QEMU_IMG:-qemu-img}"
+if ! command -v "${qemu_bin}" >/dev/null 2>&1; then
   echo "qemu-system-x86_64 is not installed; no virtual machine was started" >&2
   exit 2
 fi
-if ! command -v qemu-img >/dev/null 2>&1; then
+if ! command -v "${qemu_img}" >/dev/null 2>&1; then
   echo "qemu-img is not installed; no virtual machine was started" >&2
   exit 2
 fi
 
-ovmf=""
-for candidate in \
-  /usr/share/OVMF/OVMF_CODE_4M.fd \
-  /usr/share/OVMF/OVMF_CODE.fd \
-  /usr/share/ovmf/OVMF.fd
-do
-  if [[ -f "${candidate}" ]]; then
-    ovmf="${candidate}"
-    break
-  fi
-done
+ovmf="${OMNE_OVMF_CODE:-}"
 if [[ -z "${ovmf}" ]]; then
+  for candidate in \
+    /usr/share/OVMF/OVMF_CODE_4M.fd \
+    /usr/share/OVMF/OVMF_CODE.fd \
+    /usr/share/ovmf/OVMF.fd
+  do
+    if [[ -f "${candidate}" ]]; then
+      ovmf="${candidate}"
+      break
+    fi
+  done
+fi
+if [[ -z "${ovmf}" || ! -f "${ovmf}" ]]; then
   echo "OVMF is missing; no virtual machine was started" >&2
   exit 2
 fi
 
-vars_template=""
-for candidate in \
-  /usr/share/OVMF/OVMF_VARS_4M.fd \
-  /usr/share/OVMF/OVMF_VARS.fd
-do
-  if [[ -f "${candidate}" ]]; then
-    vars_template="${candidate}"
-    break
-  fi
-done
+vars_template="${OMNE_OVMF_VARS:-}"
 if [[ -z "${vars_template}" ]]; then
+  for candidate in \
+    /usr/share/OVMF/OVMF_VARS_4M.fd \
+    /usr/share/OVMF/OVMF_VARS.fd
+  do
+    if [[ -f "${candidate}" ]]; then
+      vars_template="${candidate}"
+      break
+    fi
+  done
+fi
+if [[ -z "${vars_template}" || ! -f "${vars_template}" ]]; then
   echo "OVMF variable store is missing; no virtual machine was started" >&2
   exit 2
 fi
@@ -209,14 +218,14 @@ if [[ -z "${disk_path}" ]]; then
   disk_path="${work}/data.qcow2"
 fi
 if [[ ! -e "${disk_path}" ]]; then
-  qemu-img create -f qcow2 "${disk_path}" 1G >/dev/null
+  "${qemu_img}" create -f qcow2 "${disk_path}" 1G >/dev/null
 fi
 
 args=(
-  qemu-system-x86_64
+  "${qemu_bin}"
   -name omne
-  -machine "q35,accel=${OMNE_QEMU_ACCEL:-kvm:tcg}"
-  -cpu qemu64
+  -machine "q35,accel=${OMNE_QEMU_ACCEL:-kvm:tcg},i8042=on"
+  -cpu "${OMNE_QEMU_CPU:-qemu64}"
   -m "${memory}"
   -smp "${cpus}"
   -serial "file:${serial_path}"
@@ -232,9 +241,13 @@ args=(
   -audiodev none,id=snd0
   -device ich9-intel-hda
   -device hda-duplex,audiodev=snd0
+  -chardev "socket,id=reboot0,path=${work}/reboot.sock,server=on,wait=off"
+  -device virtio-serial-pci
+  -device "virtserialport,chardev=reboot0,name=omne-reboot"
 )
 if [[ "${headless}" -eq 1 ]]; then
-  args+=(-display none)
+  # A display backend is required for monitor sendkey. The socket is not a TCP port.
+  args+=(-vnc "unix:${work}/vnc.sock")
 else
   args+=(-display gtk)
 fi

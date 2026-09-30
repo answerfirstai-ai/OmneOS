@@ -126,9 +126,9 @@ chroot "${dest}" dpkg -i \
   "/tmp/omne-packages/omne-system_${version}_all.deb"
 rm -rf "${dest}/tmp/omne-packages" "${dest}/usr/sbin/policy-rc.d"
 
-wants="${dest}/etc/systemd/system/multi-user.target.wants"
-mkdir -p "${wants}"
-ln -sfn /etc/systemd/system/omne.target "${wants}/omne.target"
+# shellcheck disable=SC1091
+source "${root}/scripts/linux/enable-units.sh"
+enable_omne_units "${dest}"
 
 echo "rootfs written to ${dest}"
 echo "no kernel and no bootloader were installed"

@@ -269,8 +269,15 @@ def test_stage_places_services_on_the_ubuntu_base(tmp_path: Path) -> None:
     assert "WAYLAND_DISPLAY" not in session
     assert "ExecStart=/usr/bin/omne-session" in session
     assert (dest / "usr/bin/omne-session").is_file()
+    assert (dest / "usr/bin/omne-prove").is_file()
+    assert (dest / "usr/bin/omne-reboot-listen").is_file()
+    assert (dest / "etc/systemd/system/omne-doctor.service").is_file()
+    assert (dest / "usr/lib/modules-load.d/omne.conf").read_text(encoding="utf-8").find(
+        "virtio_gpu"
+    ) >= 0
     assert (dest / "usr/lib/omne/applications/omne-hello").is_file()
-    assert (dest / "etc/systemd/system/omne-reboot.socket").is_file()
+    reboot = (dest / "etc/systemd/system/omne-reboot.socket").read_text(encoding="utf-8")
+    assert "After=multi-user.target" not in reboot
     assert (dest / "usr/bin/omne-boot").is_file()
     assert (dest / "usr/bin/omne-diag").is_file()
     assert (dest / "usr/lib/omne/agents/coding/agent.toml").is_file()
@@ -328,6 +335,9 @@ def test_packages_are_services_without_a_kernel(tmp_path: Path) -> None:
     assert "./usr/bin/omne-boot" in system
     assert "./usr/bin/omne-diag" in system
     assert "./usr/bin/omne-session" in system
+    assert "./usr/bin/omne-prove" in system
+    assert "./etc/systemd/system/omne-doctor.service" in system
+    assert "./usr/lib/modules-load.d/omne.conf" in system
     assert "./etc/systemd/system/omne-boot.service" in system
     assert "./etc/systemd/system/omne-diag.service" in system
     assert "./etc/systemd/system/omne-session.service" in system
@@ -484,6 +494,57 @@ def test_vm_test_dry_run_lists_checks_without_booting(tmp_path: Path) -> None:
     assert "starting virtual machine" not in result.stdout
 
 
+def test_vm_boot_starts_qemu_on_the_desktop_chain(tmp_path: Path) -> None:
+    image = tmp_path / "OMNE-OS.iso"
+    blob = bytearray(0x8006)
+    blob[0x8001:0x8006] = b"CD001"
+    image.write_bytes(blob)
+    tools = tmp_path / "bin"
+    tools.mkdir()
+    log = tmp_path / "qemu.log"
+    qemu = tools / "qemu-system-x86_64"
+    qemu.write_text(
+        '#!/bin/sh\nprintf \'%s\\n\' "$@" > "$OMNE_QEMU_LOG"\n',
+        encoding="utf-8",
+    )
+    qemu.chmod(0o755)
+    img = tools / "qemu-img"
+    img.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    img.chmod(0o755)
+    code = tmp_path / "OVMF_CODE.fd"
+    variables = tmp_path / "OVMF_VARS.fd"
+    code.write_bytes(b"code")
+    variables.write_bytes(b"vars")
+    env = os.environ.copy()
+    env.update(
+        {
+            "OMNE_QEMU_BIN": str(qemu),
+            "OMNE_QEMU_IMG": str(img),
+            "OMNE_OVMF_CODE": str(code),
+            "OMNE_OVMF_VARS": str(variables),
+            "OMNE_QEMU_LOG": str(log),
+        }
+    )
+    result = subprocess.run(
+        ["bash", "scripts/linux/vm-boot.sh", str(image)],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0
+    assert "desktop: automatic" in result.stdout
+    assert "QEMU -> UEFI -> systemd-boot -> Linux -> systemd -> OMNE services" in result.stdout
+    assert "graphical session -> OMNE Shell" in result.stdout
+    assert "dry-run" not in result.stdout
+    recorded = log.read_text(encoding="utf-8")
+    assert "virtio-vga" in recorded
+    assert "-cdrom" in recorded
+    assert "file=/dev" not in recorded
+
+
 def test_vm_dry_run_does_not_start(tmp_path: Path) -> None:
     image = tmp_path / "OMNE-OS.img"
     image.write_bytes(b"not a disk")
@@ -496,12 +557,63 @@ def test_vm_dry_run_does_not_start(tmp_path: Path) -> None:
     assert "no virtual machine was started" in result.stdout
 
 
+def test_enable_units_links_the_session_without_systemctl(tmp_path: Path) -> None:
+    system = tmp_path / "etc/systemd/system"
+    system.mkdir(parents=True)
+    for name in (
+        "omne.target",
+        "omne-session.service",
+        "omne-diag.service",
+        "omne-doctor.service",
+        "omne-reboot.socket",
+    ):
+        (system / name).write_text("[Unit]\n", encoding="utf-8")
+    result = _run(
+        [
+            "bash",
+            "-c",
+            'source scripts/linux/enable-units.sh && enable_omne_units "$1"',
+            "enable",
+            str(tmp_path),
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    wants = system / "multi-user.target.wants"
+    assert (wants / "omne-session.service").is_symlink()
+    assert not (wants / "omne-doctor.service").exists()
+    assert (wants / "omne-diag.service").is_symlink()
+    assert (system / "sockets.target.wants" / "omne-reboot.socket").is_symlink()
+    assert "systemctl" not in (ROOT / "scripts/linux/enable-units.sh").read_text(encoding="utf-8")
+    guest = tmp_path / "etc/systemd/system/omne-session.service"
+    link = wants / "omne-session.service"
+    assert _image_ready(tmp_path, link)
+    guest.write_text("", encoding="utf-8")
+    assert not _image_ready(tmp_path, link)
+    guest.write_text("[Unit]\n", encoding="utf-8")
+    assert _image_ready(tmp_path, link)
+
+
 def test_base_refuses_boot() -> None:
     result = _run(["bash", "scripts/linux/build-base.sh", "--dry-run", "--dest", "/boot/omne"])
 
     assert result.returncode == 2
     assert "refusing" in result.stderr
     assert not Path("/boot/omne").exists()
+
+
+def _image_ready(rootfs: Path, required: Path) -> bool:
+    result = _run(
+        [
+            "bash",
+            "-c",
+            'source scripts/linux/enable-units.sh && image_path_ready "$1" "$2"',
+            "ready",
+            str(rootfs),
+            str(required),
+        ]
+    )
+    return result.returncode == 0
 
 
 def _deb_listing(path: Path) -> str:

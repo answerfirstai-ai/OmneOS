@@ -49,6 +49,8 @@ class TaskScheduler:
         self._models = models
         self._mode = execution_mode
         self._holds: dict[str, str] = {}
+        self._schedule_pause = 0.5
+        self._schedule_attempts = 30
 
     async def execute_parent(self, parent_id: str) -> Task:
         parent = self._store.get(parent_id)
@@ -61,6 +63,7 @@ class TaskScheduler:
         elif parent.status is not TaskStatus.RUNNING:
             return parent
 
+        waits = 0
         while True:
             parent = self._store.get(parent.id)
             children = self._store.children(parent.id)
@@ -86,13 +89,20 @@ class TaskScheduler:
                 return self._complete(parent, _aggregate(parent, children))
 
             ready = _ready(children)
-            batch = self._select_batch(ready)
+            batch, reason, requests = self._choose(ready)
             if not batch:
+                if reason == "wait" and waits < self._schedule_attempts:
+                    waits += 1
+                    self._release_requests(requests)
+                    await asyncio.sleep(self._schedule_pause)
+                    continue
+                self._release_requests(requests)
                 return self._fail(
                     parent,
                     "no ready task could be scheduled",
                     code="scheduling_blocked",
                 )
+            waits = 0
             if len(batch) == 1:
                 await self._run_child(batch[0])
             else:
@@ -187,7 +197,15 @@ class TaskScheduler:
                 self._compute.release_id(reservation_id)
 
     def _select_batch(self, ready: list[Task]) -> list[Task]:
+        batch, _reason, _requests = self._choose(ready)
+        return batch
+
+    def _choose(self, ready: list[Task]) -> tuple[list[Task], str, list[str]]:
+        """Pick a batch. ``wait`` means a later attempt can still admit work."""
+
         batch: list[Task] = []
+        requests: list[str] = []
+        waiting = False
         used_agents: dict[str, int] = {}
         snapshot = self._monitor.snapshot()
         for child in ready:
@@ -199,12 +217,17 @@ class TaskScheduler:
             if batch and any(bool(item.metadata.get("exclusive")) for item in batch):
                 continue
             agent_id = child.assigned_agent
-            if agent_id and not self._has_worker_slot(
-                agent_id,
-                used_agents.get(agent_id, 0),
-                cpu_percent=snapshot.cpu.usage_percent,
-            ):
-                continue
+            if agent_id:
+                decision = self._worker_decision(
+                    agent_id,
+                    used_agents.get(agent_id, 0),
+                    cpu_percent=snapshot.cpu.usage_percent,
+                )
+                if decision == "WAIT":
+                    waiting = True
+                    continue
+                if decision != "ALLOW":
+                    continue
             reservation = self._compute.open(
                 child.required_resources,
                 owner=child.id,
@@ -214,6 +237,9 @@ class TaskScheduler:
                 snapshot=snapshot,
             )
             if reservation.decision is not AllocationDecision.ALLOW:
+                requests.append(reservation.id)
+                if reservation.decision is AllocationDecision.WAIT:
+                    waiting = True
                 continue
             self._holds[child.id] = reservation.id
             batch.append(child)
@@ -221,7 +247,15 @@ class TaskScheduler:
                 used_agents[agent_id] = used_agents.get(agent_id, 0) + 1
             if exclusive:
                 break
-        return batch
+        if batch:
+            return batch, "ready", requests
+        if waiting:
+            return [], "wait", requests
+        return [], "blocked", requests
+
+    def _release_requests(self, reservation_ids: list[str]) -> None:
+        for reservation_id in reservation_ids:
+            self._compute.release_id(reservation_id)
 
     def _worker_limit(self, agent_id: str) -> int:
         try:
@@ -229,25 +263,23 @@ class TaskScheduler:
         except KeyError:
             return 1
 
-    def _has_worker_slot(
+    def _worker_decision(
         self, agent_id: str, already_batched: int, *, cpu_percent: float | None
-    ) -> bool:
+    ) -> str:
         limit = self._worker_limit(agent_id)
         if limit <= 1 and not self._agent_free(agent_id):
-            return False
+            return "WAIT" if self._agent_transient(agent_id) else "DENY"
         try:
-            manifest = self._agents.get(agent_id)
-            requested = manifest.resources.ram_mb
+            requested = self._agents.get(agent_id).resources.ram_mb
         except KeyError:
             requested = 0
-        decision = self._runtime.pool.can_start(
+        return self._runtime.pool.can_start(
             agent_id=agent_id,
             max_workers=limit,
             requested_ram_mb=requested,
             cpu_percent=cpu_percent,
             extra_active=already_batched,
         )
-        return decision == "ALLOW"
 
     def _agent_free(self, agent_id: str) -> bool:
         try:
@@ -255,6 +287,19 @@ class TaskScheduler:
         except KeyError:
             return True
         return state in {AgentState.AVAILABLE, AgentState.UNLOADED}
+
+    def _agent_transient(self, agent_id: str) -> bool:
+        try:
+            state = self._lifecycle.state(agent_id)
+        except KeyError:
+            return False
+        return state in {
+            AgentState.RESERVED,
+            AgentState.INITIALIZING,
+            AgentState.RUNNING,
+            AgentState.VERIFYING,
+            AgentState.RECOVERING,
+        }
 
     def _abandon(self, task: Task) -> None:
         agent_id = task.assigned_agent

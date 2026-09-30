@@ -195,9 +195,10 @@ if wait_for "Reached target multi-user.target" "${timeout_seconds}"; then
   if ! wait_for "OMNE READY" 90; then
     wait_for "OMNE NOT READY" 60 || true
   fi
-  # labwc starts after multi-user.target. Give it time to open the socket.
-  wait_for "labwc running" 45 || true
-  sleep 3
+  # The session and the doctor start after multi-user.target.
+  wait_for "labwc running" 90 || true
+  wait_for "OMNE desktop ready" 90 || true
+  wait_for "SYSTEM STATUS:" 180 || true
 fi
 clean_log
 log="${work}/serial.clean"
@@ -211,7 +212,28 @@ if [[ -f "${log}" ]]; then
 fi
 reboot_ok=0
 if [[ "${boot_ok}" -eq 1 ]] && kill -0 "${qemu_pid}" 2>/dev/null; then
-  monitor_cmd "sendkey ctrl-alt-delete" || true
+  if [[ -S "${work}/reboot.sock" ]]; then
+    python3 - "${work}/reboot.sock" <<'PY' || true
+import socket
+import sys
+import time
+
+path = sys.argv[1]
+deadline = time.monotonic() + 8
+while time.monotonic() < deadline:
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.settimeout(2)
+    try:
+        sock.connect(path)
+        sock.sendall(b"reboot\n")
+    except OSError:
+        pass
+    finally:
+        sock.close()
+    time.sleep(0.4)
+PY
+  fi
+  monitor_cmd "sendkey ctrl-alt-delete 100" || true
   if wait_for "Reached target reboot.target" 120; then
     reboot_ok=1
   fi

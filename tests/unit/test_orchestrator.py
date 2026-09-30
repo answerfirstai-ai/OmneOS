@@ -14,7 +14,16 @@ from core.agents.lifecycle import AgentLifecycle
 from core.agents.registry import AgentRegistry
 from core.agents.runtime import AgentRuntime
 from core.api.runtime import build_OMNE
-from core.compute.monitor import SystemMonitor
+from core.compute.monitor import (
+    CpuTelemetry,
+    DiskTelemetry,
+    GpuTelemetry,
+    MemoryTelemetry,
+    NetworkTelemetry,
+    ResourceSnapshot,
+    SystemMonitor,
+    ThermalTelemetry,
+)
 from core.compute.requirements import ResourceRequirements
 from core.compute.scheduler import ComputeScheduler
 from core.events.bus import EventBus
@@ -23,6 +32,7 @@ from core.models.types import GenerateRequest, GenerateResponse
 from core.orchestrator.scheduler import TaskScheduler
 from core.orchestrator.store import TaskStore
 from core.orchestrator.task import PlannedCall, Task, TaskStatus, TaskStep
+from core.workers.pool import WorkerPool
 
 
 def test_write_file_objective_completes(tmp_path: Path) -> None:
@@ -226,6 +236,46 @@ def test_independent_tasks_can_overlap_and_shared_agents_cannot(tmp_path: Path) 
     assert separate.max_active == 2
 
 
+def test_high_cpu_waits_and_then_runs(tmp_path: Path) -> None:
+    readings = _CpuReadings([99.0, 10.0])
+    finished, executor = _run_ready_child(tmp_path, readings, attempts=4)
+
+    assert finished.status is TaskStatus.COMPLETED
+    assert executor.ran == 1
+    assert readings.calls == 2
+
+
+def test_a_full_worker_slot_still_fails_immediately(tmp_path: Path) -> None:
+    readings = _CpuReadings([10.0])
+    pool = WorkerPool(ram_limit_mb=8192)
+    pool.start(
+        agent_id="coding",
+        max_workers=1,
+        task_id="busy",
+        mission_id=None,
+        model_id=None,
+        trace_id=None,
+        resources=ResourceRequirements(ram_mb=64, ram_known=True, vram_known=True),
+        context="busy",
+    )
+    finished, executor = _run_ready_child(tmp_path, readings, attempts=4, pool=pool)
+
+    assert finished.status is TaskStatus.FAILED
+    assert finished.errors[-1].code == "scheduling_blocked"
+    assert executor.ran == 0
+    assert readings.calls == 1
+
+
+def test_cpu_wait_stays_bounded(tmp_path: Path) -> None:
+    readings = _CpuReadings([99.0])
+    finished, executor = _run_ready_child(tmp_path, readings, attempts=2)
+
+    assert finished.status is TaskStatus.FAILED
+    assert finished.errors[-1].code == "scheduling_blocked"
+    assert executor.ran == 0
+    assert readings.calls == 3
+
+
 def test_browser_objective_is_explicitly_unavailable(tmp_path: Path) -> None:
     OMNE = build_OMNE(runtime_settings(tmp_path))
 
@@ -235,3 +285,89 @@ def test_browser_objective_is_explicitly_unavailable(tmp_path: Path) -> None:
     rendered = str(task.result)
     assert "available" in rendered
     assert "False" in rendered or "false" in rendered
+
+
+class _CpuReadings:
+    def __init__(self, usages: list[float]) -> None:
+        self._usages = usages
+        self.calls = 0
+
+    def snapshot(self) -> ResourceSnapshot:
+        usage = self._usages[min(self.calls, len(self._usages) - 1)]
+        self.calls += 1
+        return ResourceSnapshot(
+            cpu=CpuTelemetry(usage_percent=usage, count=4),
+            memory=MemoryTelemetry(total_mb=16000, available_mb=12000, used_mb=4000),
+            gpu=GpuTelemetry(available=False, count=0),
+            disk=DiskTelemetry(total_mb=100000, available_mb=80000, used_mb=20000),
+            network=NetworkTelemetry(available=True),
+            thermal=ThermalTelemetry(),
+        )
+
+
+class _CountingExecutor:
+    def __init__(self, store: TaskStore) -> None:
+        self._store = store
+        self.ran = 0
+
+    async def run(self, task: Task) -> Task:
+        self.ran += 1
+        current = self._store.get(task.id)
+        current = self._store.transition(current, TaskStatus.PLANNING)
+        current = self._store.transition(current, TaskStatus.RUNNING)
+        current = self._store.transition(current, TaskStatus.VERIFYING)
+        return self._store.transition(current, TaskStatus.COMPLETED, result={"ok": True})
+
+
+def _run_ready_child(
+    tmp_path: Path,
+    monitor: _CpuReadings,
+    *,
+    attempts: int,
+    pool: WorkerPool | None = None,
+) -> tuple[Task, _CountingExecutor]:
+    store = TaskStore(tmp_path / "tasks.sqlite")
+    events = EventBus()
+    lifecycle = AgentLifecycle(events)
+    executor = _CountingExecutor(store)
+    now = datetime.now(UTC)
+    parent_id = str(uuid4())
+    child_id = str(uuid4())
+    resources = ResourceRequirements(ram_mb=64, cpu_threads=1, ram_known=True, vram_known=True)
+    store.save(
+        Task(
+            id=parent_id,
+            objective="write file",
+            created_at=now,
+            updated_at=now,
+            steps=[TaskStep(id=child_id, objective="write", status=TaskStatus.QUEUED)],
+            metadata={"role": "parent"},
+        )
+    )
+    store.save(
+        Task(
+            id=child_id,
+            objective="write",
+            created_at=now,
+            updated_at=now,
+            parent_task=parent_id,
+            assigned_agent="coding",
+            required_resources=resources,
+            metadata={"exclusive": False, "key": child_id},
+        )
+    )
+    scheduler = TaskScheduler(
+        store=store,
+        executor=executor,  # type: ignore[arg-type]
+        events=events,
+        monitor=monitor,  # type: ignore[arg-type]
+        compute=ComputeScheduler(SystemMonitor(sample_seconds=0)),
+        agents=AgentRegistry(),
+        runtime=AgentRuntime(lifecycle, pool=pool),
+        lifecycle=lifecycle,
+        max_parallel=1,
+    )
+    scheduler._schedule_pause = 0
+    scheduler._schedule_attempts = attempts
+    finished = asyncio.run(scheduler.execute_parent(parent_id))
+    return finished, executor
