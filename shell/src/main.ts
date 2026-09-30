@@ -3,6 +3,7 @@ import {
   activeMission,
   agentLine,
   attentionLine,
+  waitingCancelTarget,
   chooseMission,
   describeModel,
   parentTasks,
@@ -589,11 +590,19 @@ function paintMissionDetail(): void {
   if (detailLevel !== "normal" && inspection.verification.lines.length > 0) {
     detail.append(linesOrEmpty(inspection.verification.lines, ""));
   }
+  if (inspection.path.length > 0) {
+    detail.append(heading("Decision"));
+    detail.append(linesOrEmpty(inspection.path, ""));
+  }
   if (inspection.question !== null) {
     detail.append(heading("OMNE needs clarification"));
     const question = document.createElement("p");
     question.textContent = inspection.question;
     detail.append(question);
+    const cancel = actionButton("Cancel", () => {
+      void cancelTarget({ kind: "mission", id: inspection.id });
+    });
+    detail.append(cancel);
   }
   const lifecycleDetails = document.createElement("details");
   const lifecycleSummary = document.createElement("summary");
@@ -739,6 +748,9 @@ function paintPermissions(): void {
       actionButton("Deny", () => {
         void confirmTask(prompt.taskId, false);
       }),
+      actionButton("Cancel", () => {
+        void cancelTarget({ kind: "task", id: prompt.taskId });
+      }),
       actionButton("Inspect", () => {
         const confirmation = desktopView?.confirmations.find(
           (item) => item.task_id === prompt.taskId,
@@ -787,7 +799,7 @@ function paintLauncher(): void {
     })),
     verification: inspection.verification,
   });
-  const rendered = `${detailLevel}\n${JSON.stringify(beats)}`;
+  const rendered = `${detailLevel}\n${JSON.stringify(beats)}\n${inspection.path.join("|")}`;
   if (shouldRepaint(story.dataset["rendered"] ?? null, rendered)) {
     story.dataset["rendered"] = rendered;
     story.replaceChildren();
@@ -814,6 +826,19 @@ function paintLauncher(): void {
       const item = document.createElement("li");
       item.textContent = line;
       list.append(item);
+    }
+    if (inspection.path.length > 0) {
+      const decision = document.createElement("section");
+      const title = document.createElement("h3");
+      title.textContent = "Decision";
+      const items = document.createElement("ul");
+      for (const line of inspection.path) {
+        const item = document.createElement("li");
+        item.textContent = line;
+        items.append(item);
+      }
+      decision.append(title, items);
+      story.append(decision);
     }
     if (result !== null) {
       const evidence = inspection.verification.lines[0];
@@ -901,12 +926,16 @@ function openCommand(): void {
 }
 
 function cancelCommand(): void {
+  const target = desktopView === null ? null : waitingCancelTarget(desktopView);
   applyWindows(closeWindow(windowState, "launcher"));
   const objective = document.getElementById("objective");
   if (objective instanceof HTMLInputElement) {
     objective.blur();
   }
   hideStartMenu();
+  if (target !== null) {
+    void cancelTarget(target);
+  }
 }
 
 function paintAudio(): void {
@@ -1334,6 +1363,22 @@ async function refreshGraph(coreUrl: string): Promise<void> {
     paintGraph();
   } finally {
     graphFlight = false;
+  }
+}
+
+async function cancelTarget(target: { kind: "task" | "mission"; id: string }): Promise<void> {
+  const coreUrl = readCoreUrl(window.location.search);
+  const path =
+    target.kind === "task" ? `/tasks/${target.id}/cancel` : `/missions/${target.id}/cancel`;
+  await fetchJson(coreApiUrl(coreUrl, path), fetch, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  const status = listElement("status");
+  const detail = listElement("detail");
+  if (status !== null && detail !== null) {
+    await refresh(status, detail);
   }
 }
 

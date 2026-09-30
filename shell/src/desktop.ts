@@ -65,6 +65,17 @@ export interface VerificationBrief {
   errors: string[];
 }
 
+export interface DecisionBrief {
+  provider: string;
+  model: string;
+  intent: string;
+  plan: string[];
+  tools: string[];
+  rejected_tools: string[];
+  final_response: string;
+  observation: string;
+}
+
 export interface ActivityDocument {
   id: string;
   parent_task: string | null;
@@ -74,6 +85,7 @@ export interface ActivityDocument {
   assigned_model: string | null;
   mission_id: string | null;
   verification: VerificationBrief | null;
+  decision?: DecisionBrief | null;
   errors: MissionErrorDocument[];
 }
 
@@ -90,6 +102,7 @@ export interface QuestionDocument {
   question_id: string;
   mission_id: string;
   question: string;
+  task_id?: string;
 }
 
 export interface ProjectDocument {
@@ -233,6 +246,28 @@ export function attentionLine(
   const question = questions[0];
   if (question !== undefined) {
     return question.question;
+  }
+  return null;
+}
+
+/** The waiting confirmation or question the cancel action should stop. */
+export function waitingCancelTarget(input: {
+  confirmations: readonly ConfirmationDocument[];
+  questions: readonly QuestionDocument[];
+}): { kind: "task" | "mission"; id: string } | null {
+  const confirmation = input.confirmations[0];
+  if (confirmation !== undefined && confirmation.task_id !== "") {
+    return { kind: "task", id: confirmation.task_id };
+  }
+  const question = input.questions[0];
+  if (question === undefined) {
+    return null;
+  }
+  if (question.task_id !== undefined && question.task_id !== "") {
+    return { kind: "task", id: question.task_id };
+  }
+  if (question.mission_id !== "") {
+    return { kind: "mission", id: question.mission_id };
   }
   return null;
 }
@@ -407,6 +442,7 @@ function readActivity(value: Record<string, unknown>): ActivityDocument[] {
     assigned_model: typeof value["assigned_model"] === "string" ? value["assigned_model"] : null,
     mission_id: typeof value["mission_id"] === "string" ? value["mission_id"] : null,
     verification: readVerification(value["verification"]),
+    decision: readDecision(value["decision"]),
     errors: readErrors(value["errors"]),
   };
   return [activity];
@@ -446,6 +482,7 @@ function readQuestion(value: Record<string, unknown>): QuestionDocument[] {
       question_id: value["question_id"],
       mission_id: value["mission_id"],
       question: value["question"],
+      ...(typeof value["task_id"] === "string" ? { task_id: value["task_id"] } : {}),
     },
   ];
 }
@@ -462,6 +499,22 @@ function readProject(value: unknown): ProjectDocument | null {
     type: value["type"],
     git_branch: typeof value["git_branch"] === "string" ? value["git_branch"] : null,
     languages,
+  };
+}
+
+function readDecision(value: unknown): DecisionBrief | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  return {
+    provider: typeof value["provider"] === "string" ? value["provider"] : "",
+    model: typeof value["model"] === "string" ? value["model"] : "",
+    intent: typeof value["intent"] === "string" ? value["intent"] : "",
+    plan: stringList(value["plan"]),
+    tools: stringList(value["tools"]),
+    rejected_tools: stringList(value["rejected_tools"]),
+    final_response: typeof value["final_response"] === "string" ? value["final_response"] : "",
+    observation: typeof value["observation"] === "string" ? value["observation"] : "",
   };
 }
 

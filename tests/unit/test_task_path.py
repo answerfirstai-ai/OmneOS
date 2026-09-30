@@ -23,8 +23,15 @@ def test_model_read_goes_through_the_gateway_and_is_verified(tmp_path: Path) -> 
     observation = child.observations[0]
     events = omne.list_events()
 
+    view = omne.desktop_view()
+    activity = next(item for item in view["activity"] if item["id"] == child.id)
+
     assert task.status is TaskStatus.COMPLETED
     assert child.assigned_agent == "coding"
+    assert activity["decision"]["provider"] == "mock"
+    assert activity["decision"]["tools"] == ["filesystem.read"]
+    assert "hello from the disk" in activity["decision"]["observation"]
+    assert activity["verification"]["status"] == "PASS"
     assert observation["kind"] == "decision"
     assert observation["provider"] == "mock"
     assert observation["tools"] == ["filesystem.read"]
@@ -98,7 +105,15 @@ def test_model_confirmation_runs_the_read_only_after_approval(tmp_path: Path) ->
     omne = build_OMNE(runtime_settings(tmp_path))
 
     waiting = omne.execute_sync("confirm before reading file notes.txt")
+    waiting_view = omne.desktop_view()
+    waiting_activity = next(
+        item for item in waiting_view["activity"] if item["status"] == "WAITING"
+    )
     assert waiting.status is TaskStatus.WAITING
+    assert waiting_activity["decision"]["provider"] == "mock"
+    assert waiting_activity["decision"]["tools"] == ["filesystem.read"]
+    assert waiting_activity["decision"]["observation"] == ""
+    assert waiting_view["confirmations"][0]["tool_id"] == "filesystem.read"
     assert not any(event.type == "tool.executed" for event in omne.list_events())
 
     finished = omne.confirm_sync(waiting.id, approved=True)
@@ -121,6 +136,9 @@ def test_model_question_can_be_cancelled_without_a_tool(tmp_path: Path) -> None:
     )
 
     cancelled = omne.cancel(waiting.id)
+    view = omne.desktop_view()
 
     assert cancelled.status is TaskStatus.CANCELLED
+    assert omne.list_missions()[0].status.value == "CANCELLED"
+    assert view["questions"] == []
     assert not any(event.type == "tool.executed" for event in omne.list_events())

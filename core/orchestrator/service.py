@@ -29,7 +29,13 @@ from core.intent.engine import Intent, IntentEngine
 from core.memory.retrieval import SCOPES, AccessGrant, MemoryAccessError
 from core.memory.store import MemoryStore
 from core.metrics import ReliabilityLedger
-from core.mission.model import Mission, MissionError, MissionStatus, mission_event
+from core.mission.model import (
+    MISSION_TRANSITIONS,
+    Mission,
+    MissionError,
+    MissionStatus,
+    mission_event,
+)
 from core.mission.store import MissionStore
 from core.models.cortex import Cortex, IntelligenceContext
 from core.models.lifecycle import LOADED_STATES, SELECTABLE_STATES, ModelLifecycle
@@ -227,7 +233,9 @@ class OMNE:
 
     def cancel(self, task_id: str) -> Task:
         with self._lock:
-            return self._cancel(task_id)
+            task = self._cancel(task_id)
+            self._cancel_mission_for(task)
+            return self._store.get(task.id)
 
     async def execute(self, objective: str, *, dry_run: bool = False) -> Task:
         text = " ".join(objective.split())
@@ -347,7 +355,7 @@ class OMNE:
             ],
             "activity": [activity_document(task) for task in tasks if task.parent_task],
             "confirmations": confirmations,
-            "questions": [dict(question) for question in self._questions],
+            "questions": self._open_questions(),
             "project": project_document(self._project),
         }
 
@@ -1466,6 +1474,32 @@ class OMNE:
             raise ValueError("task is not waiting for confirmation")
         return parent, waiting[0]
 
+    def _open_questions(self) -> list[dict[str, object]]:
+        open_questions: list[dict[str, object]] = []
+        for question in self._questions:
+            mission_id = question.get("mission_id")
+            if not isinstance(mission_id, str) or not mission_id:
+                continue
+            try:
+                mission = self._missions.get(mission_id)
+            except KeyError:
+                continue
+            if mission.status is MissionStatus.WAITING:
+                open_questions.append(dict(question))
+        return open_questions
+
+    def _cancel_mission_for(self, task: Task) -> None:
+        mission_id = task.metadata.get("mission_id")
+        if not isinstance(mission_id, str) or not mission_id:
+            return
+        try:
+            mission = self._missions.get(mission_id)
+        except KeyError:
+            return
+        if MissionStatus.CANCELLED not in MISSION_TRANSITIONS[mission.status]:
+            return
+        self._advance_mission(mission, MissionStatus.CANCELLED)
+
     def _cancel(self, task_id: str) -> Task:
         task = self._store.get(task_id)
         parent = self._store.get(task.parent_task) if task.parent_task else task
@@ -1507,6 +1541,7 @@ def activity_document(task: Task) -> dict[str, Any]:
         "assigned_model": task.assigned_model,
         "mission_id": mission_id if isinstance(mission_id, str) else None,
         "verification": _verification_brief(task.result),
+        "decision": _decision_brief(task),
         "errors": [{"code": error.code, "message": error.message} for error in task.errors],
     }
 
@@ -1537,6 +1572,71 @@ def project_document(project: ProjectContext) -> dict[str, Any]:
         "git_branch": project.git_branch,
         "languages": list(project.languages),
     }
+
+
+def _decision_brief(task: Task) -> dict[str, Any] | None:
+    """Describe the model decision already recorded for one child task."""
+
+    for observation in reversed(task.observations):
+        if observation.get("kind") == "decision":
+            return {
+                "provider": _text(observation.get("provider")),
+                "model": _text(observation.get("model")),
+                "intent": _text(observation.get("intent")),
+                "plan": _string_list(observation.get("plan")),
+                "tools": _string_list(observation.get("tools")),
+                "rejected_tools": _string_list(observation.get("rejected_tools")),
+                "final_response": _text(observation.get("final_response")),
+                "observation": _tool_observation(observation.get("outputs")),
+            }
+    stored = task.metadata.get("structured_decision")
+    if not isinstance(stored, dict):
+        return None
+    return {
+        "provider": _text(stored.get("provider")),
+        "model": _text(stored.get("model")),
+        "intent": _text(stored.get("intent")),
+        "plan": _string_list(stored.get("plan")),
+        "tools": _requested_tools(stored.get("tool_requests")),
+        "rejected_tools": _string_list(stored.get("rejected_tools")),
+        "final_response": _text(stored.get("final_response")),
+        "observation": "",
+    }
+
+
+def _requested_tools(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    names: list[str] = []
+    for item in value:
+        if isinstance(item, dict) and isinstance(item.get("name"), str) and item["name"]:
+            names.append(item["name"])
+    return names
+
+
+def _tool_observation(value: object) -> str:
+    if not isinstance(value, list):
+        return ""
+    notes: list[str] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        tool_id = item.get("tool_id")
+        output = item.get("output")
+        if not isinstance(tool_id, str) or not tool_id:
+            continue
+        if tool_id == "filesystem.read" and isinstance(output, dict):
+            content = _text(output.get("content"))
+            notes.append(f"read {_text(output.get('path'))}: {content[:80]}")
+        elif tool_id == "terminal.execute" and isinstance(output, dict):
+            notes.append(f"terminal: {_text(output.get('stdout'))[:80]}")
+        else:
+            notes.append(tool_id)
+    return "; ".join(notes)
+
+
+def _text(value: object) -> str:
+    return value if isinstance(value, str) else ""
 
 
 def _verification_brief(result: dict[str, Any] | None) -> dict[str, Any] | None:
