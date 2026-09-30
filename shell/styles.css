@@ -142,7 +142,7 @@ input:focus-visible {
 #window-launcher {
   top: 72px;
   left: 108px;
-  width: min(380px, 34vw);
+  width: min(440px, 40vw);
 }
 
 #window-tasks {
@@ -292,7 +292,11 @@ input:focus-visible {
 #character[data-state="UNDERSTANDING"],
 #character[data-state="ROUTING"],
 #character[data-state="VERIFYING"],
-#character[data-state="WAITING"] {
+#character[data-state="WAITING"],
+#character[data-state="THINKING"],
+#character[data-state="RESEARCHING"],
+#character[data-state="EXECUTING"],
+#character[data-state="WARNING"] {
   color: var(--checking);
 }
 
@@ -307,7 +311,8 @@ input:focus-visible {
 #network-status[data-state="unknown"],
 #tray-status[data-state="unavailable"],
 #character[data-state="error"],
-#character[data-state="ERROR"] {
+#character[data-state="ERROR"],
+#character[data-state="OFFLINE"] {
   color: var(--unavailable);
 }
 
@@ -516,12 +521,54 @@ input {
 .presence[data-state="ROUTING"] .ring,
 .presence[data-state="VERIFYING"] .ring,
 .presence[data-state="LISTENING"] .ring,
-.presence[data-state="WAITING"] .ring {
+.presence[data-state="WAITING"] .ring,
+.presence[data-state="THINKING"] .ring,
+.presence[data-state="RESEARCHING"] .ring,
+.presence[data-state="EXECUTING"] .ring,
+.presence[data-state="WARNING"] .ring {
   stroke: var(--accent);
 }
 
-.presence[data-state="ERROR"] .ring {
+.presence[data-state="ERROR"] .ring,
+.presence[data-state="OFFLINE"] .ring {
   stroke: var(--unavailable);
+}
+
+.presence-name,
+.presence-ask,
+#launcher-prompt {
+  margin: 0.2rem 0 0;
+}
+
+.presence-name {
+  letter-spacing: 0.18em;
+  font-size: 0.78rem;
+}
+
+.presence-ask,
+#launcher-prompt {
+  color: var(--ink);
+}
+
+.launcher-actions {
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.launcher-actions button {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0.15rem 0;
+}
+
+.launcher-actions button::before {
+  content: "> ";
 }
 
 .presence[data-state="SUCCESS"] .ring {

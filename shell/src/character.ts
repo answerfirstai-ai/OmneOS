@@ -13,12 +13,28 @@ export type CharacterState =
   | "verifying"
   | "waiting";
 
+export type CharacterMode =
+  "IDLE" | "THINKING" | "RESEARCHING" | "EXECUTING" | "WAITING" | "WARNING" | "ERROR" | "OFFLINE";
+
 export interface CharacterInput {
   coreOk: boolean;
   voiceListening: boolean;
   statuses: readonly string[];
   missionStatuses?: readonly string[];
+  activeAgents?: readonly string[];
+  recovery?: string | null;
+  waitingForUser?: boolean;
 }
+
+const LIVE = new Set([
+  "ANALYZING",
+  "PLANNING",
+  "RUNNING",
+  "RECOVERING",
+  "VERIFYING",
+  "WAITING",
+  "FAILED",
+]);
 
 const ASSETS: Record<CharacterState, string | null> = {
   idle: null,
@@ -33,6 +49,49 @@ const ASSETS: Record<CharacterState, string | null> = {
   verifying: null,
   waiting: null,
 };
+
+/** The visible character. Completed work returns to idle. An unread core is offline. */
+export function characterMode(input: CharacterInput): CharacterMode {
+  if (!input.coreOk) {
+    return "OFFLINE";
+  }
+  const missions = (input.missionStatuses ?? []).filter((status) => LIVE.has(status));
+  const tasks = input.statuses.filter((status) => LIVE.has(status));
+  if (missions.includes("FAILED") || tasks.includes("FAILED")) {
+    return "ERROR";
+  }
+  if (missions.includes("WAITING") || tasks.includes("WAITING") || input.waitingForUser === true) {
+    return "WAITING";
+  }
+  const executing =
+    missions.some(
+      (status) => status === "RUNNING" || status === "RECOVERING" || status === "VERIFYING",
+    ) ||
+    tasks.some(
+      (status) => status === "RUNNING" || status === "RECOVERING" || status === "VERIFYING",
+    );
+  const thinking =
+    input.voiceListening ||
+    missions.some((status) => status === "ANALYZING" || status === "PLANNING") ||
+    tasks.some((status) => status === "PLANNING");
+  if ((executing || thinking) && (input.activeAgents ?? []).includes("research")) {
+    return "RESEARCHING";
+  }
+  if (executing) {
+    return "EXECUTING";
+  }
+  if (thinking) {
+    return "THINKING";
+  }
+  if (
+    input.recovery === "DEGRADED" ||
+    input.recovery === "SAFE_MODE" ||
+    input.recovery === "RECOVERY"
+  ) {
+    return "WARNING";
+  }
+  return "IDLE";
+}
 
 /** Choose a character state from core health, voice, and task statuses. */
 export function characterState(input: CharacterInput): CharacterState {
