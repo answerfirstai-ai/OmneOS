@@ -182,6 +182,7 @@ def build_OMNE(settings: Settings) -> OMNE:
         processes=processes,
         model_runtime=model_runtime,
         resources=resources,
+        data_dir=settings.data_dir,
     )
     executor._context_text = omne.context_for
     return omne

@@ -12,4 +12,5 @@ Browser integration keeps the application, automation, research, and rendering l
 and does not import Playwright.
 Process inspection reads the process table and does not signal the host.
 Secret storage keeps credentials out of configuration, logs, and task records.
+Update planning checks signed catalogs and does not install packages on the host.
 """

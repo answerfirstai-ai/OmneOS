@@ -151,7 +151,9 @@ terminal and process decisions. The deny list is unchanged. Workers use the agen
 for that call. They do not receive extra permissions because a mission exists. After permission
 allows a call, the worker security profile can still deny it. See `docs/SECURITY_MODEL.md`. A
 credential is separate from those grants. The secret service returns one only when the audience
-names the caller. See `docs/SECRETS.md`.
+names the caller. See `docs/SECRETS.md`. Package changes stay with apt and dpkg. The update layer
+checks a signed catalog, records a pending boot slot, and does not install on the development host.
+See `docs/UPDATE_ARCHITECTURE.md`.
 
 ## Model cache
 

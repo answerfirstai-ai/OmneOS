@@ -93,6 +93,10 @@ Python:
   owner, parent, children, start time, and limits, and it does not signal a process. Command lines
   stay out of the snapshot. Protected and unowned processes cannot be stopped. `POST /processes`
   stays 404.
+- Update catalogs. A signed fixture is verified and staged into a pending slot. An invalid
+  signature, an unsigned OMNE package, and a corrupt package are rejected. An interrupted install
+  leaves the booted slot in place. Rollback restores the previous generation. Apt and dpkg are not
+  executed. `POST /updates` stays 404.
 
 TypeScript:
 
