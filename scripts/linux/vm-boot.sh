@@ -225,7 +225,7 @@ args=(
   "${qemu_bin}"
   -name omne
   -machine "q35,accel=${OMNE_QEMU_ACCEL:-kvm:tcg}"
-  -cpu qemu64
+  -cpu "${OMNE_QEMU_CPU:-qemu64}"
   -m "${memory}"
   -smp "${cpus}"
   -serial "file:${serial_path}"
