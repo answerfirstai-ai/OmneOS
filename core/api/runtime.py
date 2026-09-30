@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from core.agents.communication import AgentMailbox
@@ -49,8 +49,17 @@ from core.workers.pool import WorkerPool
 from core.world.state import WorldStateService
 from omne.applications.select import application_service
 from omne.applications.service import ApplicationService
+from omne.audio.select import audio_service
+from omne.audio.service import AudioService
 from omne.browser.select import browser_service
 from omne.browser.service import BrowserService
+from omne.display.select import select_provider as select_display
+from omne.hardware.select import hardware_service
+from omne.hardware.service import HardwareService
+from omne.input.select import input_service
+from omne.input.service import InputService
+from omne.network.select import network_service
+from omne.network.service import NetworkService
 from omne.processes.select import process_service
 from omne.processes.service import (
     ProcessService,
@@ -62,6 +71,8 @@ from omne.recovery.select import recovery_service
 from omne.secrets.audit import SecretAuditLog
 from omne.secrets.select import select_provider
 from omne.secrets.service import SecretService
+from omne.storage.select import storage_service
+from omne.storage.service import StorageService
 
 
 def build_OMNE(settings: Settings) -> OMNE:
@@ -89,11 +100,19 @@ def build_OMNE(settings: Settings) -> OMNE:
         pool=WorkerPool(ram_limit_mb=8192, resources=resources),
     )
     processes = _process_service(settings, events, evaluator, monitor, runtime, applications)
+    network, audio, hardware, storage, controls = _observer_services(settings, events, evaluator)
     tools = build_registry(
         browser_command=settings.browser_command,
         applications=applications,
         browser=browser,
         processes=processes,
+        environment=settings.environment,
+        network=network,
+        audio=audio,
+        hardware=hardware,
+        storage=storage,
+        display=select_display(settings.environment),
+        controls=controls,
     )
     gateway = ToolGateway(
         tools,
@@ -217,7 +236,56 @@ def build_OMNE(settings: Settings) -> OMNE:
     )
     executor._context_text = omne.context_for
     executor._decider = omne.decide_for
+    omne._network = network
+    omne._audio = audio
+    omne._hardware = hardware
+    omne._storage = storage
+    omne._input = controls
     return omne
+
+
+def _observer_services(
+    settings: Settings,
+    events: EventBus,
+    evaluator: PermissionEvaluator,
+) -> tuple[NetworkService, AudioService, HardwareService, StorageService, InputService]:
+    def sink_for(source: str) -> Callable[[str, dict[str, Any]], None]:
+        def sink(event_type: str, payload: dict[str, Any]) -> None:
+            events.publish(event_type, source=source, payload=payload)
+
+        return sink
+
+    def authorize(
+        tool_id: str,
+        arguments: dict[str, object],
+        grants: Mapping[str, Sequence[str]],
+        environment: str,
+    ) -> tuple[str, str]:
+        result = evaluator.evaluate(
+            PermissionRequest(
+                tool_id=tool_id,
+                arguments=dict(arguments),
+                grants={key: list(value) for key, value in grants.items()},
+                environment=environment,
+                workspace_root=str(settings.workspace_root),
+            )
+        )
+        return result.decision.value, result.reason
+
+    return (
+        network_service(settings.environment, sink=sink_for("network"), authorize=authorize),
+        audio_service(settings.environment, sink=sink_for("audio"), authorize=authorize),
+        hardware_service(settings.environment, sink=sink_for("hardware")),
+        storage_service(settings.environment, sink=sink_for("storage")),
+        input_service(
+            settings.environment,
+            activation=settings.activation_shortcut,
+            cancel=settings.cancel_shortcut,
+            push_to_talk=settings.push_to_talk_shortcut,
+            sink=sink_for("input"),
+            authorize=authorize,
+        ),
+    )
 
 
 def _application_service(

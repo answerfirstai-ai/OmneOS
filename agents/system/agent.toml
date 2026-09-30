@@ -10,11 +10,19 @@ tools = [
   "system.disk",
   "system.network",
   "process.list",
+  "network.scan",
+  "display.inspect",
+  "hardware.inspect",
+  "storage.inspect",
 ]
 
 [permissions]
 system = ["read"]
 process = ["list"]
+network = ["scan"]
+display = ["read"]
+hardware = ["read"]
+storage = ["read"]
 
 [lifecycle]
 persistent = false

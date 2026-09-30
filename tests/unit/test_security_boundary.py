@@ -13,7 +13,13 @@ from core.events.bus import EventBus
 from core.permissions.audit import AuditLog
 from core.permissions.evaluator import PermissionEvaluator
 from core.permissions.policies import PermissionDecision, PermissionRequest, PermissionResult
-from core.security.boundary import BoundaryDecision, BoundaryRequest, admit, resource_denial
+from core.security.boundary import (
+    BoundaryDecision,
+    BoundaryRequest,
+    admit,
+    admit_tool,
+    resource_denial,
+)
 from core.security.profiles import PROFILES, ProfileName
 from core.tools.base import ToolContext
 from core.tools.gateway import ToolGateway
@@ -148,6 +154,16 @@ def test_unauthorized_network_is_denied() -> None:
     assert remote.decision is BoundaryDecision.DENY
     assert core.decision is BoundaryDecision.DENY
     assert loopback.decision is BoundaryDecision.ALLOW
+
+    local = admit_tool(profile="WORKER", tool_id="network.scan", arguments={}, workspace="/tmp")
+    opened = admit_tool(
+        profile="WORKER",
+        tool_id="network.connect",
+        arguments={"host": "1.1.1.1"},
+        workspace="/tmp",
+    )
+    assert local.decision is BoundaryDecision.ALLOW
+    assert opened.decision is BoundaryDecision.DENY
 
 
 def test_resource_exhaustion_is_denied() -> None:

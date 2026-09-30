@@ -69,6 +69,8 @@ def mock_decision(prompt: str) -> str:
     tool_requests: list[dict[str, object]] = []
     if "os.system" in lowered or "unknown tool" in lowered:
         tool_requests.append({"name": "os.system", "arguments": {"command": "id"}})
+    elif "scan wifi" in lowered:
+        tool_requests.append({"name": "network.scan", "arguments": {}})
     elif launched is not None:
         tool_requests.append(
             {"name": "application.launch", "arguments": {"name": launched.group("name").strip()}}

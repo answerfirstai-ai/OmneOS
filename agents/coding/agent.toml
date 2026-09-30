@@ -25,6 +25,10 @@ tools = [
   "application.launch",
   "application.focus",
   "application.close",
+  "network.scan",
+  "display.inspect",
+  "hardware.inspect",
+  "storage.inspect",
 ]
 max_workers = 2
 
@@ -34,6 +38,10 @@ terminal = ["workspace"]
 process = ["list", "start", "signal"]
 git = ["read", "commit"]
 application = ["launch", "focus", "close"]
+network = ["scan"]
+display = ["read"]
+hardware = ["read"]
+storage = ["read"]
 
 [lifecycle]
 persistent = false

@@ -288,10 +288,16 @@ def _tool_request(
         )
     if tool_id.startswith("network."):
         host = arguments.get("host", "")
+        bind = arguments.get("bind", "")
+        host_text = host if isinstance(host, str) else ""
+        bind_text = bind if isinstance(bind, str) else ""
+        if not host_text and not bind_text:
+            return None
         return BoundaryRequest(
             profile=profile,
             kind="network",
-            host=host if isinstance(host, str) else "",
+            host=host_text,
+            bind=bind_text,
         )
     return None
 

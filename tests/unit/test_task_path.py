@@ -123,6 +123,24 @@ def test_model_confirmation_runs_the_read_only_after_approval(tmp_path: Path) ->
     assert child.observations[0]["outputs"][0]["output"]["content"] == "kept\n"
 
 
+def test_model_scan_uses_the_network_gateway_action(tmp_path: Path) -> None:
+    omne = build_OMNE(runtime_settings(tmp_path))
+
+    task = omne.execute_sync("scan wifi")
+    child = next(item for item in omne.list_tasks() if item.parent_task == task.id)
+    observation = child.observations[0]
+
+    assert task.status is TaskStatus.COMPLETED
+    assert observation["tools"] == ["network.scan"]
+    assert observation["outputs"][0]["output"]["state"]["scan_known"] is True
+    assert observation["outputs"][0]["output"]["state"]["stack_commanded"] is False
+    assert omne.network_view()["scan_known"] is True
+    assert any(
+        event.type == "tool.executed" and event.tool_id == "network.scan"
+        for event in omne.list_events()
+    )
+
+
 def test_model_launch_opens_an_application_window_after_confirmation(tmp_path: Path) -> None:
     omne = build_OMNE(runtime_settings(tmp_path))
 
