@@ -15,8 +15,8 @@ context window and the allocator, and does not download weights. See `docs/MODEL
 
 NVIDIA calls `POST {base}/chat/completions` on `https://integrate.api.nvidia.com/v1` when
 `NVIDIA_API_KEY` or a `model/nvidia` secret is present. A missing credential raises `ProviderError`
-with code `configuration` before any HTTP request. The route `auto` tries NVIDIA, then local, then
-mock. See `docs/MODELS.md`.
+with code `configuration` before any HTTP request. The route `auto` without a cortex policy tries
+NVIDIA, then local, then mock. A recorded policy can choose a different order. See `docs/MODELS.md`.
 
 xAI calls `POST {base}/chat/completions`. In development and testing, a missing `XAI_API_KEY` and a
 missing `model/xai` secret raise `ProviderError` with code `configuration` before any HTTP request.

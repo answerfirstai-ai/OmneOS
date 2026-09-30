@@ -41,19 +41,19 @@ class IntentEngine:
     ) -> Intent:
         stripped = " ".join(text.split())
         parsed = _deterministic(stripped)
-        if parsed is not None:
-            return parsed
-        if allow_model and model_text:
-            modeled = _from_model_text(stripped, model_text)
-            if modeled is not None:
-                return modeled
-        return Intent(
-            intent="conversation",
-            desired_outcome="answer",
-            privacy="local",
-            risk="low",
-            source="fallback",
-        )
+        if parsed is None and allow_model and model_text:
+            parsed = _from_model_text(stripped, model_text)
+        if parsed is None:
+            parsed = Intent(
+                intent="conversation",
+                desired_outcome="answer",
+                privacy="local",
+                risk="low",
+                source="fallback",
+            )
+        if request_is_private(stripped) and not parsed.ambiguous:
+            return parsed.model_copy(update={"privacy": "private"})
+        return parsed
 
 
 def _deterministic(text: str) -> Intent | None:
@@ -147,6 +147,17 @@ def _deterministic(text: str) -> Intent | None:
             requires_network=True,
         )
     return None
+
+
+def request_is_private(text: str) -> bool:
+    return (
+        re.search(
+            r"\b(?:private|confidential|local only|on this machine|do not send|don't send)\b",
+            text,
+            re.IGNORECASE,
+        )
+        is not None
+    )
 
 
 def _question(intent: str, question: str, options: list[str]) -> Intent:

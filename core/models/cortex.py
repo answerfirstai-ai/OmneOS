@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from core.compute.monitor import ResourceSnapshot
 from core.events.bus import EventBus
+from core.models.policy import RoutePolicy
 from core.models.providers.base import ModelProvider
 from core.models.router import ModelRouter
 from core.models.structured import StructuredDecision, parse_structured, validate_tool_requests
@@ -90,6 +91,7 @@ class Cortex:
         trace_id: str | None = None,
         preferred_model: str | None = None,
         allow_mock: bool = True,
+        policy: RoutePolicy | None = None,
     ) -> StructuredDecision:
         chain = self._router.order(
             [capability],
@@ -98,6 +100,7 @@ class Cortex:
             available=available,
             allow_mock=allow_mock,
             preferred_model=preferred_model,
+            policy=policy if route == "auto" else None,
         )
         if not chain:
             raise ProviderError(

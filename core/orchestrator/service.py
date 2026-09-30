@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from pydantic import ValidationError
+
 from core.agents.communication import AgentMailbox
 from core.agents.lifecycle import AgentLifecycle, AgentState
 from core.agents.registry import AgentRegistry
@@ -21,6 +23,7 @@ from core.compute.manager import ResourceManager
 from core.compute.model_cache import ModelCache
 from core.compute.monitor import ResourceSnapshot, SystemMonitor
 from core.context.builder import build_context
+from core.cortex.cycle import STAGES, CortexCycle, make_cycle
 from core.decision.engine import DecisionEngine, ExecutionDecision
 from core.events.bus import Event, EventBus
 from core.events.replay import replay_events
@@ -39,6 +42,15 @@ from core.mission.model import (
 from core.mission.store import MissionStore
 from core.models.cortex import Cortex, IntelligenceContext
 from core.models.lifecycle import LOADED_STATES, SELECTABLE_STATES, ModelLifecycle
+from core.models.policy import (
+    NetworkFact,
+    RoutePolicy,
+    RouteSituation,
+    choose_route,
+    complexity_of,
+    gpu_is_overloaded,
+    is_private_request,
+)
 from core.models.providers.base import ModelProvider
 from core.models.providers.nvidia.provider import NvidiaProvider
 from core.models.registry import ModelRegistry
@@ -253,6 +265,7 @@ class OMNE:
             cpu_wait=False,
             trace_id=trace_id,
         )
+        cycle, policy = self._cortex_cycle(text, intent, decision)
         now = datetime.now(UTC)
         mission = Mission(
             id=str(uuid4()),
@@ -264,9 +277,23 @@ class OMNE:
             metadata={
                 "intent": intent.model_dump(mode="json"),
                 "decision": decision.model_dump(mode="json"),
+                "cortex": cycle.model_dump(mode="json"),
+                "route_policy": policy.model_dump(mode="json"),
             },
         )
         self._missions.save(mission)
+        self._events.publish(
+            "cortex.routed",
+            mission_id=mission.id,
+            trace_id=trace_id,
+            payload={
+                "policy": cycle.policy,
+                "providers": list(cycle.providers),
+                "selected_model": cycle.selected_model,
+                "selected_provider": cycle.selected_provider,
+                "reason": cycle.policy_reason,
+            },
+        )
         set_mission_id(mission.id)
         self._events.publish("mission.created", mission_id=mission.id, trace_id=trace_id)
         mission = self._advance_mission(mission, MissionStatus.ANALYZING)
@@ -286,6 +313,7 @@ class OMNE:
                 "mission_id": mission.id,
                 "world_revision": world.revision,
                 "decision": decision.decision,
+                "route_policy": policy.model_dump(mode="json"),
             },
         )
         self._store.save(parent)
@@ -545,17 +573,19 @@ class OMNE:
             raise ValueError("objective must not be empty")
         worker = task.metadata.get("worker_id")
         trace = task.metadata.get("trace_id")
+        route = self._route_for_mode()
         return await self._cortex.complete(
             self._intelligence_context(text),
             self._monitor.snapshot(),
             capability="reasoning",
-            route=self._route_for_mode(),
+            route=route,
             available=self._available_model_ids(),
             task_id=task.id,
             worker_id=worker if isinstance(worker, str) else None,
             trace_id=trace if isinstance(trace, str) else None,
             preferred_model=self._preferred_nvidia_model or None,
             allow_mock=True,
+            policy=_stored_policy(task.metadata) if route == "auto" else None,
         )
 
     def _intelligence_context(self, objective: str) -> IntelligenceContext:
@@ -1115,7 +1145,15 @@ class OMNE:
         children: list[Task] = []
         steps: list[TaskStep] = []
         for node in nodes:
-            child = self._child(node, parent_id, key_to_id, now, snapshot, extras or {})
+            child = self._child(
+                node,
+                parent_id,
+                key_to_id,
+                now,
+                snapshot,
+                extras or {},
+                policy=_stored_policy(extras or {}),
+            )
             children.append(child)
             steps.append(
                 TaskStep(
@@ -1146,10 +1184,11 @@ class OMNE:
         now: datetime,
         snapshot: ResourceSnapshot,
         extras: dict[str, Any],
+        policy: RoutePolicy | None = None,
     ) -> Task:
         matches = self._agents.by_capability(node.capability)
         agent = matches[0] if matches else None
-        model_id, fallbacks = self._select_model(node.capability, snapshot)
+        model_id, fallbacks = self._select_model(node.capability, snapshot, policy=policy)
         return Task(
             id=key_to_id[node.key],
             objective=node.objective,
@@ -1173,7 +1212,11 @@ class OMNE:
         )
 
     def _select_model(
-        self, capability: str, snapshot: ResourceSnapshot
+        self,
+        capability: str,
+        snapshot: ResourceSnapshot,
+        *,
+        policy: RoutePolicy | None = None,
     ) -> tuple[str | None, list[str]]:
         if not self._models.enabled():
             return None, []
@@ -1195,6 +1238,7 @@ class OMNE:
             available=available,
             allow_mock=True,
             preferred_model=self._preferred_nvidia_model or None,
+            policy=policy if route == "auto" else None,
         )
         if not chain:
             return None, []
@@ -1206,6 +1250,118 @@ class OMNE:
         if self._mode == "testing":
             return "mock"
         return self._model_route
+
+    def _cortex_cycle(
+        self, text: str, intent: Intent, decision: ExecutionDecision
+    ) -> tuple[CortexCycle, RoutePolicy]:
+        """Record the route class. This does not call a model or run a tool."""
+
+        world = self._world.current()
+        rendered, memory_notes = self._bounded_context_text(text, world.revision)
+        nodes = plan_objective(text)
+        snapshot = self._monitor.snapshot()
+        network = self._network_fact()
+        overloaded = gpu_is_overloaded(snapshot)
+        complexity = complexity_of(intent, text)
+        private = is_private_request(text) or intent.privacy == "private"
+        policy = choose_route(
+            RouteSituation(
+                complexity=complexity,
+                private=private,
+                network=network,
+                gpu_overloaded=overloaded,
+                local_available=self._local_available(),
+                cloud_available=self._cloud_available(),
+                mock_available=self._mock_available(),
+            )
+        )
+        capability = nodes[0].capability if nodes else "reasoning"
+        selected_model, selected_provider = self._recorded_selection(capability, snapshot, policy)
+        cycle = make_cycle(
+            intent=intent.intent,
+            intent_source=intent.source,
+            complexity=complexity,
+            private=private,
+            network=network,
+            gpu_overloaded=overloaded,
+            context_chars=len(rendered),
+            world_revision=world.revision,
+            memory_notes=memory_notes,
+            plan=[node.key for node in nodes],
+            decision=decision.decision,
+            policy=policy,
+            selected_model=selected_model,
+            selected_provider=selected_provider,
+            completed=list(STAGES[: STAGES.index("execution")]),
+        )
+        return cycle, policy
+
+    def _bounded_context_text(self, objective: str, revision: int) -> tuple[str, int]:
+        memory = self._bounded_memory(objective)
+        notes = [line for line in memory.splitlines() if line.strip()]
+        memories = [
+            {"content": note, "source": "memory", "scope": "project", "priority": 0}
+            for note in notes
+        ]
+        built = build_context(
+            request=objective,
+            memories=memories,
+            project_name=self._project.name,
+            world_revision=revision,
+            item_limit=self._context_items,
+            char_limit=self._context_chars,
+        )
+        return built.render(char_limit=self._context_chars), len(notes)
+
+    def _network_fact(self) -> NetworkFact:
+        """Down for offline mode, or when a host read says the link is unreachable.
+
+        The testing mock starts with no route and reports ``unreachable``. That
+        is not a measurement of the public internet, so the fact stays
+        ``unknown``. A fact is never stored as internet-up.
+        """
+
+        if self._mode in {"offline", "local"}:
+            return "down"
+        state = self._network_service().inspect()
+        if state.provider == "mock" or state.internet != "unreachable":
+            return "unknown"
+        return "down"
+
+    def _recorded_selection(
+        self,
+        capability: str,
+        snapshot: ResourceSnapshot,
+        policy: RoutePolicy,
+    ) -> tuple[str | None, str | None]:
+        route = self._route_for_mode()
+        required = _required_model_capability(capability)
+        if route == "auto":
+            chain = self._router.order(
+                [required],
+                snapshot,
+                route="auto",
+                available=self._available_model_ids(),
+                allow_mock=True,
+                preferred_model=self._preferred_nvidia_model or None,
+                policy=policy,
+            )
+            if not chain:
+                return None, None
+            return chain[0].id, chain[0].provider
+        model_id, _fallbacks = self._select_model(capability, snapshot, policy=policy)
+        if model_id is None:
+            return None, None
+        model = self._models.get(model_id)
+        if route == "mock" and model.provider != "mock":
+            return None, None
+        return model.id, model.provider
+
+    def _mock_available(self) -> bool:
+        ready = self._available_model_ids()
+        return any(
+            model.provider == "mock" and model.id in ready for model in self._models.enabled()
+        )
 
     def _on_event(self, event: Event) -> None:
         self._metrics.observe(event)
@@ -1234,6 +1390,7 @@ class OMNE:
                 "worker.",
                 "permission.",
                 "verification.",
+                "cortex.",
                 "model.",
                 "compute.",
                 "security.",
@@ -1376,6 +1533,9 @@ class OMNE:
                 result={"task_id": task.id, "status": task.status.value},
             )
             self._remember(task)
+            self._finish_cortex(
+                current.id, "execution", "observation", "verification", "memory_write"
+            )
         elif task.status is TaskStatus.WAITING and current.status is MissionStatus.RUNNING:
             self._advance_mission(current, MissionStatus.WAITING)
         elif task.status is TaskStatus.FAILED and current.status is MissionStatus.RUNNING:
@@ -1405,6 +1565,31 @@ class OMNE:
             content=f"Mission finished with status {task.status.value} for {task.objective}"[:500],
             trace_id=trace if isinstance(trace, str) else "",
             source="mission",
+        )
+
+    def _finish_cortex(self, mission_id: str, *stages: str) -> None:
+        """Append cycle stages onto the saved mission."""
+
+        try:
+            mission = self._missions.get(mission_id)
+        except KeyError:
+            return
+        stored = mission.metadata.get("cortex")
+        if not isinstance(stored, dict):
+            return
+        raw = stored.get("completed")
+        completed = [item for item in raw if isinstance(item, str)] if isinstance(raw, list) else []
+        for stage in stages:
+            if stage not in completed:
+                completed.append(stage)
+        try:
+            cortex = CortexCycle.model_validate({**stored, "completed": completed})
+        except ValidationError:
+            return
+        metadata = dict(mission.metadata)
+        metadata["cortex"] = cortex.model_dump(mode="json")
+        self._missions.save(
+            mission.model_copy(update={"metadata": metadata, "updated_at": datetime.now(UTC)})
         )
 
     def _record_verifications(self, task: Task) -> None:
@@ -1534,6 +1719,18 @@ class OMNE:
         current = self._store.transition(task, TaskStatus.CANCELLED)
         self._events.publish("task.cancelled", task_id=current.id)
         return current
+
+
+def _stored_policy(mapping: Mapping[str, Any]) -> RoutePolicy | None:
+    """Read a route policy stored on a task. A bad document is ignored."""
+
+    raw = mapping.get("route_policy")
+    if not isinstance(raw, Mapping):
+        return None
+    try:
+        return RoutePolicy.model_validate(dict(raw))
+    except ValidationError:
+        return None
 
 
 def task_document(task: Task) -> dict[str, Any]:

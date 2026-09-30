@@ -38,7 +38,7 @@ where npm >nul 2>&1 || (
 )
 
 set "DEST=%USERPROFILE%\OmneOS"
-set "BRANCH=cursor/omne-desktop-windows-92cc"
+set "BRANCH=cursor/omne-cortex-92cc"
 set "REPO=https://github.com/answerfirstai-ai/OmneOS.git"
 
 if not exist "%DEST%\.git" (

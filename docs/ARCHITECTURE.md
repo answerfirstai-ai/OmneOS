@@ -98,6 +98,12 @@ URL is UNAVAILABLE. `ModelRuntime.load` maps a model the selected engine already
 download weights. A successful load emits `model.loaded`. Ordinary task execution does not call
 load, so a file write does not emit that event. See `docs/MODELS.md`.
 
+`OMNE.execute` records a cortex cycle on the mission: user, intent, context, world, memory,
+planning, decision, model router, execution, observation, verification, and memory. The cycle
+classifies the route from the request, a host network read, and measured GPU load. The rule-based
+planner still builds the task graph. Research of the workspace stays on the local tool path. See
+`docs/MODELS.md`.
+
 Execution mode is `OMNE_EXECUTION_MODE`. When it is omitted, development, testing, and production
 follow `OMNE_ENVIRONMENT`.
 

@@ -43,11 +43,26 @@ chat:
 | `nvidia-vision`    | `meta/llama-3.2-11b-vision-instruct`    | vision                   |
 
 `OMNE_MODEL_ROUTE` is `auto`, `mock`, `local`, or `nvidia`. Development and production default to
-`auto`, which prefers NVIDIA, then a local model, then mock. Testing defaults to `mock`. An explicit
-route does not pretend a different provider answered. Timeouts, connection errors, HTTP 429, and
-HTTP 5xx are retried. Authentication failures are not retried. A model may request a tool. The
-request is validated and then has to pass the tool gateway, the permission evaluator, and the
-resource check. The provider does not run operating-system commands.
+`auto`. Without a cortex policy, `auto` tries NVIDIA, then a local model, then mock. A recorded
+policy reorders `auto`:
+
+| Situation | Order |
+| --- | --- |
+| Simple task | local, then mock |
+| Complex reasoning (`create_website`, `diagnose_and_fix_network`, coding, a build-and-project request, or explain / why / design / compare / analyze / reason / debug / architect) | `nvidia-reasoning`, then local, then mock |
+| Private text, execution mode `offline` or `local`, or a host read whose internet state is `unreachable` | local, then mock |
+| Measured GPU use or VRAM at 90 percent or more, a cloud model is available, and the request is not private or offline | NVIDIA, then mock |
+| No cloud model is available | local, then mock |
+
+An unknown network is not treated as down, and it is not described as internet-up. An unknown GPU
+load is not treated as overloaded. Workspace research stays on the local tool path. Testing defaults
+to `mock`. The testing route still stores the policy and does not put NVIDIA in the selected
+provider. An explicit `mock`, `local`, or `nvidia` route ignores the policy. A response is named
+NVIDIA only when that provider answered. `OMNE check`, the doctor, and the unit tests do not call
+the NVIDIA API. Timeouts, connection errors, HTTP 429, and HTTP 5xx are retried. Authentication
+failures are not retried. A model may request a tool. The request is validated and then has to pass
+the tool gateway, the permission evaluator, and the resource check. The provider does not run
+operating-system commands.
 
 ```bash
 OMNE models

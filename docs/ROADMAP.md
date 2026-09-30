@@ -73,6 +73,8 @@ not erased, and the operating system is not reinstalled.
 
 The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
 capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,
-and event replay described in `docs/ARCHITECTURE.md`. Model loading uses a resident local runtime or
+and event replay described in `docs/ARCHITECTURE.md`. This revision records the cortex cycle on each
+mission and classifies the model route while the rule-based planner still builds the task graph.
+Model loading uses a resident local runtime or
 the mock engine and does not download weights. A galaxy animation is not implemented. The ISO build
 is documented in `docs/ISO_BUILD.md` and is not a physical install.

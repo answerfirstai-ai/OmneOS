@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 from core.compute.allocation import AllocationDecision, AllocationRequest, allocate
 from core.compute.monitor import ResourceSnapshot
+from core.models.policy import RoutePolicy
 from core.models.registry import ModelMetadata, ModelRegistry
 
 
@@ -147,11 +148,13 @@ class ModelRouter:
         available: set[str] | None = None,
         allow_mock: bool = True,
         preferred_model: str | None = None,
+        policy: RoutePolicy | None = None,
     ) -> list[ModelMetadata]:
         """Return models for ``route`` that fit the snapshot.
 
-        ``auto`` prefers NVIDIA, then a local model, then mock. An explicit
-        route does not substitute a different provider.
+        ``auto`` without a policy prefers NVIDIA, then a local model, then
+        mock. A cortex policy reorders that list. An explicit route does not
+        substitute a different provider.
         """
 
         if route not in {"auto", "mock", "local", "nvidia"}:
@@ -169,7 +172,10 @@ class ModelRouter:
         elif route == "nvidia":
             candidates = [model for model in candidates if model.provider == "nvidia"]
         else:
-            allowed = {"nvidia", "local", "mock"} if allow_mock else {"nvidia", "local"}
+            if policy is not None:
+                allowed = set(policy.providers)
+            else:
+                allowed = {"nvidia", "local", "mock"} if allow_mock else {"nvidia", "local"}
             candidates = [model for model in candidates if model.provider in allowed]
         preferred_known = bool(
             preferred_model
@@ -178,15 +184,26 @@ class ModelRouter:
                 for model in candidates
             )
         )
-        ranked = sorted(
-            candidates,
-            key=lambda model: _route_key(
-                model,
-                route=route,
-                preferred_model=preferred_model,
-                preferred_known=preferred_known,
-            ),
-        )
+        if policy is not None and route == "auto":
+            ranked = sorted(
+                candidates,
+                key=lambda model: _policy_key(
+                    model,
+                    policy,
+                    preferred_model=preferred_model,
+                    preferred_known=preferred_known,
+                ),
+            )
+        else:
+            ranked = sorted(
+                candidates,
+                key=lambda model: _route_key(
+                    model,
+                    route=route,
+                    preferred_model=preferred_model,
+                    preferred_known=preferred_known,
+                ),
+            )
         fitted: list[ModelMetadata] = []
         for model in ranked:
             decision, _reason = allocate(
@@ -218,6 +235,23 @@ def _choice(
         estimated_cost=model.cost_input,
         decision=decision,
     )
+
+
+def _policy_key(
+    model: ModelMetadata,
+    policy: RoutePolicy,
+    *,
+    preferred_model: str | None,
+    preferred_known: bool,
+) -> tuple[int, int, int, str]:
+    provider_rank = policy.providers.index(model.provider)
+    name_rank = 1
+    if policy.prefer_strong and model.provider == "nvidia":
+        named = bool(preferred_model) and model.model_name == preferred_model
+        fallback = (not preferred_known) and model.id == "nvidia-reasoning"
+        plain = preferred_model is None and model.id == "nvidia-reasoning"
+        name_rank = 0 if named or fallback or plain else 1
+    return (provider_rank, name_rank, model.priority, model.id)
 
 
 def _route_key(

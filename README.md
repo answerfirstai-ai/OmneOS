@@ -8,6 +8,7 @@ separate TypeScript program that talks to the core over HTTP. The core runs with
 
 ## Requirements
 
+- Git
 - Python 3.12
 - Node.js 22
 - npm 10
@@ -16,21 +17,39 @@ Debian and Ubuntu also need the `python3.12-venv` package.
 
 Verified locally with Python 3.12.3, Node.js 22.14.0, and npm 10.9.7.
 
-## Windows simulation
+## Before you download
 
-On Windows 11, paste this into Command Prompt. It installs Git, Python 3.12, and Node.js 22, clones
-this branch into `%USERPROFILE%\OmneOS`, builds the shell, and opens the desktop. No API key is
-required.
+Install Git, Python 3.12, and Node.js 22 before cloning. The software you run is the Git branch
+`cursor/omne-cortex-92cc`. There is no ISO to download. Physical installation is not implemented.
+`docs/ISO_BUILD.md` describes the image build.
+
+Windows 11: install Git, Python 3.12, and Node.js 22. For Python, use the py launcher and select
+Add python.exe to PATH. Node.js 22 includes npm 10. Command Prompt can do that install, then clone
+`cursor/omne-cortex-92cc`, build the shell, and open the desktop. No API key is required.
 
 ```bat
-curl.exe -fL --ssl-no-revoke -o %TEMP%\omne-install.cmd https://raw.githubusercontent.com/answerfirstai-ai/OmneOS/cursor/omne-desktop-windows-92cc/scripts/windows/install-simulation.cmd && %TEMP%\omne-install.cmd
+curl.exe -fL --ssl-no-revoke -o %TEMP%\omne-install.cmd https://raw.githubusercontent.com/answerfirstai-ai/OmneOS/cursor/omne-cortex-92cc/scripts/windows/install-simulation.cmd && %TEMP%\omne-install.cmd
 ```
 
 The same steps are in `scripts/windows/install-simulation.cmd`.
 
-## Setup
+Ubuntu and Debian: install Git, `python3.12`, `python3.12-venv`, Node.js 22, and npm 10.
 
 ```bash
+sudo apt-get update
+sudo apt-get install -y git python3.12 python3.12-venv
+```
+
+The Ubuntu 24.04 `nodejs` package is older than Node.js 22. Install Node.js 22 so `npm` is version 10.
+
+## Setup
+
+Clone `cursor/omne-cortex-92cc`, then create the virtual environment.
+
+```bash
+git clone https://github.com/answerfirstai-ai/OmneOS.git
+cd OmneOS
+git checkout cursor/omne-cortex-92cc
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -38,7 +57,20 @@ python -m pip install -e ".[dev]"
 npm install
 ```
 
-`bash scripts/development/bootstrap.sh` runs the same installation.
+Windows 11, in PowerShell:
+
+```powershell
+git clone https://github.com/answerfirstai-ai/OmneOS.git
+cd OmneOS
+git checkout cursor/omne-cortex-92cc
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+npm install
+```
+
+`bash scripts/development/bootstrap.sh` runs the same installation on Ubuntu after the clone.
 
 ## Run
 
@@ -69,7 +101,18 @@ npm run build
 python3 -m http.server 4173 --directory shell
 ```
 
-Open `http://127.0.0.1:4173/`.
+Windows 11, in PowerShell:
+
+```powershell
+npm run build
+python -m http.server 4173 --directory shell
+```
+
+Open `http://127.0.0.1:4173/`. Port 4173 is required. Development CORS allows `http://127.0.0.1:4173`
+and `http://localhost:4173`. `OMNE serve` listens on `127.0.0.1:8787`.
+
+After a later pull on `cursor/omne-cortex-92cc`, run `git pull` and `npm run build`, then reload
+`http://127.0.0.1:4173/`. Restart `OMNE serve` when Python code changed.
 
 ## Checks
 
