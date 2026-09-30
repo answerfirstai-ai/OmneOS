@@ -275,7 +275,8 @@ def test_stage_places_services_on_the_ubuntu_base(tmp_path: Path) -> None:
         "virtio_gpu"
     ) >= 0
     assert (dest / "usr/lib/omne/applications/omne-hello").is_file()
-    assert (dest / "etc/systemd/system/omne-reboot.socket").is_file()
+    reboot = (dest / "etc/systemd/system/omne-reboot.socket").read_text(encoding="utf-8")
+    assert "After=multi-user.target" not in reboot
     assert (dest / "usr/bin/omne-boot").is_file()
     assert (dest / "usr/bin/omne-diag").is_file()
     assert (dest / "usr/lib/omne/agents/coding/agent.toml").is_file()
