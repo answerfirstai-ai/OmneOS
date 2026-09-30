@@ -22,8 +22,9 @@ UEFI
 ```
 
 The ISO 9660 volume id is `OMNE`. Firmware boots an El Torito FAT image that holds
-`EFI/BOOT/BOOTX64.EFI`, the loader entry, `/omne/vmlinuz`, and `/omne/initrd.img`. The kernel
-command line mounts that volume read-only:
+`EFI/BOOT/BOOTX64.EFI`, the loader entry, `/omne/vmlinuz`, and `/omne/initrd.img`. That same image
+is appended as an MBR partition of type `0xef`, which is how firmware reads an EFI system partition
+larger than the El Torito catalog can size. The kernel command line mounts that volume read-only:
 
 ```text
 root=LABEL=OMNE rootfstype=iso9660 ro rootwait systemd.unit=multi-user.target systemd.volatile=state
