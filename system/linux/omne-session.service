@@ -1,7 +1,8 @@
 [Unit]
 Description=OMNE Wayland session
 After=multi-user.target seatd.service omne-shell.service
-Wants=seatd.service
+Wants=seatd.service omne-doctor.service
+Before=omne-doctor.service
 
 [Service]
 Type=simple

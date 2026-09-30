@@ -7,7 +7,9 @@ enable_omne_units() {
   local sockets="${system}/sockets.target.wants"
   local unit
   mkdir -p "${multi}" "${sockets}"
-  for unit in omne.target omne-session.service omne-diag.service omne-doctor.service; do
+  # omne-doctor is pulled in by omne-session. Linking it from multi-user
+  # creates an ordering cycle and systemd skips the doctor.
+  for unit in omne.target omne-session.service omne-diag.service; do
     if [[ -e "${system}/${unit}" ]]; then
       ln -sfn "/etc/systemd/system/${unit}" "${multi}/${unit}"
     fi

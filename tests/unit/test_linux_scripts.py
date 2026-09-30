@@ -579,7 +579,7 @@ def test_enable_units_links_the_session_without_systemctl(tmp_path: Path) -> Non
     assert result.returncode == 0, result.stderr
     wants = system / "multi-user.target.wants"
     assert (wants / "omne-session.service").is_symlink()
-    assert (wants / "omne-doctor.service").is_symlink()
+    assert not (wants / "omne-doctor.service").exists()
     assert (wants / "omne-diag.service").is_symlink()
     assert (system / "sockets.target.wants" / "omne-reboot.socket").is_symlink()
     assert "systemctl" not in (ROOT / "scripts/linux/enable-units.sh").read_text(encoding="utf-8")

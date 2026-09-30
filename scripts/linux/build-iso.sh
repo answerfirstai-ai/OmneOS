@@ -290,7 +290,7 @@ for required in \
   "${rootfs}/usr/bin/omne-session" \
   "${rootfs}/usr/bin/omne-prove" \
   "${rootfs}/etc/systemd/system/multi-user.target.wants/omne-session.service" \
-  "${rootfs}/etc/systemd/system/multi-user.target.wants/omne-doctor.service" \
+  "${rootfs}/etc/systemd/system/omne-doctor.service" \
   "${rootfs}/usr/lib/systemd/systemd" \
   "${rootfs}/usr/share/omne/shell/dist/main.js" \
   "${rootfs}/usr/lib/omne/python/omne/recovery/service.py"

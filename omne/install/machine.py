@@ -163,11 +163,6 @@ def _write(source: Path, dest: Path, record: InstallRecord) -> None:
     )
     _link(
         units / "multi-user.target.wants",
-        "omne-doctor.service",
-        "../omne-doctor.service",
-    )
-    _link(
-        units / "multi-user.target.wants",
         "omne-diag.service",
         "../omne-diag.service",
     )

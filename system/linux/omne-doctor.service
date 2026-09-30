@@ -1,7 +1,7 @@
 [Unit]
 Description=OMNE boot proof
 After=omne-session.service omne-core.service network-online.target
-Wants=omne-session.service network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
@@ -13,6 +13,3 @@ StandardOutput=journal+console
 StandardError=journal+console
 RemainAfterExit=yes
 NoNewPrivileges=true
-
-[Install]
-WantedBy=multi-user.target
