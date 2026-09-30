@@ -5,6 +5,7 @@ export interface ApplicationView {
   name: string;
   categories: string[];
   state: string;
+  windows: string[];
 }
 
 const COMMAND_KEYS = new Set(["argv", "command", "shell", "exec", "cmd"]);
@@ -59,7 +60,15 @@ export function readApplications(payload: unknown): ApplicationView[] {
     const categories = Array.isArray(row["categories"])
       ? row["categories"].filter((item): item is string => typeof item === "string")
       : [];
-    views.push({ id, name, categories, state });
+    const windows = Array.isArray(row["windows"])
+      ? row["windows"].flatMap((item) => {
+          if (!isRecord(item) || typeof item["title"] !== "string" || item["title"] === "") {
+            return [];
+          }
+          return [item["title"]];
+        })
+      : [];
+    views.push({ id, name, categories, state, windows });
   }
   return views;
 }
@@ -67,4 +76,13 @@ export function readApplications(payload: unknown): ApplicationView[] {
 /** The objective the launcher submits for one application. */
 export function applicationObjective(name: string): string {
   return `Open ${name}`;
+}
+
+/** Button label for an application, including a window the model opened. */
+export function applicationLabel(app: ApplicationView): string {
+  const title = app.windows[0];
+  if (title === undefined) {
+    return app.name;
+  }
+  return `${app.name} (${title})`;
 }

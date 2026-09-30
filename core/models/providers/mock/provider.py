@@ -65,9 +65,14 @@ def mock_decision(prompt: str) -> str:
     objective = _objective_line(prompt)
     lowered = objective.lower()
     read = re.search(r"read(?:ing)? (?:the )?file (?P<path>\S+)", objective, re.IGNORECASE)
+    launched = re.search(r"launch application (?P<name>.+)$", objective, re.IGNORECASE)
     tool_requests: list[dict[str, object]] = []
     if "os.system" in lowered or "unknown tool" in lowered:
         tool_requests.append({"name": "os.system", "arguments": {"command": "id"}})
+    elif launched is not None:
+        tool_requests.append(
+            {"name": "application.launch", "arguments": {"name": launched.group("name").strip()}}
+        )
     elif "terminal.execute" in lowered:
         tool_requests.append(
             {"name": "terminal.execute", "arguments": {"argv": ["echo", "hello"], "cwd": "."}}

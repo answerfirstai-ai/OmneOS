@@ -60,6 +60,20 @@ def test_labwc_uses_drm_instead_of_a_nested_display() -> None:
     assert env["HOME"] == "/var/lib/omne"
 
 
+def test_shell_surface_uses_the_desktop_client_without_a_shell() -> None:
+    argv = session.shell_surface_argv(["/usr/bin/firefox", "/usr/bin/cog"])
+    assert argv == ["cog", "-P", "http://127.0.0.1:4173/?surface=desktop"]
+    assert session.shell_surface_argv(["/usr/bin/bash"]) is None
+    env = session.shell_client_environment(
+        {"DISPLAY": ":0", "HOME": "/var/lib/omne"},
+        runtime="/run/omne",
+        display="wayland-0",
+    )
+    assert env["WAYLAND_DISPLAY"] == "wayland-0"
+    assert env["XDG_RUNTIME_DIR"] == "/run/omne"
+    assert "DISPLAY" not in env
+
+
 def test_owned_application_marker_requires_the_fixed_program() -> None:
     assert (
         session.launch_owned_application(["/usr/lib/omne/applications/omne-hello"], returncode=0)

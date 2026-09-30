@@ -46,7 +46,12 @@ import {
 } from "./graph-layout.js";
 import { hudText, readCompute, resourcePressure, type HudLine } from "./hud.js";
 import { readAudioStatus, type AudioStatusView } from "./audio-status.js";
-import { applicationObjective, readApplications, type ApplicationView } from "./applications.js";
+import {
+  applicationLabel,
+  applicationObjective,
+  readApplications,
+  type ApplicationView,
+} from "./applications.js";
 import { chordMatches, readInputStatus, type InputStatusView } from "./input-status.js";
 import { readNetworkStatus, type NetworkStatusView } from "./network-status.js";
 import { coreHealthUrl, parseHealth, type CoreHealth } from "./health.js";
@@ -890,7 +895,7 @@ function paintApplications(): void {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset["application"] = app.id;
-    button.textContent = app.name;
+    button.textContent = applicationLabel(app);
     button.addEventListener("click", () => {
       const objective = document.getElementById("objective");
       if (objective instanceof HTMLInputElement) {
