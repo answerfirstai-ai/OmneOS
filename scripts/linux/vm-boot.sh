@@ -138,7 +138,7 @@ if [[ "${dry_run}" -eq 1 ]]; then
 fi
 
 echo "desktop: automatic"
-echo "boot chain: QEMU -> UEFI -> systemd-boot -> Linux -> systemd -> OMNE services -> graphical session -> OMNE Shell"
+echo "boot chain: QEMU -> UEFI -> systemd-boot -> Linux -> systemd -> OMNE LOGIN -> USER SESSION -> OMNE CORE -> OMNE SHELL -> DESKTOP"
 
 qemu_bin="${OMNE_QEMU_BIN:-qemu-system-x86_64}"
 qemu_img="${OMNE_QEMU_IMG:-qemu-img}"

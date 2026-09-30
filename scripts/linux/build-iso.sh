@@ -288,7 +288,12 @@ for required in \
   "${rootfs}/usr/bin/OMNE" \
   "${rootfs}/usr/bin/labwc" \
   "${rootfs}/usr/bin/omne-session" \
+  "${rootfs}/usr/bin/omne-login" \
+  "${rootfs}/usr/bin/omne-user-session" \
   "${rootfs}/usr/bin/omne-prove" \
+  "${rootfs}/etc/omne/operator.json" \
+  "${rootfs}/etc/systemd/system/omne-core.service.d/user-session.conf" \
+  "${rootfs}/etc/systemd/system/multi-user.target.wants/omne-login.service" \
   "${rootfs}/etc/systemd/system/multi-user.target.wants/omne-session.service" \
   "${rootfs}/etc/systemd/system/omne-doctor.service" \
   "${rootfs}/usr/lib/systemd/systemd" \

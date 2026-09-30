@@ -33,8 +33,9 @@
 The Linux base is Ubuntu 24.04 LTS. `omne-core`, `omne-shell`, and `omne-system` are Debian
 packages, and `omne.target` starts them from `multi-user.target`. `scripts/linux/build-base.sh`
 builds a minbase rootfs and does not install a kernel or a bootloader. `scripts/linux/build-disk.sh`
-adds Ubuntu's kernel, initramfs, and systemd-boot. The console program is `omne-boot`. No display
-manager is installed.
+adds Ubuntu's kernel, initramfs, and systemd-boot. Power reaches OMNE login, then the user session
+starts OMNE Core, the shell, and the desktop. `omne-boot` remains the checklist. No display manager
+is installed, and a terminal is not the login.
 
 Phase 14 writes `OMNE-OS.iso` from `scripts/linux/build-iso.sh` on Ubuntu 24.04 x86-64 as root. The
 script exits 2 when that environment is not present, and it does not install the image. See
@@ -48,26 +49,27 @@ does not start a virtual machine. See `docs/VM_TEST.md`.
 Phase 16, physical hardware installation, has not been started. `omne.display` can report whether
 labwc, DRM, a render node, a connected monitor, and an input device are present. It does not start a
 Wayland session. `omne.windowing` records windows and workspaces for that session and does not
-command labwc. `omne.hardware` reads Linux device state, derives a capability registry from that read, and does not configure it. `omne.network`
-reads the Linux network stack and does not replace systemd-networkd. `omne.audio` reads the Linux
-audio stack and does not open a microphone. `omne.input` reads configured shortcuts and published
-keyboards and mice and does not read the keyboard stream. `omne.storage` reads disks and mounts and
-does not format them. `omne.applications` reads desktop entries and does not start a shell.
-`omne.browser` separates the browser application from automation, research, and rendering, and it
-does not import Playwright. `omne.processes` reads the process table and does not signal a protected
-process. The shell is still the web desktop. `docs/GRAPHICS_ARCHITECTURE.md` lists what a VM needs
-before that session can launch. `docs/WINDOWING.md` describes the window record. `docs/NETWORK.md`
-describes the network read. `docs/AUDIO_ARCHITECTURE.md` describes the audio read and the later
-voice path. `docs/INPUT_ARCHITECTURE.md` describes the shortcut configuration and the closed key
-stream. `docs/STORAGE.md` describes the disk read and the path classes. `docs/APPLICATIONS.md`
-describes the application lookup. `docs/BROWSER.md` describes the four browser layers and the
-Playwright dependency. `docs/PROCESSES.md` describes the process table and the closed host signal
-path. `docs/WORKERS.md` describes agent definitions and in-memory workers. `docs/MODELS.md`
-describes resident model loading. `docs/SECURITY_MODEL.md` describes the profile boundary that sits
-behind the permission evaluator. `docs/SECRETS.md` describes scoped credentials and the Linux
-keyring. `docs/UPDATE_ARCHITECTURE.md` describes signed catalogs and apt plans. The development host
-is not updated. `docs/RECOVERY.md` describes startup checks, safe mode, and recovery commands. User
-data is not erased, and the operating system is not reinstalled.
+command labwc. `omne.hardware` reads Linux device state, derives a capability registry from that
+read, and does not configure it. `omne.network` reads the Linux network stack and does not replace
+systemd-networkd. `omne.audio` reads the Linux audio stack and does not open a microphone.
+`omne.input` reads configured shortcuts and published keyboards and mice and does not read the
+keyboard stream. `omne.storage` reads disks and mounts and does not format them. `omne.applications`
+reads desktop entries and does not start a shell. `omne.browser` separates the browser application
+from automation, research, and rendering, and it does not import Playwright. `omne.processes` reads
+the process table and does not signal a protected process. The shell is still the web desktop.
+`docs/GRAPHICS_ARCHITECTURE.md` lists what a VM needs before that session can launch.
+`docs/WINDOWING.md` describes the window record. `docs/NETWORK.md` describes the network read.
+`docs/AUDIO_ARCHITECTURE.md` describes the audio read and the later voice path.
+`docs/INPUT_ARCHITECTURE.md` describes the shortcut configuration and the closed key stream.
+`docs/STORAGE.md` describes the disk read and the path classes. `docs/APPLICATIONS.md` describes the
+application lookup. `docs/BROWSER.md` describes the four browser layers and the Playwright
+dependency. `docs/PROCESSES.md` describes the process table and the closed host signal path.
+`docs/WORKERS.md` describes agent definitions and in-memory workers. `docs/MODELS.md` describes
+resident model loading. `docs/SECURITY_MODEL.md` describes the profile boundary that sits behind the
+permission evaluator. `docs/SECRETS.md` describes scoped credentials and the Linux keyring.
+`docs/UPDATE_ARCHITECTURE.md` describes signed catalogs and apt plans. The development host is not
+updated. `docs/RECOVERY.md` describes startup checks, safe mode, and recovery commands. User data is
+not erased, and the operating system is not reinstalled.
 
 The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
 capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,

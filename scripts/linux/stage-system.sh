@@ -131,6 +131,17 @@ if [[ "${want_system}" -eq 1 ]]; then
   cp "${root}/system/linux/omne-session.service" "${dest}/etc/systemd/system/omne-session.service"
   cp "${root}/system/linux/omne-session" "${dest}/usr/bin/omne-session"
   chmod 755 "${dest}/usr/bin/omne-session"
+  cp "${root}/system/linux/omne-login.service" "${dest}/etc/systemd/system/omne-login.service"
+  cp "${root}/system/linux/omne-login" "${dest}/usr/bin/omne-login"
+  chmod 755 "${dest}/usr/bin/omne-login"
+  cp "${root}/system/linux/omne-user-session.service" \
+    "${dest}/etc/systemd/system/omne-user-session.service"
+  cp "${root}/system/linux/omne-user-session" "${dest}/usr/bin/omne-user-session"
+  chmod 755 "${dest}/usr/bin/omne-user-session"
+  mkdir -p "${dest}/etc/systemd/system/omne-core.service.d" "${dest}/etc/omne"
+  cp "${root}/system/linux/omne-core.service.d/user-session.conf" \
+    "${dest}/etc/systemd/system/omne-core.service.d/user-session.conf"
+  cp "${root}/system/linux/operator.json" "${dest}/etc/omne/operator.json"
   cp "${root}/system/linux/omne-doctor.service" "${dest}/etc/systemd/system/omne-doctor.service"
   cp "${root}/system/linux/omne-prove" "${dest}/usr/bin/omne-prove"
   chmod 755 "${dest}/usr/bin/omne-prove"

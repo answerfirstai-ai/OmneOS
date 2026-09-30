@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""The user session. systemd starts the core and the shell after this exits 0."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+_SITE = Path("/usr/lib/omne/python")
+if _SITE.is_dir():
+    sys.path.insert(0, str(_SITE))
+
+from omne.login import user_session_main  # noqa: E402
+
+if __name__ == "__main__":
+    raise SystemExit(user_session_main())

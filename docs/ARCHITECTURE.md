@@ -189,8 +189,9 @@ Unknown resource values stay unknown, and an unavailable GPU stays unavailable.
 ## Linux integration
 
 Ubuntu 24.04 LTS is the development base. OMNE packages and systemd units sit on that userspace.
-`multi-user.target` wants `omne.target`, which starts OMNE Core and the shell. The system user is
-`omne`. State stays under `/var/lib/omne`. The core still binds to `127.0.0.1`.
+`multi-user.target` starts OMNE login. The user session then starts OMNE Core and the shell, and the
+desktop follows. The system user is `omne`. State stays under `/var/lib/omne`. The core still binds
+to `127.0.0.1`.
 
 `scripts/linux/install.sh` remains the user-level unit for a checkout and still refuses `/boot`. It
 does not change the bootloader. The system tree, packages, and rootfs builder are described in
