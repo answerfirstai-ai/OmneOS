@@ -16,3 +16,20 @@ enable_omne_units() {
     ln -sfn "/etc/systemd/system/omne-reboot.socket" "${sockets}/omne-reboot.socket"
   fi
 }
+
+# A boot link uses a guest absolute path. Size is read from the rootfs copy.
+image_path_ready() {
+  local rootfs="$1"
+  local required="$2"
+  local target resolved
+  if [[ -L "${required}" ]]; then
+    target="$(readlink "${required}")"
+    case "${target}" in
+      /*) resolved="${rootfs}${target}" ;;
+      *) resolved="$(cd "$(dirname "${required}")" && realpath -m "${target}")" ;;
+    esac
+    [[ -s "${resolved}" ]]
+    return
+  fi
+  [[ -s "${required}" ]]
+}

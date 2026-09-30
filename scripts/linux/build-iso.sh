@@ -295,7 +295,7 @@ for required in \
   "${rootfs}/usr/share/omne/shell/dist/main.js" \
   "${rootfs}/usr/lib/omne/python/omne/recovery/service.py"
 do
-  if [[ ! -s "${required}" ]]; then
+  if ! image_path_ready "${rootfs}" "${required}"; then
     echo "required image file is missing: ${required}; no image was built" >&2
     exit 2
   fi

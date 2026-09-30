@@ -583,6 +583,13 @@ def test_enable_units_links_the_session_without_systemctl(tmp_path: Path) -> Non
     assert (wants / "omne-diag.service").is_symlink()
     assert (system / "sockets.target.wants" / "omne-reboot.socket").is_symlink()
     assert "systemctl" not in (ROOT / "scripts/linux/enable-units.sh").read_text(encoding="utf-8")
+    guest = tmp_path / "etc/systemd/system/omne-session.service"
+    link = wants / "omne-session.service"
+    assert _image_ready(tmp_path, link)
+    guest.write_text("", encoding="utf-8")
+    assert not _image_ready(tmp_path, link)
+    guest.write_text("[Unit]\n", encoding="utf-8")
+    assert _image_ready(tmp_path, link)
 
 
 def test_base_refuses_boot() -> None:
@@ -591,6 +598,20 @@ def test_base_refuses_boot() -> None:
     assert result.returncode == 2
     assert "refusing" in result.stderr
     assert not Path("/boot/omne").exists()
+
+
+def _image_ready(rootfs: Path, required: Path) -> bool:
+    result = _run(
+        [
+            "bash",
+            "-c",
+            'source scripts/linux/enable-units.sh && image_path_ready "$1" "$2"',
+            "ready",
+            str(rootfs),
+            str(required),
+        ]
+    )
+    return result.returncode == 0
 
 
 def _deb_listing(path: Path) -> str:
