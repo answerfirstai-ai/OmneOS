@@ -17,7 +17,7 @@
 | 11    | Character state driven by health, voice, and task status                         |
 | 12    | Voice status that stays silent without permission and a provider                 |
 | 13    | User systemd unit, installer, and health command                                 |
-| 14    | Image script that exits when it cannot build                                     |
+| 14    | UEFI ISO with systemd-boot, the Ubuntu kernel, and OMNE                          |
 | 15    | VM script that exits when no image is present                                    |
 | —     | Missions, world state, intent, decisions, workers, verification                  |
 | —     | Ubuntu 24.04 base, system packages, and `omne.target`                            |
@@ -36,8 +36,9 @@ builds a minbase rootfs and does not install a kernel or a bootloader. `scripts/
 adds Ubuntu's kernel, initramfs, and systemd-boot. The console program is `omne-boot`. No display
 manager is installed.
 
-Phase 14 does not write `OMNE-OS.iso`. The script exits 2. The bootable artifact is the UEFI disk
-from `scripts/linux/build-disk.sh`.
+Phase 14 writes `OMNE-OS.iso` from `scripts/linux/build-iso.sh` on Ubuntu 24.04 x86-64 as root. The
+script exits 2 when that environment is not present, and it does not install the image. See
+`docs/ISO_BUILD.md`. The UEFI disk from `scripts/linux/build-disk.sh` remains a separate artifact.
 
 Phase 15 starts a virtual machine only with `scripts/linux/vm-boot.sh --run` when the disk, QEMU,
 and OVMF are all present. Without them it exits 2 and does not start QEMU.
@@ -69,5 +70,5 @@ data is not erased, and the operating system is not reinstalled.
 The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
 capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,
 and event replay described in `docs/ARCHITECTURE.md`. Model loading uses a resident local runtime or
-the mock engine and does not download weights. A galaxy animation is not implemented. An ISO is not
-produced.
+the mock engine and does not download weights. A galaxy animation is not implemented. The ISO build
+is documented in `docs/ISO_BUILD.md` and is not a physical install.

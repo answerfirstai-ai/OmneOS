@@ -93,4 +93,5 @@ not imported. `POST /browser` is not a route. Process start, stop, and restart r
 `process:start`, `process:signal`, and `process:restart`. The Linux provider does not signal pid 1,
 a kernel thread, a system service, OMNE Core, a security service, or the desktop session. A command
 line requires `process:command` and is omitted from `GET /processes`. `POST /processes` is not a
-route. The ISO script does not write `OMNE-OS.iso`. No physical disk installation is performed.
+route. The ISO is assembled in a temporary directory and is not written to the host disk or the host
+bootloader. No physical disk installation is performed. See `docs/ISO_BUILD.md`.

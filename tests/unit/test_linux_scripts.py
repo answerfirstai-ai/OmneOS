@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -54,8 +55,87 @@ def test_iso_script_does_not_create_an_image(tmp_path: Path) -> None:
 
     assert result.returncode == 2
     assert "no image was built" in result.stderr
+    assert "Ubuntu 24.04" in result.stderr
+    assert "xorriso" in result.stderr
     assert not (tmp_path / "OMNE-OS.iso").exists()
     assert not (ROOT / "OMNE-OS.iso").exists()
+
+
+def test_iso_dry_run_writes_nothing(tmp_path: Path) -> None:
+    dest = tmp_path / "OMNE-OS.iso"
+    result = _run(["bash", "scripts/linux/build-iso.sh", "--dry-run", "--dest", str(dest)])
+
+    assert result.returncode == 0
+    assert "ubuntu 24.04 (noble)" in result.stdout
+    assert "linux-image-generic" in result.stdout
+    assert "systemd-boot" in result.stdout
+    assert "labwc" in result.stdout
+    assert "systemd-networkd" in result.stdout
+    assert "recovery: included" in result.stdout
+    assert "physical installation: not performed" in result.stdout
+    assert "dry-run: no ISO was written" in result.stdout
+    assert "validation passed" not in result.stdout
+    assert "ISO written" not in result.stdout
+    assert not dest.exists()
+
+
+def test_iso_refuses_boot_and_block_devices(tmp_path: Path) -> None:
+    boot = _run(["bash", "scripts/linux/build-iso.sh", "--dry-run", "--dest", "/boot/OMNE-OS.iso"])
+    block = _run(["bash", "scripts/linux/build-iso.sh", "--dest", "/dev/sda"])
+    source = _run(
+        ["bash", "scripts/linux/build-iso.sh", "--dry-run", "--dest", str(ROOT / "OMNE-OS.iso")]
+    )
+
+    assert boot.returncode == 2
+    assert "refusing" in boot.stderr
+    assert block.returncode == 2
+    assert "refusing" in block.stderr
+    assert "no image was built" in block.stderr
+    assert source.returncode == 2
+    assert "source tree" in source.stderr
+    assert not Path("/boot/OMNE-OS.iso").exists()
+    assert not (tmp_path / "OMNE-OS.iso").exists()
+    assert not (ROOT / "OMNE-OS.iso").exists()
+
+
+def test_iso_detects_an_unsupported_system(tmp_path: Path) -> None:
+    dest = tmp_path / "OMNE-OS.iso"
+    env = os.environ.copy()
+    env["OMNE_ISO_UNAME"] = "Windows_NT"
+    result = subprocess.run(
+        ["bash", "scripts/linux/build-iso.sh", "--dest", str(dest)],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 2
+    assert "no image was built" in result.stderr
+    assert "Ubuntu 24.04" in result.stderr
+    assert "container" in result.stderr.lower()
+    assert "workflow_dispatch" in result.stderr
+    assert not dest.exists()
+
+
+def test_iso_script_stays_off_the_host_disk() -> None:
+    text = (ROOT / "scripts/linux/build-iso.sh").read_text(encoding="utf-8")
+    assert "mktemp" in text
+    assert "systemd.volatile=state" in text
+    assert "validate-iso.sh" in text
+    assert "root=LABEL=${OMNE_ISO_VOLUME_ID}" in text
+    assert "grub-install" not in text
+    assert "of=/dev" not in text
+    assert "bootctl install" not in text
+
+
+def test_iso_config_pins_image_packages() -> None:
+    text = (ROOT / "system/linux/iso.conf").read_text(encoding="utf-8")
+    for name in ("labwc", "systemd-boot-efi", "systemd-sysv", "iproute2"):
+        assert name in text
+    for excluded in ("ubuntu-desktop", "gdm3", "lightdm", "plymouth", "grub-pc"):
+        assert excluded not in text
 
 
 def test_vm_script_does_not_start_a_machine(tmp_path: Path) -> None:
@@ -342,3 +422,124 @@ def _deb_listing(path: Path) -> str:
     result = _run(["dpkg-deb", "-c", str(path)])
     assert result.returncode == 0
     return result.stdout
+
+
+def _iso_tools_ready() -> bool:
+    return all(shutil.which(name) for name in ("xorriso", "mkfs.vfat", "mmd", "mcopy"))
+
+
+def _tiny_iso(tmp_path: Path, *, include_omne: bool = True) -> Path:
+    iso = tmp_path / "tiny.iso"
+    script = r"""
+set -euo pipefail
+dest="$1"
+include_omne="$2"
+work="$(mktemp -d)"
+mkdir -p "$work/root/boot" "$work/root/EFI/BOOT" "$work/root/omne" "$work/root/usr/bin" \
+  "$work/root/usr/lib/systemd" "$work/root/usr/lib/omne/python/omne/recovery" \
+  "$work/root/etc/systemd/network" "$work/root/etc/omne" \
+  "$work/esp/EFI/BOOT" "$work/esp/loader/entries" "$work/esp/omne"
+printf 'efi' > "$work/esp/EFI/BOOT/BOOTX64.EFI"
+printf 'vmlinuz' > "$work/esp/omne/vmlinuz"
+printf 'initrd' > "$work/esp/omne/initrd.img"
+printf 'default omne.conf\n' > "$work/esp/loader/loader.conf"
+printf 'title OMNE\n' > "$work/esp/loader/entries/omne.conf"
+cp -a "$work/esp/EFI" "$work/root/"
+cp -a "$work/esp/omne/." "$work/root/omne/"
+if [[ "$include_omne" == "yes" ]]; then
+  printf 'omne\n' > "$work/root/usr/bin/OMNE"
+fi
+printf 'labwc\n' > "$work/root/usr/bin/labwc"
+printf 'systemd\n' > "$work/root/usr/lib/systemd/systemd"
+printf 'DHCP=yes\n' > "$work/root/etc/systemd/network/20-omne-dhcp.network"
+python3 - "$work/root/etc/omne/image.json" <<'PY'
+import json
+import sys
+
+payload = {
+    "arch": "amd64",
+    "base_distribution": "ubuntu 24.04 (noble)",
+    "bootloader": "systemd-boot",
+    "build_id": "0123456789abcdef",
+    "build_timestamp": "2026-09-30T00:00:00Z",
+    "compositor": "labwc",
+    "kernel_version": "6.8.0",
+    "name": "OMNE OS",
+    "physical_install": False,
+    "version": "0.1.0",
+}
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    json.dump(payload, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+PY
+cp "$work/root/etc/omne/image.json" "$dest.json"
+printf 'recovery\n' > "$work/root/usr/lib/omne/python/omne/recovery/service.py"
+truncate -s 16M "$work/efiboot.img"
+mkfs.vfat -F 16 -n ESP "$work/efiboot.img" >/dev/null
+export MTOOLS_SKIP_CHECK=1
+mmd -i "$work/efiboot.img" ::EFI ::EFI/BOOT ::loader ::loader/entries ::omne
+mcopy -i "$work/efiboot.img" "$work/esp/EFI/BOOT/BOOTX64.EFI" ::EFI/BOOT/BOOTX64.EFI
+mcopy -i "$work/efiboot.img" "$work/esp/omne/vmlinuz" ::omne/vmlinuz
+mcopy -i "$work/efiboot.img" "$work/esp/omne/initrd.img" ::omne/initrd.img
+mcopy -i "$work/efiboot.img" "$work/esp/loader/loader.conf" ::loader/loader.conf
+mcopy -i "$work/efiboot.img" "$work/esp/loader/entries/omne.conf" ::loader/entries/omne.conf
+cp "$work/efiboot.img" "$work/root/boot/efiboot.img"
+xorriso -as mkisofs -R -J -V OMNE -o "$dest" -e boot/efiboot.img -no-emul-boot \
+  -append_partition 2 0xef "$work/root/boot/efiboot.img" "$work/root"
+sha256sum "$dest" > "$dest.sha256"
+rm -rf "$work"
+"""
+    flag = "yes" if include_omne else "no"
+    result = subprocess.run(
+        ["bash", "-c", script, "bash", str(iso), flag],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    return iso
+
+
+def test_validate_iso_rejects_files_that_are_not_images(tmp_path: Path) -> None:
+    missing = _run(["bash", "scripts/linux/validate-iso.sh", str(tmp_path / "missing.iso")])
+    empty = tmp_path / "empty.iso"
+    empty.write_bytes(b"")
+    empty_result = _run(["bash", "scripts/linux/validate-iso.sh", str(empty)])
+    random = tmp_path / "random.iso"
+    random.write_bytes(b"not an iso")
+    random_result = _run(["bash", "scripts/linux/validate-iso.sh", str(random)])
+
+    assert missing.returncode == 2
+    assert "missing" in missing.stderr
+    assert empty_result.returncode == 2
+    assert "empty" in empty_result.stderr
+    assert random_result.returncode == 2
+    assert "magic" in random_result.stderr
+
+
+def test_validate_iso_checks_structure_and_refuses_a_tiny_os_image(tmp_path: Path) -> None:
+    if not _iso_tools_ready():
+        pytest.skip("xorriso or mtools is not installed")
+    iso = _tiny_iso(tmp_path)
+    structure = _run(["bash", "scripts/linux/validate-iso.sh", str(iso)])
+    operating_system = _run(["bash", "scripts/linux/validate-iso.sh", "--os", str(iso)])
+    broken = iso.with_name("broken.iso")
+    broken.write_bytes(iso.read_bytes())
+    digest = "0" * 64 + "  " + str(broken) + "\n"
+    (tmp_path / "broken.iso.sha256").write_text(digest, encoding="utf-8")
+    checksum = _run(["bash", "scripts/linux/validate-iso.sh", str(broken)])
+    incomplete_dir = tmp_path / "incomplete"
+    incomplete_dir.mkdir()
+    incomplete = _tiny_iso(incomplete_dir, include_omne=False)
+    missing_omne = _run(["bash", "scripts/linux/validate-iso.sh", str(incomplete)])
+
+    assert structure.returncode == 0, structure.stderr
+    assert "validation passed" in structure.stdout
+    assert operating_system.returncode == 2
+    assert "kernel image is too small" in operating_system.stderr
+    assert "validation passed" not in operating_system.stdout
+    assert checksum.returncode == 2
+    assert "checksum does not match" in checksum.stderr
+    assert missing_omne.returncode == 2
+    assert "missing path: /usr/bin/OMNE" in missing_omne.stderr

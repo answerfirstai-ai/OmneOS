@@ -42,7 +42,8 @@ binary is there. An empty window list means the provider has not queried a compo
 `http://127.0.0.1:4173/?surface=desktop`
 
 The TypeScript shell still draws its own windows in the page. A later host can map that URL as a
-Wayland layer. This revision does not replace the shell and does not install labwc.
+Wayland layer. This revision does not replace the shell and does not start labwc. The ISO installs
+the labwc package and leaves it stopped. See `docs/ISO_BUILD.md`.
 
 ## Providers
 

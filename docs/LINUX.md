@@ -1,8 +1,9 @@
 # Linux base
 
 Ubuntu 24.04 LTS (noble) is the development base. Debian packages install on that userspace and on
-other systems that provide Python 3.12. Linux stays the kernel. This layer does not build one, and
-it does not write a bootloader or an ISO.
+other systems that provide Python 3.12. Linux stays the kernel. This layer does not compile one. The
+ISO and disk builders install Ubuntu's kernel and systemd-boot into an isolated image. They do not
+change the host bootloader. See `docs/ISO_BUILD.md`.
 
 ```text
 Ubuntu 24.04
@@ -102,5 +103,7 @@ bash scripts/linux/vm-boot.sh --run /var/tmp/OMNE-OS.img
 ```
 
 `--dry-run` writes nothing and does not start QEMU. `--run` needs `qemu-system-x86_64` and OVMF.
-`scripts/linux/build-iso.sh` still exits 2. The graphical session is labwc, described in
-`docs/GRAPHICS_ARCHITECTURE.md`. This revision does not start it. A physical install is later.
+`scripts/linux/build-iso.sh` writes a bootable ISO in a temporary directory when it is root on
+Ubuntu 24.04 x86-64. The build is described in `docs/ISO_BUILD.md`. The graphical session is labwc,
+described in `docs/GRAPHICS_ARCHITECTURE.md`. The ISO installs labwc and does not start it. A
+physical install is later.
