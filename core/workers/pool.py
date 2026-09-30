@@ -15,6 +15,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from core.compute.allocation import AllocationDecision
+from core.compute.manager import ResourceManager
 from core.compute.requirements import ResourceRequirements
 from core.workers.lifecycle import (
     ACTIVE_STATES,
@@ -101,11 +103,14 @@ class WorkerPool:
         *,
         hook: WorkerHook | None = None,
         ram_limit_mb: int | None = None,
+        resources: ResourceManager | None = None,
     ) -> None:
         self._workers: dict[str, Worker] = {}
         self._by_agent: dict[str, list[str]] = {}
         self._hook = hook
         self._ram_limit = ram_limit_mb
+        self._resources = resources
+        self._reservations: dict[str, str] = {}
         self._log: list[tuple[str, str]] = []
         self._lock = threading.Lock()
 
@@ -168,30 +173,90 @@ class WorkerPool:
             context=context,
         )
         with self._lock:
-            decision = self._admission(
-                agent_id,
-                max_workers=max_workers,
-                requested_ram_mb=assignment.resources.ram_mb,
-                cpu_percent=cpu_percent,
-            )
-            if decision != "ALLOW":
-                waiting = decision == "WAIT"
-                memory = waiting and not self._ram_fits(assignment)
-                reason = "resources" if memory else "cpu" if waiting else "limit"
-                message = (
-                    f"{agent_id} is waiting for resources"
-                    if waiting
-                    else f"{agent_id} already has {max_workers} workers"
-                )
-                raise WorkerLimit(message, reason=reason)
-            reusable = self._reusable(agent_id)
-            if reusable is None:
-                worker, pending = self._create(assignment)
+            failure = self._admission_failure(agent_id, assignment, max_workers, cpu_percent)
+            fresh_needed = failure is None and self._reusable(agent_id) is None
+        if failure is not None:
+            raise failure
+        reservation_id: str | None = None
+        if fresh_needed:
+            reservation_id = self._reserve_new(assignment)
+        with self._lock:
+            failure = self._admission_failure(agent_id, assignment, max_workers, cpu_percent)
+            if failure is not None:
+                kept = None
+                worker = None
+                pending: list[tuple[str, Worker]] = []
             else:
-                worker, pending = self._reuse(reusable, assignment)
+                reusable = self._reusable(agent_id)
+                if reusable is None:
+                    worker, pending = self._create(assignment)
+                    if reservation_id is not None:
+                        self._reservations[worker.worker_id] = reservation_id
+                    kept = reservation_id
+                else:
+                    worker, pending = self._reuse(reusable, assignment)
+                    kept = None
             hook = self._hook
+        if failure is not None:
+            self._drop(reservation_id)
+            raise failure
+        if kept is None:
+            self._drop(reservation_id)
+        elif self._resources is not None:
+            self._resources.run(kept)
         self._flush(hook, pending)
+        assert worker is not None
         return worker
+
+    def _admission_failure(
+        self,
+        agent_id: str,
+        assignment: _Assignment,
+        max_workers: int,
+        cpu_percent: float | None,
+    ) -> WorkerLimit | None:
+        decision = self._admission(
+            agent_id,
+            max_workers=max_workers,
+            requested_ram_mb=assignment.resources.ram_mb,
+            cpu_percent=cpu_percent,
+        )
+        if decision == "ALLOW":
+            return None
+        waiting = decision == "WAIT"
+        memory = waiting and not self._ram_fits(assignment)
+        reason = "resources" if memory else "cpu" if waiting else "limit"
+        message = (
+            f"{agent_id} is waiting for resources"
+            if waiting
+            else f"{agent_id} already has {max_workers} workers"
+        )
+        return WorkerLimit(message, reason=reason)
+
+    def _reserve_new(self, assignment: _Assignment) -> str | None:
+        if self._resources is None:
+            return None
+        reservation = self._resources.request(
+            assignment.resources,
+            owner=assignment.agent_id,
+            kind="worker",
+            local=True,
+            cloud_available=False,
+        )
+        if reservation.decision is not AllocationDecision.ALLOW:
+            raise WorkerLimit(
+                f"{assignment.agent_id} is waiting for resources",
+                reason="resources",
+            )
+        return reservation.id
+
+    def _drop(self, reservation_id: str | None) -> None:
+        if reservation_id is None or self._resources is None:
+            return
+        current = self._resources.get(reservation_id)
+        if current.state.value == "RELEASE":
+            return
+        self._resources.release(reservation_id)
 
     def complete(self, agent_id: str) -> Worker | None:
         return self._close_running(agent_id, WorkerState.IDLE, "worker.idle", "worker.completed")
@@ -235,8 +300,10 @@ class WorkerPool:
         with self._lock:
             worker = self._get(worker_id)
             updated = self._move(worker, WorkerState.TERMINATED, current_task=None)
+            reservation_id = self._reservations.pop(worker_id, None)
             pending = [("worker.terminated", updated)]
             hook = self._hook
+        self._drop(reservation_id)
         self._flush(hook, pending)
         return updated
 
@@ -274,8 +341,11 @@ class WorkerPool:
                 for worker_id in self._by_agent.get(agent_id, [])
                 if self._workers[worker_id].lifecycle is state
             ]
+            released = [self._reservations.pop(worker.worker_id, None) for worker in found]
             pending = [("worker.terminated", worker) for worker in found]
             hook = self._hook
+        for reservation_id in released:
+            self._drop(reservation_id)
         self._flush(hook, pending)
         return found
 

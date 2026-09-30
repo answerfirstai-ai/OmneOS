@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import time
 from pathlib import Path
 
@@ -77,11 +78,12 @@ def test_live_snapshot_uses_host_sources() -> None:
     assert snapshot.cpu.usage_percent is not None
     assert snapshot.disk.total_mb is not None
     assert snapshot.network.available is True
-    assert (
-        snapshot.gpu.available is False
-        or snapshot.gpu.available is True
-        or snapshot.gpu.available is None
-    )
+    assert snapshot.cpu.count is None or snapshot.cpu.count >= 1
+    assert snapshot.thermal.celsius is None or isinstance(snapshot.thermal.celsius, float)
+    if snapshot.gpu.available is False:
+        assert snapshot.gpu.count == 0
+    elif snapshot.gpu.available is None:
+        assert snapshot.gpu.count is None
 
 
 def test_snapshot_is_reused_within_the_ttl(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -125,6 +127,60 @@ def test_allocator_decisions() -> None:
     assert cloud is AllocationDecision.USE_CLOUD
     assert wait is AllocationDecision.WAIT
     assert vram is AllocationDecision.USE_CLOUD
+
+
+def test_missing_sources_stay_null(tmp_path: Path) -> None:
+    monitor = SystemMonitor(root=tmp_path, sample_seconds=0)
+
+    assert monitor.cpu().count is None
+    assert monitor.cpu().usage_percent is None
+    assert monitor.memory().available_mb is None
+    assert monitor.thermal().celsius is None
+    assert monitor.network().available is False
+    assert monitor.network().interfaces == []
+
+
+def test_cpu_count_and_thermal_use_only_the_provided_files(tmp_path: Path) -> None:
+    stat = tmp_path / "proc" / "stat"
+    stat.parent.mkdir(parents=True)
+    stat.write_text(
+        "cpu 10 0 0 10 0 0 0 0\ncpu0 5 0 0 5 0 0 0 0\ncpu1 5 0 0 5 0 0 0 0\n",
+        encoding="utf-8",
+    )
+    unrelated = tmp_path / "sys" / "class" / "thermal" / "thermal_zone0"
+    unrelated.mkdir(parents=True)
+    (unrelated / "type").write_text("acpitz\n", encoding="utf-8")
+    (unrelated / "temp").write_text("30000\n", encoding="utf-8")
+    package = tmp_path / "sys" / "class" / "thermal" / "thermal_zone1"
+    package.mkdir()
+    (package / "type").write_text("x86_pkg_temp\n", encoding="utf-8")
+    (package / "temp").write_text("47000\n", encoding="utf-8")
+    monitor = SystemMonitor(root=tmp_path, sample_seconds=0)
+
+    assert monitor.cpu().count == 2
+    assert monitor.thermal().celsius == 47.0
+
+
+def test_gpu_probe_does_not_invent_a_device(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("core.compute.monitor.shutil.which", lambda _name: None)
+    missing = SystemMonitor().gpu()
+
+    assert missing.available is False
+    assert missing.count == 0
+    assert missing.usage_percent is None
+    assert missing.vram_total_mb is None
+
+    def timeout(*_args: object, **_kwargs: object) -> None:
+        raise subprocess.TimeoutExpired(cmd="nvidia-smi", timeout=2)
+
+    monkeypatch.setattr("core.compute.monitor.shutil.which", lambda _name: "nvidia-smi")
+    monkeypatch.setattr("core.compute.monitor.subprocess.run", timeout)
+    failed = SystemMonitor().gpu()
+
+    assert failed.available is None
+    assert failed.count is None
+    assert failed.vram_used_mb is None
+    assert failed.usage_percent is None
 
 
 def test_model_cache_does_not_load_weights() -> None:

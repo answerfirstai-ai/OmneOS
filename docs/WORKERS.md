@@ -36,7 +36,9 @@ keeps the idle worker for the next task.
 `admit_worker` denies a start at `max_workers`. It denies a request larger than the memory budget.
 It waits when other workers already hold the remaining memory, and when a measured CPU percent is at
 least 95. Unknown CPU does not count as free or busy capacity. The runtime pool uses an 8192 MB
-budget. The task scheduler asks the pool before it reserves a slot, including that CPU reading.
+budget. A new worker also reserves its manifest on the shared resource manager. Reuse keeps that
+hold, and termination releases it. The task scheduler asks the pool before it reserves a slot,
+including that CPU reading. See `docs/protocols/COMPUTE.md`.
 
 The shell lists agent definitions and runtime workers separately. A definition is not a worker, and
 a paused or stopped worker is not shown as active.

@@ -21,6 +21,7 @@ export function readCompute(payload: unknown): HudLine[] {
     { label: "VRAM", value: pair(gpu["vram_used_mb"], gpu["vram_total_mb"]) },
     { label: "Disk", value: pair(disk["used_mb"], disk["total_mb"]) },
     { label: "Network", value: networkValue(network) },
+    { label: "Thermal", value: temperature(record(snapshot, "thermal")["celsius"]) },
   ];
 }
 
@@ -60,6 +61,10 @@ function networkValue(network: Record<string, unknown>): string {
   }
   const interfaces = Array.isArray(network["interfaces"]) ? network["interfaces"] : [];
   return interfaces.length === 1 ? "1 interface" : `${interfaces.length} interfaces`;
+}
+
+function temperature(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value) ? `${Math.round(value)}°C` : "unknown";
 }
 
 function percent(value: unknown): string {

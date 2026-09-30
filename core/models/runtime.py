@@ -18,6 +18,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict
 
 from core.compute.allocation import AllocationDecision, AllocationRequest, allocate
+from core.compute.manager import ResourceManager
 from core.compute.monitor import ResourceSnapshot
 from core.events.bus import EventBus
 from core.models.engines.base import ModelEngine
@@ -65,6 +66,7 @@ class _Session:
     worker_id: str | None = None
     request_id: str | None = None
     failure: str | None = None
+    reservation_id: str | None = None
 
 
 @dataclass
@@ -87,6 +89,7 @@ class ModelRuntime:
         events: EventBus,
         engines: Mapping[str, ModelEngine],
         workers: WorkerLookup | None = None,
+        resources: ResourceManager | None = None,
     ) -> None:
         self._registry = registry
         self._lifecycle = lifecycle
@@ -94,6 +97,7 @@ class ModelRuntime:
         self._events = events
         self._engines = dict(engines)
         self._workers = workers
+        self._resources = resources
         self._sessions: dict[str, _Session] = {}
         self._requests: dict[str, str] = {}
         self._cancel_ids: set[str] = set()
@@ -130,11 +134,23 @@ class ModelRuntime:
         snapshot = self._monitor.snapshot()
         with self._lock:
             session = self._require(model_id)
-            refusal = self._load_refusal(model, session, worker_id, snapshot)
+            refusal = self._load_gate(model, session, worker_id)
             if refusal is not None:
                 return refusal
-            self._lifecycle.transition(model_id, ModelLifecycleState.LOADING)
             engine_name = session.engine
+        reserved = self._reserve_model(model, snapshot, engine_name)
+        if isinstance(reserved, dict):
+            return reserved
+        with self._lock:
+            session = self._require(model_id)
+            refusal = self._load_gate(model, session, worker_id)
+            if refusal is None:
+                self._lifecycle.transition(model_id, ModelLifecycleState.LOADING)
+                session.reservation_id = reserved
+                engine_name = session.engine
+        if refusal is not None:
+            self._drop_reservation(reserved)
+            return refusal
         engine = self._engines[engine_name] if engine_name is not None else None
         self._emit(
             "model.loading",
@@ -152,6 +168,9 @@ class ModelRuntime:
             self._lifecycle.transition(model_id, ModelLifecycleState.LOADED)
             session.failure = None
             session.worker_id = worker_id
+            reservation_id = session.reservation_id
+        if reservation_id is not None and self._resources is not None:
+            self._resources.run(reservation_id)
         self._emit(
             "model.loaded",
             model_id,
@@ -254,9 +273,12 @@ class ModelRuntime:
             )
         with self._lock:
             self._lifecycle.transition(model_id, ModelLifecycleState.AVAILABLE)
+            reservation_id = session.reservation_id
+            session.reservation_id = None
             session.worker_id = None
             session.request_id = None
             session.failure = None
+        self._drop_reservation(reservation_id)
         self._emit(
             "model.unloaded",
             model_id,
@@ -503,12 +525,11 @@ class ModelRuntime:
             return True, True, status.gpu, None
         return False, False, status.gpu, "model is not installed on the local runtime"
 
-    def _load_refusal(
+    def _load_gate(
         self,
         model: ModelMetadata,
         session: _Session,
         worker_id: str | None,
-        snapshot: ResourceSnapshot,
     ) -> dict[str, object] | None:
         state = self._lifecycle.state(model.id)
         engine_name = session.engine
@@ -570,24 +591,60 @@ class ModelRuntime:
                 code="not_installed",
                 engine=engine_name,
             )
-        decision, reason = allocate(
-            snapshot,
-            AllocationRequest(
-                requirements=model.requirements,
-                local=model.local,
-                cloud_available=False,
-            ),
+        return None
+
+    def _reserve_model(
+        self,
+        model: ModelMetadata,
+        snapshot: ResourceSnapshot,
+        engine_name: str | None,
+    ) -> str | dict[str, object] | None:
+        state = self._lifecycle.state(model.id).value
+        if self._resources is None:
+            decision, reason = allocate(
+                snapshot,
+                AllocationRequest(
+                    requirements=model.requirements,
+                    local=model.local,
+                    cloud_available=False,
+                ),
+            )
+            if decision is not AllocationDecision.ALLOW:
+                return _status(
+                    model.id,
+                    performed=False,
+                    state=state,
+                    reason=reason,
+                    code="resources",
+                    engine=engine_name,
+                )
+            return None
+        reservation = self._resources.request(
+            model.requirements,
+            owner=model.id,
+            kind="model",
+            local=model.local,
+            cloud_available=False,
+            snapshot=snapshot,
         )
-        if decision is not AllocationDecision.ALLOW:
+        if reservation.decision is not AllocationDecision.ALLOW:
             return _status(
                 model.id,
                 performed=False,
-                state=state.value,
-                reason=reason,
+                state=state,
+                reason=reservation.reason,
                 code="resources",
                 engine=engine_name,
             )
-        return None
+        return reservation.id
+
+    def _drop_reservation(self, reservation_id: str | None) -> None:
+        if reservation_id is None or self._resources is None:
+            return
+        current = self._resources.get(reservation_id)
+        if current.state.value == "RELEASE":
+            return
+        self._resources.release(reservation_id)
 
     def _begin(
         self,
@@ -731,6 +788,9 @@ class ModelRuntime:
             session.failure = reason
             worker_id = session.worker_id
             engine_name = session.engine
+            reservation_id = session.reservation_id
+            session.reservation_id = None
+        self._drop_reservation(reservation_id)
         self._emit(
             "model.failed",
             model_id,

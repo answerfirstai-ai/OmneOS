@@ -63,9 +63,9 @@ agent or model directories leave those registries empty.
 `OMNE check` validates configuration and creates the workspace and data directories. It does not
 build the runtime. `OMNE serve` exposes the local HTTP API. `OMNE execute` creates a mission for one
 objective and runs it. `OMNE execute --dry-run` stores the plan and does not call tools.
-`OMNE compute` prints one resource snapshot. Inspection commands print JSON: `mission list`,
-`mission show`, `world`, `agents`, `workers`, `models`, `capabilities`, `trace`, `events`, and
-`memory`.
+`OMNE compute` prints telemetry, current holds, and reservations. Missing measurements stay null.
+Inspection commands print JSON: `mission list`, `mission show`, `world`, `agents`, `workers`,
+`models`, `capabilities`, `trace`, `events`, and `memory`.
 
 ## Mission
 
@@ -113,9 +113,11 @@ process.
 The pool reuses an idle or paused worker for the same agent. It refuses a new instance at
 `max_workers`, when measured CPU is at least 95, or when the declared memory budget cannot hold
 another allocation. Unknown CPU does not count as free or busy capacity. The runtime pool budget is
-8192 MB. On-demand agents terminate idle workers after the task. Persistent agents keep them for the
-next task. See `docs/WORKERS.md`. Discovery loads `agent.toml` and `manifest.toml` only, so
-`tools.toml` and `permissions.toml` cannot grant anything by existing.
+8192 MB. A new worker also reserves its declared requirements on the shared resource manager. Reuse
+keeps that hold. Termination releases it. On-demand agents terminate idle workers after the task.
+Persistent agents keep them for the next task. See `docs/WORKERS.md` and
+`docs/protocols/COMPUTE.md`. Discovery loads `agent.toml` and `manifest.toml` only, so `tools.toml`
+and `permissions.toml` cannot grant anything by existing.
 
 ## Capabilities, context, memory, and verification
 

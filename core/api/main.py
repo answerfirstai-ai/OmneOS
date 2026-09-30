@@ -228,8 +228,7 @@ def _inspection_payload(runtime: OMNE, args: argparse.Namespace) -> object:
 
 
 def _run_compute(settings: Settings) -> int:
-    snapshot = build_OMNE(settings).compute_status()
-    print(json.dumps(snapshot.model_dump(), sort_keys=True))
+    print(json.dumps(build_OMNE(settings).resource_view(), sort_keys=True))
     return 0
 
 

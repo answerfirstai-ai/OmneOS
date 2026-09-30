@@ -354,6 +354,7 @@ test("resource lines keep unknown and unavailable values", () => {
   assert.equal(lines.find((line) => line.label === "VRAM")?.value, "unknown");
   assert.equal(lines.find((line) => line.label === "RAM")?.value, "8.2 GB / 15.6 GB");
   assert.equal(lines.find((line) => line.label === "Network")?.value, "1 interface");
+  assert.equal(lines.find((line) => line.label === "Thermal")?.value, "unknown");
   assert.equal(resourcePressure(lines), null);
   assert.equal(resourcePressure([{ label: "CPU", value: "94%" }]), "CPU pressure 94%");
   assert.equal(hudText(lines).includes("unavailable"), true);

@@ -190,7 +190,7 @@ def test_memory_and_video_memory_refusals_do_not_load() -> None:
     runtime, events, _registry = _runtime(
         [heavy, unknown, gpu],
         engine=engine,
-        snapshot=_snapshot(available_mb=512, gpu_available=None),
+        snapshot=_snapshot(available_mb=512, gpu_available=False),
     )
 
     memory = runtime.load("heavy-local")

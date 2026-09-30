@@ -11,6 +11,7 @@ from core.agents.lifecycle import AgentLifecycle
 from core.agents.registry import AgentRegistry
 from core.agents.runtime import AgentRuntime
 from core.capabilities.registry import build_capability_registry
+from core.compute.manager import ResourceManager
 from core.compute.model_cache import ModelCache
 from core.compute.monitor import SystemMonitor
 from core.compute.scheduler import ComputeScheduler
@@ -42,6 +43,7 @@ from core.tools import build_registry
 from core.tools.gateway import ToolGateway
 from core.voice.service import VoiceService
 from core.workers.lifecycle import WorkerState
+from core.workers.pool import WorkerPool
 from core.world.state import WorldStateService
 from omne.applications.select import application_service
 from omne.applications.service import ApplicationService
@@ -67,13 +69,18 @@ def build_OMNE(settings: Settings) -> OMNE:
     prepare_runtime_directories(settings)
     events = EventBus(persist_path=settings.data_dir / "events.jsonl")
     monitor = SystemMonitor()
-    compute = ComputeScheduler(monitor)
+    resources = ResourceManager(monitor, events=events)
+    compute = ComputeScheduler(monitor, manager=resources)
     cache = ModelCache()
     evaluator = PermissionEvaluator()
     applications = _application_service(settings, events, evaluator)
     browser = _browser_service(settings, events, evaluator)
     lifecycle = AgentLifecycle(events)
-    runtime = AgentRuntime(lifecycle, events=events)
+    runtime = AgentRuntime(
+        lifecycle,
+        events=events,
+        pool=WorkerPool(ram_limit_mb=8192, resources=resources),
+    )
     processes = _process_service(settings, events, evaluator, monitor, runtime, applications)
     tools = build_registry(
         browser_command=settings.browser_command,
@@ -105,6 +112,7 @@ def build_OMNE(settings: Settings) -> OMNE:
         monitor,
         events,
         runtime,
+        resources,
     )
     executor = TaskExecutor(
         store=store,
@@ -167,6 +175,7 @@ def build_OMNE(settings: Settings) -> OMNE:
         browser=browser,
         processes=processes,
         model_runtime=model_runtime,
+        resources=resources,
     )
     executor._context_text = omne.context_for
     return omne
@@ -288,6 +297,7 @@ def _model_runtime(
     monitor: SystemMonitor,
     events: EventBus,
     runtime: AgentRuntime,
+    resources: ResourceManager,
 ) -> ModelRuntime:
     """Select adapters from configuration. Construction does not load a model."""
 
@@ -306,6 +316,7 @@ def _model_runtime(
         events=events,
         engines={"mock": mock_engine, "openai-compatible": local_engine},
         workers=lambda worker_id: _worker_alive(runtime, worker_id),
+        resources=resources,
     )
     model_runtime.prepare(available=lambda model: _model_is_available(settings, model.provider))
     return model_runtime

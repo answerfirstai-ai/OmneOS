@@ -50,10 +50,12 @@ do not carry a filesystem path or a prompt.
 
 ## Limits
 
-Load calls the compute allocator with cloud fallback disabled. Unknown local RAM is deferred. RAM
-above the snapshot is denied. A video-memory requirement is denied when the snapshot does not report
-a GPU with enough free memory, including when GPU telemetry is missing. The refusal names the
-resource, not a vendor.
+Load reserves the model requirements on the shared resource manager, with cloud fallback disabled.
+Unknown local RAM is deferred. RAM above the snapshot is denied. RAM that fits the host but is
+already reserved waits. A video-memory requirement is deferred when GPU telemetry is unavailable,
+and denied when the snapshot reports that this probe saw no GPU or not enough free memory. The
+refusal names the resource, not a vendor. A successful load moves the reservation to RUN. Unload and
+a failed load release it.
 
 A context window on the manifest is enforced with a four-characters-per-token estimate of the system
 text plus the prompt. A missing window is not replaced with a guessed cap. Cancellation stops an
