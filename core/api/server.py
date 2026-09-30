@@ -180,6 +180,7 @@ def _is_runtime_path(path: str) -> bool:
         "/compute",
         "/audio",
         "/input",
+        "/storage",
         "/network",
         "/voice",
         "/desktop",

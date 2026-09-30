@@ -56,6 +56,8 @@ from omne.input.service import InputService
 from omne.network.model import NetworkRequest
 from omne.network.select import network_service
 from omne.network.service import NetworkService
+from omne.storage.select import storage_service
+from omne.storage.service import StorageService
 from omne.windowing.model import WindowRequest
 from omne.windowing.select import windowing_service
 from omne.windowing.service import WindowingService
@@ -157,6 +159,7 @@ class OMNE:
         self._network: NetworkService | None = None
         self._audio: AudioService | None = None
         self._input: InputService | None = None
+        self._storage: StorageService | None = None
         self._activation_shortcut = activation_shortcut
         self._cancel_shortcut = cancel_shortcut
         self._push_to_talk_shortcut = push_to_talk_shortcut
@@ -522,6 +525,22 @@ class OMNE:
             authorize=authorize,
         )
         self._input = service
+        return service
+
+    def storage_view(self) -> dict[str, object]:
+        with self._lock:
+            return self._storage_service().inspect().model_dump(mode="json")
+
+    def _storage_service(self) -> StorageService:
+        service = self._storage
+        if service is not None:
+            return service
+
+        def sink(event_type: str, payload: dict[str, Any]) -> None:
+            self._events.publish(event_type, source="storage", payload=payload)
+
+        service = storage_service(self._environment, sink=sink)
+        self._storage = service
         return service
 
     def voice_status(self) -> dict[str, object]:

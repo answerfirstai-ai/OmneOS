@@ -77,7 +77,8 @@ can use iwd for Wi-Fi association and leave addressing with systemd-networkd, an
 explicit grant. This image does not scan a radio or write a network unit. See `docs/NETWORK.md`.
 Audio on a later image is PipeWire with WirePlumber. OMNE reads that session and does not replace
 it. This image does not open a microphone. See `docs/AUDIO_ARCHITECTURE.md`. Input chords are
-configuration. The image does not grab the keyboard. See `docs/INPUT_ARCHITECTURE.md`.
+configuration. The image does not grab the keyboard. See `docs/INPUT_ARCHITECTURE.md`. Storage is
+the layout Linux already published. The image does not format a disk. See `docs/STORAGE.md`.
 
 `omne-boot` is the tty1 program. It prints Hardware, Storage, Network, GPU, Core, and Models from
 the live machine and from `GET /health` and `GET /models`. A check is printed only when that probe
