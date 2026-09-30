@@ -61,8 +61,9 @@ Python:
   record does not invent a GPU vendor.
 - Objective execution, dependency order, retry escalation, parallel work, and voice silence.
 - The installer refusing `/boot`, the Ubuntu 24.04 system tree, the three system packages, the
-  rootfs and UEFI disk builders refusing to write without root, and the ISO and VM scripts exiting
-  without an image or a boot unless `vm-boot.sh --run` is passed.
+  rootfs and UEFI disk builders refusing to write without root, the ISO script refusing a non-root
+  or non-Linux build, ISO structure validation on a tiny fixture, and the VM script exiting without
+  a boot unless `vm-boot.sh --run` is passed.
 - Display diagnostics. The testing API uses the mock provider and does not invent a monitor. The
   labwc provider reads a fixture filesystem and does not start a compositor.
 - Window records. The testing API uses the mock window provider and starts with no windows. A grant
@@ -116,15 +117,16 @@ TypeScript:
 
 ## Not claimed
 
-`scripts/linux/build-iso.sh` is tested for its refusal. It does not produce `OMNE-OS.iso`.
-`scripts/linux/vm-boot.sh` does not start a virtual machine unless `--run` is passed.
-`scripts/linux/build-base.sh` and `scripts/linux/build-disk.sh` are tested for their plans and for
-refusing to write when not root. The boot checklist is tested against a fixture machine and a local
-core: an unavailable GPU is not a check. Display launch readiness is tested against a fixture DRM
-tree. Window commands are tested against the in-memory record and a snapshot file. Hardware
-discovery is tested against a fixture sysfs tree. Network state is tested against an in-memory
-session and a fixture route table. Audio state is tested against an in-memory mixer and fixture ALSA
-and PipeWire records. Input bindings are tested against configuration, an in-memory device list, and
-a fixture device table that includes a key bitmap the record must drop. The default suite does not
-run `debootstrap`, QEMU, or labwc. Live xAI, a physical GPU workload, and hardware installation are
-outside the default suite.
+`scripts/linux/build-iso.sh` is tested for its refusal without root and on a non-Linux system. The
+default suite does not produce `OMNE-OS.iso`. `scripts/linux/validate-iso.sh` is tested against a
+tiny ISO, which passes the structure profile and fails `--os`. `scripts/linux/vm-boot.sh` does not
+start a virtual machine unless `--run` is passed. `scripts/linux/build-base.sh` and
+`scripts/linux/build-disk.sh` are tested for their plans and for refusing to write when not root.
+The boot checklist is tested against a fixture machine and a local core: an unavailable GPU is not a
+check. Display launch readiness is tested against a fixture DRM tree. Window commands are tested
+against the in-memory record and a snapshot file. Hardware discovery is tested against a fixture
+sysfs tree. Network state is tested against an in-memory session and a fixture route table. Audio
+state is tested against an in-memory mixer and fixture ALSA and PipeWire records. Input bindings are
+tested against configuration, an in-memory device list, and a fixture device table that includes a
+key bitmap the record must drop. The default suite does not run `debootstrap`, QEMU, or labwc. Live
+xAI, a physical GPU workload, and hardware installation are outside the default suite.

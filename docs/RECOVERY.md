@@ -90,4 +90,5 @@ recovery explanation. Rollback uses the update layer's slot record and does not 
 ## What this revision does not do
 
 The development host is not restarted. systemd units are not started or stopped. Disks are not
-formatted. User files under the data directory are not deleted. An ISO is not written.
+formatted. User files under the data directory are not deleted. Recovery commands do not write an
+ISO. Image creation is `scripts/linux/build-iso.sh`, and it does not install onto a disk.
