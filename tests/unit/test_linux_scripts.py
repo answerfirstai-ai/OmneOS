@@ -39,6 +39,27 @@ def test_install_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert not prefix.exists()
 
 
+def test_machine_install_dry_run_refuses_a_disk(tmp_path: Path) -> None:
+    result = _run(["bash", "scripts/linux/install-machine.sh", "--dry-run", "--dest", "/dev/sda"])
+
+    assert result.returncode == 2
+    assert "refusing" in result.stderr
+    assert not (tmp_path / "machine").exists()
+
+
+def test_machine_install_dry_run_writes_nothing(tmp_path: Path) -> None:
+    dest = tmp_path / "machine"
+    result = _run(["bash", "scripts/linux/install-machine.sh", "--dry-run", "--dest", str(dest)])
+
+    assert result.returncode == 0
+    assert "persistent state: yes" in result.stdout
+    assert "nvidia boot dependency: no" in result.stdout
+    assert "disk format: no" in result.stdout
+    assert "bootloader: not written" in result.stdout
+    assert "dry-run: no files were written" in result.stdout
+    assert not dest.exists()
+
+
 def test_install_copies_user_unit_without_touching_boot(tmp_path: Path) -> None:
     prefix = tmp_path / "prefix"
     result = _run(["bash", "scripts/linux/install.sh", "--prefix", str(prefix)])

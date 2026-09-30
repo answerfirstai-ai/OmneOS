@@ -123,9 +123,9 @@ class DecisionEngine:
             )
         if mode == "production" and not cloud_available and not local_available:
             return _decision(
-                "DENY",
-                "production has no available model for this request",
-                [],
+                "CLOUD_MODEL",
+                "no cloud or local model is configured, so the route uses the mock fallback",
+                ["DEFER"],
                 trace_id,
                 [mode],
             )
