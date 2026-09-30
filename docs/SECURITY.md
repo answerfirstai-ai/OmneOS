@@ -66,5 +66,7 @@ proc. Connect, disconnect, enable, and disable require `network:configure` and a
 route. A password is not stored on a network record or an event. `POST /network` is not a route.
 Audio diagnostics only read the published stack. Volume, mute, and the default device require
 `audio:configure` and are not an HTTP route. Microphone audio is not captured or transmitted, and
-`voice.transmit` stays denied. `POST /audio` is not a route. The ISO script does not write
-`OMNE-OS.iso`. No physical disk installation is performed.
+`voice.transmit` stays denied. `POST /audio` is not a route. Input diagnostics report configured
+chords and device names. They do not read keystrokes. `input:bind` does not install a host grab.
+`POST /input` is not a route. The ISO script does not write `OMNE-OS.iso`. No physical disk
+installation is performed.

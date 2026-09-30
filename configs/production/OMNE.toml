@@ -6,3 +6,6 @@ port = 8787
 workspace_root = "workspace"
 data_dir = "memory"
 cors_origins = []
+activation_shortcut = "ctrl+alt+space"
+cancel_shortcut = "ctrl+alt+escape"
+push_to_talk_shortcut = "ctrl+alt+shift+space"

@@ -45,6 +45,7 @@ import {
 } from "./graph-layout.js";
 import { hudText, readCompute, resourcePressure, type HudLine } from "./hud.js";
 import { readAudioStatus, type AudioStatusView } from "./audio-status.js";
+import { chordMatches, readInputStatus, type InputStatusView } from "./input-status.js";
 import { readNetworkStatus, type NetworkStatusView } from "./network-status.js";
 import { coreHealthUrl, parseHealth, type CoreHealth } from "./health.js";
 import { inspectMission } from "./mission-view.js";
@@ -90,6 +91,17 @@ let networkFlight = false;
 let networkStatus: NetworkStatusView = { text: "network unknown", state: "unknown" };
 let audioFlight = false;
 let audioStatus: AudioStatusView = { text: "audio unknown", state: "unknown" };
+let inputFlight = false;
+let inputStatus: InputStatusView = {
+  text: "input unknown",
+  state: "unknown",
+  activation: "",
+  cancel: "",
+  pushToTalk: "",
+  attention: "idle",
+  revision: 0,
+};
+let inputSeen = -1;
 let graphFlight = false;
 
 /** Read the core base URL from a page query string. */
@@ -810,6 +822,37 @@ function paintProject(): void {
   );
 }
 
+function paintInput(): void {
+  const element = listElement("input-status");
+  if (element === null) {
+    return;
+  }
+  if (!shouldRepaint(element.dataset["rendered"] ?? null, inputStatus.text)) {
+    return;
+  }
+  element.dataset["rendered"] = inputStatus.text;
+  element.dataset["state"] = inputStatus.state;
+  element.dataset["talk"] = inputStatus.pushToTalk.length > 0 ? "prepared" : "unconfigured";
+  element.textContent = inputStatus.text;
+}
+
+function openCommand(): void {
+  applyWindows(openWindow(windowState, "launcher"));
+  const objective = document.getElementById("objective");
+  if (objective instanceof HTMLInputElement) {
+    objective.focus();
+  }
+}
+
+function cancelCommand(): void {
+  applyWindows(closeWindow(windowState, "launcher"));
+  const objective = document.getElementById("objective");
+  if (objective instanceof HTMLInputElement) {
+    objective.blur();
+  }
+  hideStartMenu();
+}
+
 function paintAudio(): void {
   const element = listElement("audio-status");
   if (element === null) {
@@ -1114,6 +1157,38 @@ async function refreshDesktop(coreUrl: string, coreOk: boolean): Promise<void> {
   } finally {
     desktopFlight = false;
   }
+}
+
+async function refreshInput(coreUrl: string): Promise<void> {
+  if (inputFlight) {
+    return;
+  }
+  inputFlight = true;
+  try {
+    inputStatus = readInputStatus(await fetchJson(coreApiUrl(coreUrl, "/input")));
+  } catch {
+    inputStatus = {
+      text: "input unknown",
+      state: "unknown",
+      activation: inputStatus.activation,
+      cancel: inputStatus.cancel,
+      pushToTalk: inputStatus.pushToTalk,
+      attention: inputStatus.attention,
+      revision: inputSeen < 0 ? 0 : inputSeen,
+    };
+  } finally {
+    inputFlight = false;
+  }
+  const revision = inputStatus.revision;
+  if (inputSeen >= 0 && revision !== inputSeen) {
+    if (inputStatus.attention === "command") {
+      openCommand();
+    } else {
+      cancelCommand();
+    }
+  }
+  inputSeen = revision;
+  paintInput();
 }
 
 async function refreshAudio(coreUrl: string): Promise<void> {
@@ -1444,6 +1519,20 @@ function bindDesktop(): void {
     });
   }
   document.addEventListener("keydown", (event) => {
+    if (chordMatches(event, inputStatus.activation)) {
+      event.preventDefault();
+      openCommand();
+      return;
+    }
+    if (chordMatches(event, inputStatus.cancel)) {
+      event.preventDefault();
+      cancelCommand();
+      return;
+    }
+    if (chordMatches(event, inputStatus.pushToTalk)) {
+      event.preventDefault();
+      return;
+    }
     if (event.key === "Escape") {
       hideStartMenu();
       return;
@@ -1562,6 +1651,7 @@ function bootstrap(): void {
     void refreshCompute(coreUrl);
     void refreshNetwork(coreUrl);
     void refreshAudio(coreUrl);
+    void refreshInput(coreUrl);
     window.setInterval(() => {
       void refresh(status, detail);
       void refreshGraph(coreUrl);
@@ -1570,6 +1660,7 @@ function bootstrap(): void {
       void refreshCompute(coreUrl);
       void refreshNetwork(coreUrl);
       void refreshAudio(coreUrl);
+      void refreshInput(coreUrl);
     }, 4000);
   } catch (error) {
     console.error(error);

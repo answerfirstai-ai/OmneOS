@@ -190,4 +190,5 @@ and proc. It does not load drivers or write device configuration. See `docs/HARD
 `omne.network` reads interfaces, addresses, DNS, and routes from the Linux stack and does not
 replace systemd-networkd. See `docs/NETWORK.md`. `omne.audio` reads PipeWire, WirePlumber, or ALSA
 and does not open a microphone. Speech recognition is not implemented. See
-`docs/AUDIO_ARCHITECTURE.md`.
+`docs/AUDIO_ARCHITECTURE.md`. `omne.input` reads configured shortcuts and published keyboards and
+mice. It does not read the keyboard stream. See `docs/INPUT_ARCHITECTURE.md`.

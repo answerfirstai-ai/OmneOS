@@ -234,6 +234,39 @@ def test_audio_endpoint_is_read_only(tmp_path: Path) -> None:
     assert payload["error"] == "not_found"
 
 
+def test_input_endpoint_is_read_only(tmp_path: Path) -> None:
+    settings = runtime_settings(tmp_path, OMNE_HOST="127.0.0.1", OMNE_PORT=str(_free_port()))
+    started = CoreServer(settings, build_OMNE(settings))
+    started.start_in_thread()
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", started.port), timeout=0.1):
+                break
+        except OSError:
+            time.sleep(0.01)
+    else:
+        started.stop()
+        raise RuntimeError("server did not accept connections")
+    try:
+        status, body, _origin = _request(f"http://127.0.0.1:{started.port}/input")
+        posted, payload, _posted_origin = _request(
+            f"http://127.0.0.1:{started.port}/input",
+            method="POST",
+        )
+    finally:
+        started.stop()
+
+    assert status == 200
+    record = body["input"]
+    assert isinstance(record, dict)
+    assert record["provider"] == "mock"
+    assert record["host_grab"] is False
+    assert record["listening"] is False
+    assert posted == 404
+    assert payload["error"] == "not_found"
+
+
 def test_disallowed_origin_is_omitted(server: CoreServer) -> None:
     _status, _body, origin = _request(
         f"http://127.0.0.1:{server.port}/health",

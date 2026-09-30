@@ -179,6 +179,7 @@ def _is_runtime_path(path: str) -> bool:
         "/models",
         "/compute",
         "/audio",
+        "/input",
         "/network",
         "/voice",
         "/desktop",
