@@ -91,10 +91,13 @@ those programs from the application reader. See `docs/APPLICATIONS.md`. Browser 
 installed with the image. Playwright is documented and not imported. See `docs/BROWSER.md`. Process
 inspection reads `/proc` and does not signal a running process. See `docs/PROCESSES.md`.
 
-`omne-boot` is the tty1 program. It prints Hardware, Storage, Network, GPU, Core, and Models from
-the live machine and from `GET /health` and `GET /models`. A check is printed only when that probe
-succeeds. An unavailable GPU stays unavailable. `OMNE READY` requires hardware, storage, and the
-core. Network, GPU, and models are shown either way.
+`omne-boot` prints Hardware, Storage, Network, GPU, Core, and Models from the live machine and from
+`GET /health` and `GET /models`. A check is printed only when that probe succeeds. An unavailable
+GPU stays unavailable. `OMNE READY` requires hardware, storage, and the core. Network, GPU, and
+models are shown either way. The unit sends that checklist to the journal and to `/dev/console`, and
+the program also writes `/dev/ttyS0`, so a serial boot log can see it. `ipc ok` is printed only
+after `GET /health` returns the core payload. `omne-diag` then records unit state and the journal.
+It does not start a session or enter recovery.
 
 ```bash
 sudo bash scripts/linux/build-disk.sh --rootfs /var/tmp/omne-rootfs --dest /var/tmp/OMNE-OS.img

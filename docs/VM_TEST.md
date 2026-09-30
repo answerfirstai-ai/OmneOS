@@ -31,24 +31,37 @@ The host firmware files are not.
 
 ## Checks
 
+The scorer walks this dependency chain. A check that did not pass is `BLOCKED` when a dependency is
+not `PASS`, instead of being counted as another root failure. `PASS`, `FAIL`, `SKIP`, and `BLOCKED`
+are the statuses. `OS-ready: yes` still requires every check to be `PASS`.
+
 1. The ISO boots (`root=LABEL=OMNE` on the kernel command line).
 2. The Linux kernel starts.
 3. systemd reaches `multi-user.target`.
-4. `omne.target` starts OMNE Core.
-5. The boot checklist reports `OMNE READY`.
-6. A graphical session starts (`labwc` or `graphical.target`).
-7. The OMNE desktop is shown.
-8. systemd-networkd reaches `network.target` on virtio-net.
-9. The ISO root and local filesystems mount.
-10. An application launch is recorded.
-11. A safe agent task is recorded.
-12. The model runtime reports ready.
-13. Ctrl-Alt-Delete makes systemd reach `reboot.target` and the kernel starts again.
-14. ACPI power-off makes systemd reach `shutdown.target` and QEMU exits.
+4. systemd-networkd reaches `network.target` on virtio-net.
+5. The ISO root and local filesystems mount.
+6. `omne.target` starts OMNE Core.
+7. The boot checklist reports `OMNE READY`.
+8. IPC works (`ipc ok` after `GET /health`, or that health payload on the serial log).
+9. A graphical session starts (`labwc running`, a labwc log line, or `graphical.target`).
+10. Wayland reports `wayland display ready`.
+11. The OMNE desktop is shown (`OMNE desktop ready`).
+12. An application launch is recorded.
+13. A safe agent task is recorded.
+14. The model runtime reports ready.
 15. Recovery mode is observed.
+16. Ctrl-Alt-Delete makes systemd reach `reboot.target` and the kernel starts again.
+17. ACPI power-off makes systemd reach `poweroff.target` and QEMU exits.
 
-A started unit is not treated as a healthy core, a visible shell, a launched application, or a
-finished agent task. Recovery state is not inferred from a missing log line.
+The test waits for `OMNE READY` or `OMNE NOT READY` before it reboots the guest. A started unit is
+not treated as a healthy core, a visible shell, a launched application, or a finished agent task.
+Recovery state is not inferred from a missing log line.
+
+Each run writes `artifacts/vm-test/<run-id>/` with `summary.json` and one log per stage: `boot.log`,
+`systemd.log`, `services.log`, `core.log`, `ipc.log`, `display.log`, `shell.log`,
+`applications.log`, `agents.log`, `models.log`, and `recovery.log`. `summary.json` records `name`,
+`status`, `exit_code`, `duration_ms`, `dependencies`, `error`, and `evidence` for every check, plus
+`first_failure`.
 
 ## Commands
 
@@ -60,8 +73,8 @@ bash scripts/linux/vm-test.sh --iso /var/tmp/OMNE-OS.iso
 ```
 
 `--dry-run` writes nothing and does not start QEMU. `--run` is headless unless `--display gtk` is
-set. The test prints `OS-ready: yes` or `OS-ready: no` and leaves the serial log in its work
-directory under `/var/tmp`.
+set. The test prints `OS-ready: yes` or `OS-ready: no`, leaves the serial log in its work directory
+under `/var/tmp`, and writes the scored artifact under `artifacts/vm-test/`.
 
 ## CI
 

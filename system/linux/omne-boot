@@ -35,10 +35,12 @@ def main(argv: list[str] | None = None) -> int:
     lines = _collect(root, core, attempts=1 if once else _attempts())
     ready = all(line.status == "pass" for line in (lines[0], lines[1], lines[4]))
     text = render(lines, ready=ready)
+    # Serial first. A tty1 write must not hide the checklist from the boot log.
+    if not once:
+        _write_devices(text)
     sys.stdout.write(text)
     sys.stdout.flush()
     if not once:
-        _write_devices(text)
         _hold()
     return 0 if ready else 1
 
@@ -67,6 +69,9 @@ def _lines(root: Path, core: str) -> tuple[Line, ...]:
 
 def render(lines: tuple[Line, ...], *, ready: bool) -> str:
     body = ["OMNE", "Initializing...", *(f"{_mark(line.status)} {line.text}" for line in lines)]
+    # Printed only after GET /health returned the core payload.
+    if lines[4].status == "pass":
+        body.append("ipc ok")
     body.append("")
     body.append("OMNE READY" if ready else "OMNE NOT READY")
     body.append("")
@@ -208,7 +213,7 @@ def _pause_seconds() -> float:
 
 
 def _write_devices(text: str) -> None:
-    for path in ("/dev/tty1", "/dev/console"):
+    for path in ("/dev/ttyS0", "/dev/console", "/dev/tty1"):
         try:
             with open(path, "w", encoding="utf-8", errors="replace") as device:
                 device.write(text)

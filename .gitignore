@@ -25,3 +25,4 @@ workspace/**
 .DS_Store
 
 build/linux/
+artifacts/
