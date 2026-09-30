@@ -47,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
                 port=getattr(args, "port", None),
             )
     except ConfigurationError as exc:
+        if args.command == "recover":
+            return _print_invalid_configuration(exc)
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
@@ -82,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_storage(settings)
     if args.command == "updates":
         return _run_updates(settings, args)
+    if args.command == "recover":
+        return _run_recover(settings, args)
     if args.command == "applications":
         return _run_applications(settings)
     if args.command == "browser":
@@ -139,6 +143,14 @@ def _build_parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "processes", help="print the process table without starting or signaling a process"
     )
+    recover = commands.add_parser("recover", help="explain startup and run a recovery command")
+    recover_commands = recover.add_subparsers(dest="recover_command")
+    recover_commands.add_parser("status", help="print the recovery state")
+    recover_commands.add_parser("check", help="read health checks without starting services")
+    recover_commands.add_parser("safe", help="enter safe mode without erasing user data")
+    recover_commands.add_parser("explain", help="print why normal startup failed")
+    recover_commands.add_parser("normal", help="leave safe mode when required checks pass")
+    recover_commands.add_parser("rollback", help="roll back an update slot without reinstalling")
     mission = commands.add_parser("mission", help="inspect missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
     mission_commands.add_parser("list", help="list missions")
@@ -317,15 +329,66 @@ def _run_processes(settings: Settings) -> int:
     return 0
 
 
+def _run_recover(settings: Settings, args: argparse.Namespace) -> int:
+    from omne.recovery.model import explain_text
+    from omne.recovery.select import recovery_service
+    from omne.recovery.service import RecoveryRefused
+
+    service = recovery_service(
+        settings.environment,
+        settings.data_dir / "recovery",
+        updates_dir=settings.data_dir / "updates",
+        port=settings.port,
+    )
+    command = str(args.recover_command or "status")
+    try:
+        status = service.execute(command)
+    except RecoveryRefused as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if command == "explain":
+        print(explain_text(status))
+        return 0
+    print(json.dumps(status.model_dump(mode="json"), sort_keys=True))
+    return 0
+
+
+def _print_invalid_configuration(exc: ConfigurationError) -> int:
+    from omne.recovery.model import explain_text
+    from omne.recovery.service import configuration_status
+
+    status = configuration_status(str(exc))
+    print(explain_text(status))
+    print(json.dumps(status.model_dump(mode="json"), sort_keys=True))
+    return 2
+
+
 def _run_serve(settings: Settings) -> int:
+    from omne.recovery.select import recovery_service
+
     logger = get_logger("api")
+    recovery = recovery_service(
+        settings.environment,
+        settings.data_dir / "recovery",
+        updates_dir=settings.data_dir / "updates",
+        port=settings.port,
+    )
+    recovery.begin_boot()
     try:
         runtime = build_OMNE(settings)
+        server = CoreServer(settings, runtime)
+        server.start()
     except ValueError as exc:
+        recovery.fail_boot(str(exc))
         logger.error("%s", exc)
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    server = CoreServer(settings, runtime)
+    except ServerError as exc:
+        recovery.fail_boot(str(exc))
+        logger.error("%s", exc)
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    recovery.mark_ready()
 
     def _request_stop(signum: int, _frame: FrameType | None) -> None:
         logger.info("shutdown requested signal=%s", signum)
@@ -335,10 +398,8 @@ def _run_serve(settings: Settings) -> int:
     signal.signal(signal.SIGTERM, _request_stop)
     try:
         server.serve_forever()
-    except ServerError as exc:
-        logger.error("%s", exc)
-        print(f"error: {exc}", file=sys.stderr)
-        return 1
+    finally:
+        recovery.mark_stopped()
     logger.info("OMNE Core stopped")
     return 0
 

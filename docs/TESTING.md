@@ -97,6 +97,10 @@ Python:
   signature, an unsigned OMNE package, and a corrupt package are rejected. An interrupted install
   leaves the booted slot in place. Rollback restores the previous generation. Apt and dpkg are not
   executed. `POST /updates` stays 404.
+- Recovery. Injected failures cover a core crash, a shell crash, a failed update, a model crash,
+  invalid configuration, graphics, and a runaway agent. Three unfinished startups enter safe mode.
+  Erase and reinstall are refused, and a user file is still present afterward. `POST /recovery`
+  stays 404.
 
 TypeScript:
 

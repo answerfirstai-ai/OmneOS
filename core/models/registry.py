@@ -101,3 +101,6 @@ class ModelRegistry:
 
     def enabled(self) -> list[ModelMetadata]:
         return [model for model in self._models.values() if model.id not in self._disabled]
+
+    def all(self) -> list[ModelMetadata]:
+        return list(self._models.values())

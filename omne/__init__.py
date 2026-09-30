@@ -13,4 +13,5 @@ and does not import Playwright.
 Process inspection reads the process table and does not signal the host.
 Secret storage keeps credentials out of configuration, logs, and task records.
 Update planning checks signed catalogs and does not install packages on the host.
+Recovery explains a failed start and does not erase user data or reinstall the OS.
 """

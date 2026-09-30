@@ -47,6 +47,7 @@ OMNE capabilities
 OMNE input
 OMNE storage
 OMNE updates
+OMNE recover
 OMNE applications
 OMNE browser
 OMNE processes

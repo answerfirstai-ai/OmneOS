@@ -181,6 +181,7 @@ def _is_runtime_path(path: str) -> bool:
         "/audio",
         "/input",
         "/storage",
+        "/recovery",
         "/applications",
         "/browser",
         "/processes",
@@ -250,7 +251,8 @@ class CoreServer:
         logger.info("OMNE Core listening host=%s port=%s", self.settings.host, self.port)
 
     def serve_forever(self) -> None:
-        self.start()
+        if self._httpd is None:
+            self.start()
         self._serve_loop()
         self._httpd = None
 

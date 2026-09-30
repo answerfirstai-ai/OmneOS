@@ -90,6 +90,7 @@ reports disks and mounts and does not format them. `OMNE applications` reports i
 applications and does not start a shell. `OMNE browser` reports browser availability and does not
 launch a browser or import Playwright. `OMNE processes` reports the process table and does not
 signal a process. `OMNE updates` reports signed catalog status and does not install packages.
+`OMNE recover` explains startup failures and does not erase user data or reinstall the OS.
 `OMNE models` reports the model registry and does not download weights. Physical hardware
 installation is not implemented.
 
