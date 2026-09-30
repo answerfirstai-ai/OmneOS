@@ -935,7 +935,16 @@ class OMNE:
     def _on_event(self, event: Event) -> None:
         self._metrics.observe(event)
         if event.type.startswith(
-            ("mission.", "task.", "worker.", "permission.", "verification.", "model.", "compute.")
+            (
+                "mission.",
+                "task.",
+                "worker.",
+                "permission.",
+                "verification.",
+                "model.",
+                "compute.",
+                "security.",
+            )
         ):
             self._world.invalidate()
 

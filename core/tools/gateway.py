@@ -9,6 +9,7 @@ from core.logging_config import get_logger
 from core.permissions.audit import AuditEntry, AuditLog, audit_now
 from core.permissions.evaluator import PermissionEvaluator
 from core.permissions.policies import PermissionDecision, PermissionRequest
+from core.security.boundary import BoundaryDecision, admit_tool
 from core.tools.base import ToolContext, ToolError, ToolResult
 from core.tools.registry import ToolRegistry
 
@@ -118,6 +119,32 @@ class ToolGateway:
             agent_id=context.agent_id,
             tool_id=tool_id,
         )
+        boundary = admit_tool(
+            profile=context.profile,
+            tool_id=tool_id,
+            arguments=validated,
+            workspace=str(context.workspace_root),
+        )
+        if boundary.decision is BoundaryDecision.DENY:
+            self._events.publish(
+                "security.denied",
+                task_id=context.task_id,
+                agent_id=context.agent_id,
+                tool_id=tool_id,
+                payload={"reason": boundary.reason, "profile": boundary.profile},
+            )
+            self._events.publish(
+                "tool.denied",
+                task_id=context.task_id,
+                agent_id=context.agent_id,
+                tool_id=tool_id,
+                payload={"reason": boundary.reason},
+            )
+            return ToolResult(
+                ok=False,
+                tool_id=tool_id,
+                error={"code": "denied", "message": boundary.reason},
+            )
         try:
             output = tool.execute(validated, context)
         except ToolError as exc:

@@ -34,6 +34,10 @@ Python:
   connect.
 - Routing to the mock model, live host telemetry, a reused snapshot, allocator decisions, and a
   model cache that does not load weights.
+- Security profiles. Path traversal, privilege changes, pid 1, a closed network, protected files,
+  and a claim above the profile ceiling are denied. A permissive permission result does not bypass
+  the boundary. The worker sandbox covers boot, credentials, other homes, and raw devices, and it
+  does not remove host `/dev/null`.
 - Resource reservations. A fixed snapshot lets a 4-CPU, 4 GB worker run beside a GPU worker that
   needs 8 GB of VRAM. A second claim that does not fit waits until release. A request larger than
   the machine is denied and does not hold capacity. Unknown GPU, CPU, disk, and thermal readings

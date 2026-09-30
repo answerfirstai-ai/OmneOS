@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
+
+from core.security.profiles import profile_for
 
 
 class CommandOutput(BaseModel):
@@ -29,15 +32,17 @@ class SubprocessCommands:
         env: dict[str, str] | None = None,
     ) -> CommandOutput:
         completed = subprocess.run(
-            argv,
+            [sys.executable, "-m", "core.security.launch", str(cwd), *argv],
             cwd=cwd,
             timeout=timeout,
             capture_output=True,
             text=True,
             shell=False,
-            env=env or _safe_env(),
+            env=env or _sandbox_env(),
             check=False,
         )
+        if completed.returncode == 126 and completed.stderr.startswith("omne-sandbox:"):
+            raise OSError(completed.stderr.strip())
         return CommandOutput(
             exit_code=completed.returncode,
             stdout=_truncate(completed.stdout),
@@ -45,25 +50,24 @@ class SubprocessCommands:
         )
 
     def start(self, argv: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> int:
-        process = subprocess.Popen(
-            argv,
-            cwd=cwd,
-            env=env or _safe_env(),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            stdin=subprocess.DEVNULL,
-            start_new_session=True,
-            shell=False,
-        )
-        return int(process.pid)
+        del argv, cwd, env
+        raise OSError("unsandboxed process start is denied")
 
 
-def _safe_env() -> dict[str, str]:
+def _sandbox_env() -> dict[str, str]:
+    profile = profile_for("WORKER")
+    if profile is None:
+        raise OSError("worker profile is missing")
+    ceiling = profile.ceiling
     kept = {}
-    for key in ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "SYSTEMROOT"):
+    for key in ("PATH", "LANG", "LC_ALL"):
         value = os.environ.get(key)
         if value:
             kept[key] = value
+    kept["OMNE_SANDBOX_AS"] = str(ceiling.ram_mb * 1024 * 1024)
+    kept["OMNE_SANDBOX_CPU"] = str(ceiling.cpu_seconds)
+    kept["OMNE_SANDBOX_NOFILE"] = str(ceiling.nofile)
+    kept["OMNE_SANDBOX_FSIZE"] = str(ceiling.file_mb * 1024 * 1024)
     return kept
 
 

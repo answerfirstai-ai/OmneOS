@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from core.compute.allocation import AllocationDecision
 from core.compute.manager import ResourceManager
 from core.compute.requirements import ResourceRequirements
+from core.security.boundary import resource_denial
 from core.workers.lifecycle import (
     ACTIVE_STATES,
     OCCUPIED_STATES,
@@ -160,6 +161,13 @@ class WorkerPool:
         context: str = "",
         cpu_percent: float | None = None,
     ) -> Worker:
+        denial = resource_denial(
+            "WORKER",
+            ram_mb=(resources or ResourceRequirements()).ram_mb,
+            cpu_threads=(resources or ResourceRequirements()).cpu_threads,
+        )
+        if denial is not None:
+            raise WorkerLimit(f"{agent_id} is waiting for resources", reason="resources")
         assignment = _Assignment(
             agent_id=agent_id,
             task_id=task_id,

@@ -39,6 +39,7 @@ class ToolContext(BaseModel):
     user: str
     workspace_root: Path
     timeout_seconds: int
+    profile: str = "WORKER"
 
 
 class Tool(Protocol):

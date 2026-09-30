@@ -30,6 +30,7 @@ from core.models.lifecycle import (
 )
 from core.models.registry import ModelMetadata, ModelRegistry
 from core.models.types import GenerateChunk, GenerateRequest, ProviderError
+from core.security.boundary import resource_denial
 
 WorkerLookup = Callable[[str], bool]
 Availability = Callable[[ModelMetadata], bool]
@@ -600,6 +601,21 @@ class ModelRuntime:
         engine_name: str | None,
     ) -> str | dict[str, object] | None:
         state = self._lifecycle.state(model.id).value
+        ceiling = resource_denial(
+            "MODEL",
+            ram_mb=model.requirements.ram_mb,
+            vram_mb=model.requirements.vram_mb,
+            cpu_threads=model.requirements.cpu_threads,
+        )
+        if ceiling is not None:
+            return _status(
+                model.id,
+                performed=False,
+                state=state,
+                reason=ceiling,
+                code="resources",
+                engine=engine_name,
+            )
         if self._resources is None:
             decision, reason = allocate(
                 snapshot,

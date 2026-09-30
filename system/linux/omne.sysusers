@@ -1,1 +1,3 @@
 u omne - "OMNE system" /var/lib/omne /usr/sbin/nologin
+u omne-agent - "OMNE agent" /nonexistent /usr/sbin/nologin
+u omne-app - "OMNE application" /nonexistent /usr/sbin/nologin
