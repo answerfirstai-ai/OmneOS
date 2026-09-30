@@ -7,11 +7,18 @@ worker sandbox are described in `docs/SECURITY_MODEL.md`.
 
 ## Secrets
 
-- `XAI_API_KEY` is read from the process environment when the xAI provider is constructed.
-- The key is not a `OMNE_` setting, is not written to disk by the core, and is not returned by the
-  HTTP API.
+Credentials are scoped and audited. The value is not written to source, logs, events, prompts,
+SQLite task records, or plain configuration. See `docs/SECRETS.md`.
+
+- `XAI_API_KEY` is read in development and testing when no `model/xai` secret is addressed to
+  `core`. Production does not read that variable.
+- The key is not an `OMNE_` setting, is not written into the configuration file, and is not returned
+  by the HTTP API.
 - `.env` is gitignored. The process does not auto-load it.
 - Unknown `OMNE_` variables and unknown TOML keys are rejected.
+- `OMNE_SECRETS_DEV_FALLBACK` enables the in-memory store only when the value is `allow` and the
+  Linux keyring is unavailable. Any other value is a configuration error, except `false`, `deny`,
+  and `off`.
 
 ## Permissions
 

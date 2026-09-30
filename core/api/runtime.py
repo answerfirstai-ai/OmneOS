@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -21,6 +20,7 @@ from core.memory.database import MemoryDatabase
 from core.memory.store import MemoryStore
 from core.mission.store import MissionStore
 from core.models.cache import ResponseCache
+from core.models.credentials import xai_api_key
 from core.models.engines.mock import MockEngine
 from core.models.engines.openai_compatible import OpenAICompatibleEngine
 from core.models.lifecycle import ModelLifecycle
@@ -56,23 +56,27 @@ from omne.processes.service import (
     application_id_for,
     worker_id_for,
 )
+from omne.secrets.audit import SecretAuditLog
+from omne.secrets.select import select_provider
+from omne.secrets.service import SecretService
 
 
 def build_OMNE(settings: Settings) -> OMNE:
     """Assemble registries, providers, and the scheduler.
 
     Missing agent or model directories produce an empty registry. The xAI
-    credential is read from ``XAI_API_KEY`` at construction and is not written
-    into settings.
+    credential comes from the secret store, or from ``XAI_API_KEY`` in
+    development and testing. It is not written into settings.
     """
 
     prepare_runtime_directories(settings)
     events = EventBus(persist_path=settings.data_dir / "events.jsonl")
+    evaluator = PermissionEvaluator()
+    secrets = _secret_service(settings, events, evaluator)
     monitor = SystemMonitor()
     resources = ResourceManager(monitor, events=events)
     compute = ComputeScheduler(monitor, manager=resources)
     cache = ModelCache()
-    evaluator = PermissionEvaluator()
     applications = _application_service(settings, events, evaluator)
     browser = _browser_service(settings, events, evaluator)
     lifecycle = AgentLifecycle(events)
@@ -102,7 +106,8 @@ def build_OMNE(settings: Settings) -> OMNE:
     models.discover(settings.models_dir)
     for model in models.enabled():
         cache.register(model.id, size_bytes=None, requirements=model.requirements)
-    providers, model_names, provider_labels = _providers(settings, models)
+    credential = xai_api_key(settings, secrets)
+    providers, model_names, provider_labels = _providers(settings, models, credential)
     store = TaskStore(settings.data_dir / "tasks.sqlite")
     model_lifecycle = ModelLifecycle()
     model_runtime = _model_runtime(
@@ -113,6 +118,7 @@ def build_OMNE(settings: Settings) -> OMNE:
         events,
         runtime,
         resources,
+        xai_configured=credential is not None,
     )
     executor = TaskExecutor(
         store=store,
@@ -298,6 +304,8 @@ def _model_runtime(
     events: EventBus,
     runtime: AgentRuntime,
     resources: ResourceManager,
+    *,
+    xai_configured: bool,
 ) -> ModelRuntime:
     """Select adapters from configuration. Construction does not load a model."""
 
@@ -318,7 +326,11 @@ def _model_runtime(
         workers=lambda worker_id: _worker_alive(runtime, worker_id),
         resources=resources,
     )
-    model_runtime.prepare(available=lambda model: _model_is_available(settings, model.provider))
+    model_runtime.prepare(
+        available=lambda model: _model_is_available(
+            settings, model.provider, xai_configured=xai_configured
+        )
+    )
     return model_runtime
 
 
@@ -330,7 +342,7 @@ def _worker_alive(runtime: AgentRuntime, worker_id: str) -> bool:
     return worker.lifecycle not in {WorkerState.TERMINATED, WorkerState.FAILED}
 
 
-def _model_is_available(settings: Settings, provider: str) -> bool:
+def _model_is_available(settings: Settings, provider: str, *, xai_configured: bool) -> bool:
     """Report availability from configuration. This does not load weights."""
 
     if provider == "mock":
@@ -338,16 +350,18 @@ def _model_is_available(settings: Settings, provider: str) -> bool:
     if provider == "local":
         return bool(settings.local_model_base_url)
     if provider == "xai":
-        return bool(os.environ.get("XAI_API_KEY"))
+        return xai_configured
     return False
 
 
 def _providers(
-    settings: Settings, models: ModelRegistry
+    settings: Settings,
+    models: ModelRegistry,
+    xai_key: str | None,
 ) -> tuple[dict[str, ModelProvider], dict[str, str], dict[str, str]]:
     mock: ModelProvider = MockProvider()
     xai: ModelProvider = XAIProvider(
-        api_key=os.environ.get("XAI_API_KEY"),
+        api_key=xai_key,
         base_url=settings.xai_base_url,
         timeout_seconds=settings.xai_timeout_seconds,
         max_retries=settings.xai_max_retries,
@@ -365,3 +379,39 @@ def _providers(
         names[model.id] = model.model_name
         labels[model.id] = model.provider
     return providers, names, labels
+
+
+def _secret_service(
+    settings: Settings, events: EventBus, evaluator: PermissionEvaluator
+) -> SecretService:
+    """Build the secret store. Access is audited and does not record the value."""
+
+    def authorize(
+        tool_id: str,
+        agent_id: str,
+        grants: Mapping[str, Sequence[str]],
+        environment: str,
+        arguments: dict[str, Any],
+    ) -> tuple[str, str]:
+        result = evaluator.evaluate(
+            PermissionRequest(
+                tool_id=tool_id,
+                arguments=arguments,
+                grants={key: list(value) for key, value in grants.items()},
+                environment=environment,
+                workspace_root=str(settings.workspace_root),
+                agent_id=agent_id,
+                user="core",
+            )
+        )
+        return result.decision.value, result.reason
+
+    def publish(event_type: str, payload: dict[str, Any]) -> None:
+        events.publish(event_type, source="secrets", payload=payload)
+
+    return SecretService(
+        select_provider(settings.environment, dev_fallback=settings.secrets_dev_fallback),
+        authorize=authorize,
+        audit=SecretAuditLog(settings.data_dir / "secrets-audit.jsonl"),
+        sink=publish,
+    )

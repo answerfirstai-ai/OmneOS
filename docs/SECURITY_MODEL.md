@@ -82,3 +82,7 @@ permission gate are what keep those calls off the bootloader, credentials, and o
 The packaged core sets `RestrictNamespaces=true`. A host command that needs the worker sandbox
 cannot be started from that service. Production already denies `terminal.execute`. The denial stays
 a denial.
+
+The worker denylist also includes `add_key`, `request_key`, and `keyctl`. Credentials live in the
+kernel keyring described in `docs/SECRETS.md`. A sandbox that cannot call those syscalls cannot read
+that ring.

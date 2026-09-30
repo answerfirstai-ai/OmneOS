@@ -60,6 +60,7 @@ ENV_TO_FIELD: dict[str, str] = {
     "OMNE_ACTIVATION_SHORTCUT": "activation_shortcut",
     "OMNE_CANCEL_SHORTCUT": "cancel_shortcut",
     "OMNE_PUSH_TO_TALK_SHORTCUT": "push_to_talk_shortcut",
+    "OMNE_SECRETS_DEV_FALLBACK": "secrets_dev_fallback",
 }
 
 KNOWN_ENVIRONMENT_VARIABLES: frozenset[str] = frozenset(ENV_TO_FIELD) | {"OMNE_CONFIG"}
@@ -99,6 +100,7 @@ class Settings(BaseModel):
     activation_shortcut: str = ""
     cancel_shortcut: str = ""
     push_to_talk_shortcut: str = ""
+    secrets_dev_fallback: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -164,6 +166,19 @@ class Settings(BaseModel):
         if not isinstance(value, str):
             raise ValueError("shortcut must be a string")
         return canonical_shortcut(value)
+
+    @field_validator("secrets_dev_fallback", mode="before")
+    @classmethod
+    def _secrets_dev_fallback(cls, value: object) -> bool:
+        if value is True or value is False:
+            return bool(value)
+        if isinstance(value, str):
+            text = value.strip()
+            if text == "allow":
+                return True
+            if text in {"", "false", "deny", "off"}:
+                return False
+        raise ValueError("secrets_dev_fallback must be false or allow")
 
     @field_validator("local_model_base_url", "browser_command")
     @classmethod

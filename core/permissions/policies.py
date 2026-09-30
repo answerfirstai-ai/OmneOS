@@ -60,6 +60,11 @@ TOOL_GRANTS: dict[str, tuple[str, str]] = {
     "application.launch": ("application", "launch"),
     "application.focus": ("application", "focus"),
     "application.close": ("application", "close"),
+    "secret.store": ("secrets", "manage"),
+    "secret.delete": ("secrets", "manage"),
+    "secret.rotate": ("secrets", "manage"),
+    "secret.retrieve": ("secrets", "use"),
+    "secret.exists": ("secrets", "use"),
 }
 
 HIGH_RISK_TOOLS = frozenset(
@@ -193,6 +198,22 @@ def _decide(request: PermissionRequest) -> PermissionResult:
             return _deny("refusing to signal pid 1 or below")
     if request.tool_id == "voice.transmit":
         return _deny("audio transmission is denied unless a later policy explicitly allows it")
+    if request.tool_id in {"secret.store", "secret.delete", "secret.rotate"}:
+        if request.agent_id != "core":
+            return _deny("only core may manage secrets")
+        if request.environment == "production":
+            return _deny("secret management is denied in production")
+        return PermissionResult(
+            decision=PermissionDecision.CONFIRM,
+            reason="secret management requires confirmation",
+            policy_id="secret-manage",
+        )
+    if request.tool_id in {"secret.retrieve", "secret.exists"}:
+        return PermissionResult(
+            decision=PermissionDecision.ALLOW,
+            reason="secret use is granted",
+            policy_id="secret-use",
+        )
     if request.tool_id in HIGH_RISK_TOOLS or _is_package_install(request):
         if request.environment == "production":
             return _deny("high-risk operation is denied in production")

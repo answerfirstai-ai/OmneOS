@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import TextIO
 
 from core.config.settings import Settings
+from omne.secrets.redact import redact_text
 
 LOGGER_NAMESPACE = "OMNE"
 
@@ -34,8 +35,9 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
+        payload["message"] = redact_text(str(payload["message"]))
         if record.exc_info:
-            payload["exception"] = self.formatException(record.exc_info)
+            payload["exception"] = redact_text(self.formatException(record.exc_info))
         return json.dumps(payload, ensure_ascii=False)
 
 
@@ -47,6 +49,9 @@ class TextFormatter(logging.Formatter):
             fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
             datefmt="%Y-%m-%dT%H:%M:%S%z",
         )
+
+    def format(self, record: logging.LogRecord) -> str:
+        return redact_text(super().format(record))
 
 
 def get_logger(suffix: str = "core") -> logging.Logger:

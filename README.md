@@ -41,8 +41,9 @@ Development settings listen on `http://127.0.0.1:8787`. `GET /health` returns st
 runs an objective. `OMNE execute` prints JSON `{"id","status"}` and exits 0 when the task completes,
 3 when it is waiting for confirmation, and 1 when it fails.
 
-`XAI_API_KEY` is read only when the xAI provider is called. The default route uses the mock
-provider, so execute works offline.
+`XAI_API_KEY` is read in development and testing when the xAI provider is called and no stored
+`model/xai` secret is addressed to core. Production does not read that variable. The default route
+uses the mock provider, so execute works offline. See `docs/SECRETS.md`.
 
 In another shell, after the core is running:
 

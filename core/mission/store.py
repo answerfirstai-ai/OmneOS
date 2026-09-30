@@ -10,6 +10,7 @@ from pathlib import Path
 
 from core.mission.model import Mission, MissionStatus, transition_mission
 from core.sqlite import configure_sqlite, ensure_schema
+from omne.secrets.redact import redact_object
 
 
 class MissionStore:
@@ -38,6 +39,7 @@ class MissionStore:
         self._cache: dict[str, Mission] = {}
 
     def save(self, mission: Mission) -> Mission:
+        mission = Mission.model_validate(redact_object(mission.model_dump(mode="json")))
         document = json.dumps(mission.model_dump(mode="json"), sort_keys=True)
         with self._lock:
             self._connection.execute(

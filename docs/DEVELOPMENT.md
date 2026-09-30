@@ -26,7 +26,9 @@ does not load that file on startup.
 selects `configs/testing/OMNE.toml`. `OMNE_ENVIRONMENT=production` selects
 `configs/production/OMNE.toml`.
 
-Set `XAI_API_KEY` in the environment only when you intend to call xAI. Leave
+Set `XAI_API_KEY` in the environment only when you intend to call xAI from development. Production
+reads a `model/xai` secret instead of that variable. Set `OMNE_SECRETS_DEV_FALLBACK=allow` only when
+the kernel keyring cannot be used and an in-memory store is acceptable for that process. Leave
 `OMNE_LOCAL_MODEL_BASE_URL` empty to keep the local provider disconnected. When that URL is set,
 OMNE talks to models the server already has and does not download weights. Leave
 `OMNE_BROWSER_COMMAND` empty to keep browser tools unavailable.
