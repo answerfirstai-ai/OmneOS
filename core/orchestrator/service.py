@@ -65,6 +65,7 @@ from omne.processes.select import process_service
 from omne.processes.service import ProcessService
 from omne.storage.select import storage_service
 from omne.storage.service import StorageService
+from omne.updates.service import UpdateService
 from omne.windowing.model import WindowRequest
 from omne.windowing.select import windowing_service
 from omne.windowing.service import WindowingService
@@ -134,6 +135,7 @@ class OMNE:
         processes: ProcessService | None = None,
         model_runtime: ModelRuntime | None = None,
         resources: ResourceManager | None = None,
+        data_dir: Path | None = None,
     ) -> None:
         self._store = store
         self._scheduler = scheduler
@@ -174,6 +176,8 @@ class OMNE:
         self._audio: AudioService | None = None
         self._input: InputService | None = None
         self._storage: StorageService | None = None
+        self._updates: UpdateService | None = None
+        self._data_dir = data_dir
         self._applications = applications
         self._browser = browser
         self._processes = processes
@@ -586,6 +590,19 @@ class OMNE:
         self._input = service
         return service
 
+    def updates_view(self) -> dict[str, object]:
+        with self._lock:
+            return self._update_service().status().model_dump(mode="json")
+
+    def _update_service(self) -> UpdateService:
+        service = self._updates
+        if service is not None:
+            return service
+        directory = None if self._data_dir is None else self._data_dir / "updates"
+        service = UpdateService(directory, host_protected=True)
+        self._updates = service
+        return service
+
     def storage_view(self) -> dict[str, object]:
         with self._lock:
             return self._storage_service().inspect().model_dump(mode="json")
@@ -945,6 +962,7 @@ class OMNE:
                 "compute.",
                 "security.",
                 "secret.",
+                "update.",
             )
         ):
             self._world.invalidate()

@@ -80,6 +80,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_input(settings)
     if args.command == "storage":
         return _run_storage(settings)
+    if args.command == "updates":
+        return _run_updates(settings, args)
     if args.command == "applications":
         return _run_applications(settings)
     if args.command == "browser":
@@ -123,6 +125,15 @@ def _build_parser() -> argparse.ArgumentParser:
     commands.add_parser("audio", help="print audio diagnostics without opening a microphone")
     commands.add_parser("input", help="print input bindings without reading the keyboard")
     commands.add_parser("storage", help="print storage diagnostics without formatting a disk")
+    updates = commands.add_parser("updates", help="print update status without installing packages")
+    updates.add_argument(
+        "--catalog", default="", help="read a signed catalog instead of installing"
+    )
+    updates.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the apt plan and do not stage or install",
+    )
     commands.add_parser("applications", help="print installed applications without launching one")
     commands.add_parser("browser", help="print browser availability without launching one")
     commands.add_parser(
@@ -264,6 +275,30 @@ def _run_input(settings: Settings) -> int:
 
 def _run_storage(settings: Settings) -> int:
     print(json.dumps(build_OMNE(settings).storage_view(), sort_keys=True))
+    return 0
+
+
+def _run_updates(settings: Settings, args: argparse.Namespace) -> int:
+    from omne.updates.select import update_service
+    from omne.updates.service import UpdateRejected
+
+    service = update_service(settings.environment, settings.data_dir / "updates")
+    catalog = str(args.catalog).strip()
+    if not catalog and not args.dry_run:
+        print(json.dumps(service.status().model_dump(mode="json"), sort_keys=True))
+        return 0
+    if not args.dry_run:
+        print("error: refusing to install updates on this host", file=sys.stderr)
+        return 2
+    if not catalog:
+        print("error: a catalog is required for a dry-run", file=sys.stderr)
+        return 2
+    try:
+        plan = service.plan(Path(catalog), dry_run=True)
+    except UpdateRejected as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(plan.model_dump(mode="json"), sort_keys=True))
     return 0
 
 

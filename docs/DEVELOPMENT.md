@@ -46,6 +46,7 @@ OMNE mission list
 OMNE capabilities
 OMNE input
 OMNE storage
+OMNE updates
 OMNE applications
 OMNE browser
 OMNE processes

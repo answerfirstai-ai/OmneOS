@@ -25,6 +25,7 @@
 | —     | Display providers: mock, and labwc diagnostics on Linux                          |
 | —     | Security profiles for system, core, agent, worker, model, shell, and application |
 | —     | Scoped secrets for models, APIs, browsers, networks, applications, and services  |
+| —     | Signed update catalogs, pending slots, and rollback without host installation    |
 
 ## Not done
 
@@ -60,7 +61,8 @@ Playwright dependency. `docs/PROCESSES.md` describes the process table and the c
 path. `docs/WORKERS.md` describes agent definitions and in-memory workers. `docs/MODELS.md`
 describes resident model loading. `docs/SECURITY_MODEL.md` describes the profile boundary that sits
 behind the permission evaluator. `docs/SECRETS.md` describes scoped credentials and the Linux
-keyring.
+keyring. `docs/UPDATE_ARCHITECTURE.md` describes signed catalogs and apt plans. The development host
+is not updated.
 
 The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
 capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,
