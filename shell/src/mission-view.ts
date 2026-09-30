@@ -2,6 +2,7 @@
 
 import type {
   ActivityDocument,
+  DecisionBrief,
   MissionDocument,
   ModelDocument,
   QuestionDocument,
@@ -55,6 +56,7 @@ export interface MissionInspection {
   verification: EvidenceView;
   error: ErrorView | null;
   question: string | null;
+  path: string[];
   lifecycle: LifecycleStage[];
 }
 
@@ -105,6 +107,7 @@ export function inspectMission(
   const question = input.questions.find((item) => item.mission_id === mission.id)?.question ?? null;
   const waitingOn =
     mission.status !== "WAITING" ? "none" : question !== null ? "question" : "confirmation";
+  const decision = activity.find((item) => item.decision != null)?.decision ?? null;
   return {
     id: mission.id,
     objective: mission.objective,
@@ -121,6 +124,7 @@ export function inspectMission(
     verification,
     error,
     question,
+    path: decisionLines(decision),
     lifecycle: lifecycleStages({
       objective: mission.objective,
       missionStatus: mission.status,
@@ -161,6 +165,32 @@ export function taskMark(status: string): MissionTaskRow["mark"] {
     return "pending";
   }
   return "active";
+}
+
+/** Lines for the request, model, tools, observation, and result. */
+export function decisionLines(decision: DecisionBrief | null | undefined): string[] {
+  if (decision === null || decision === undefined) {
+    return [];
+  }
+  const model = [decision.provider, decision.model].filter((item) => item !== "").join(" ");
+  const lines = [`Model: ${model === "" ? "unknown" : model}`];
+  if (decision.intent !== "") {
+    lines.push(`Intent: ${decision.intent}`);
+  }
+  if (decision.plan.length > 0) {
+    lines.push(`Plan: ${decision.plan.join("; ")}`);
+  }
+  lines.push(decision.tools.length > 0 ? `Tools: ${decision.tools.join(", ")}` : "Tools: none");
+  if (decision.rejected_tools.length > 0) {
+    lines.push(`Rejected: ${decision.rejected_tools.join(", ")}`);
+  }
+  if (decision.observation !== "") {
+    lines.push(`Observation: ${decision.observation}`);
+  }
+  if (decision.final_response !== "") {
+    lines.push(`Result: ${decision.final_response}`);
+  }
+  return lines;
 }
 
 function aggregateStatus(status: EvidenceView["status"]): string | null {

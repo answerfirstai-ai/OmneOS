@@ -14,7 +14,7 @@ import {
 } from "./graph-layout.js";
 import { hudText, readCompute, resourcePressure } from "./hud.js";
 import { lifecycleStages } from "./lifecycle.js";
-import { groupWorkers, inspectMission, taskMark } from "./mission-view.js";
+import { decisionLines, groupWorkers, inspectMission, taskMark } from "./mission-view.js";
 import { noticesFromEvents } from "./notify.js";
 import { permissionPrompt } from "./permission-view.js";
 import { presenceView } from "./presence.js";
@@ -201,7 +201,27 @@ test("mission inspection uses child activity and does not invent workers", () =>
   assert.equal(view.verification.status, "PASSED");
   assert.equal(view.verification.lines.includes("exists notes.txt"), true);
   assert.equal(view.resources[0]?.value, "unknown");
+  assert.equal(view.path.length, 0);
   assert.equal(taskMark("QUEUED"), "pending");
+});
+
+test("mission inspection shows the model decision and the tool observation", () => {
+  const lines = decisionLines({
+    provider: "mock",
+    model: "mock",
+    intent: "act",
+    plan: ["use the tool gateway"],
+    tools: ["filesystem.read"],
+    rejected_tools: ["os.system"],
+    final_response: "",
+    observation: "read notes.txt: hello",
+  });
+
+  assert.equal(lines[0], "Model: mock mock");
+  assert.equal(lines.includes("Tools: filesystem.read"), true);
+  assert.equal(lines.includes("Rejected: os.system"), true);
+  assert.equal(lines.includes("Observation: read notes.txt: hello"), true);
+  assert.deepEqual(decisionLines(null), []);
 });
 
 test("workers stay grouped under the agents that own them", () => {

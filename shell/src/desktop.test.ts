@@ -14,6 +14,7 @@ import {
   retainDesktop,
   shouldRepaint,
   taskLine,
+  waitingCancelTarget,
 } from "./desktop.js";
 
 test("parent tasks are the ones shown in the monitor", () => {
@@ -113,6 +114,65 @@ test("attention follows a waiting mission before an idle one", () => {
     ),
     "Permission: npm test",
   );
+});
+
+test("cancel targets the confirmation before the question", () => {
+  assert.deepEqual(
+    waitingCancelTarget({
+      confirmations: [
+        {
+          task_id: "task-1",
+          objective: "read",
+          tool_id: "filesystem.read",
+          command: "read file notes.txt",
+          agent_id: "coding",
+          mission_id: "mission-1",
+        },
+      ],
+      questions: [{ question_id: "q", mission_id: "mission-1", question: "Which file?" }],
+    }),
+    { kind: "task", id: "task-1" },
+  );
+  assert.deepEqual(
+    waitingCancelTarget({
+      confirmations: [],
+      questions: [
+        {
+          question_id: "q",
+          mission_id: "mission-1",
+          task_id: "task-2",
+          question: "Which file?",
+        },
+      ],
+    }),
+    { kind: "task", id: "task-2" },
+  );
+});
+
+test("a desktop document keeps the model decision", () => {
+  const desktop = readDesktop({
+    activity: [
+      {
+        id: "child",
+        objective: "read file notes.txt",
+        status: "COMPLETED",
+        decision: {
+          provider: "mock",
+          model: "mock",
+          intent: "act",
+          plan: ["use the tool gateway"],
+          tools: ["filesystem.read"],
+          rejected_tools: [],
+          final_response: "",
+          observation: "read notes.txt: hello",
+        },
+      },
+    ],
+  });
+
+  assert.equal(desktop.activity[0]?.decision?.provider, "mock");
+  assert.deepEqual(desktop.activity[0]?.decision?.tools, ["filesystem.read"]);
+  assert.equal(desktop.activity[0]?.decision?.observation, "read notes.txt: hello");
 });
 
 test("agent model and notification lines stay literal", () => {
