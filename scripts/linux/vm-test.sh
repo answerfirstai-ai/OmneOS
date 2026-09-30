@@ -178,8 +178,9 @@ PY
 }
 
 boot_ok=0
-if wait_for "Reached target omne.target" "${timeout_seconds}"; then
+if wait_for "Reached target multi-user.target" "${timeout_seconds}"; then
   boot_ok=1
+  sleep 3
 fi
 clean_log
 log="${work}/serial.clean"
