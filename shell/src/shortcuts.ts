@@ -31,6 +31,19 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { target: "detail", key: ".", shift: true },
 ];
 
+export type DesktopCommand =
+  | "switch-next"
+  | "switch-previous"
+  | "fullscreen"
+  | "maximize"
+  | "minimize"
+  | "close-window"
+  | "workspace-next"
+  | "workspace-previous"
+  | "window-workspace-next"
+  | "window-workspace-previous"
+  | "monitor-next";
+
 /** Match Ctrl/Command shortcuts. Plain typing does not open a window. */
 export function matchShortcut(event: ShortcutEvent): Shortcut | null {
   const mod = event.metaKey || event.ctrlKey;
@@ -41,4 +54,36 @@ export function matchShortcut(event: ShortcutEvent): Shortcut | null {
   return (
     SHORTCUTS.find((shortcut) => shortcut.key === key && shortcut.shift === event.shiftKey) ?? null
   );
+}
+
+/** Window-manager chords. These stay separate from the command palette. */
+export function matchDesktopCommand(event: ShortcutEvent): DesktopCommand | null {
+  if ((event.altKey || event.metaKey) && !event.ctrlKey && event.key === "Tab") {
+    return event.shiftKey ? "switch-previous" : "switch-next";
+  }
+  if (event.altKey && !event.ctrlKey && !event.metaKey && event.key === "F4") {
+    return "close-window";
+  }
+  if (!event.altKey && !event.ctrlKey && !event.metaKey && event.key === "F11") {
+    return "fullscreen";
+  }
+  if (!event.metaKey || event.ctrlKey || event.altKey) {
+    return null;
+  }
+  if (event.key === "ArrowUp") {
+    return "maximize";
+  }
+  if (event.key === "ArrowDown") {
+    return "minimize";
+  }
+  if (event.key === "ArrowLeft") {
+    return event.shiftKey ? "window-workspace-previous" : "workspace-previous";
+  }
+  if (event.key === "ArrowRight") {
+    return event.shiftKey ? "window-workspace-next" : "workspace-next";
+  }
+  if (event.key.toLowerCase() === "m" && event.shiftKey) {
+    return "monitor-next";
+  }
+  return null;
 }

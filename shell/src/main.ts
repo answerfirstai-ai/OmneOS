@@ -61,15 +61,39 @@ import { permissionPrompt } from "./permission-view.js";
 import { LAUNCHER_ACTIONS } from "./launcher.js";
 import { coreRenderer, presenceView } from "./presence.js";
 import { readRecovery, type RecoveryState } from "./recovery.js";
-import { matchShortcut } from "./shortcuts.js";
+import { matchDesktopCommand, matchShortcut, type DesktopCommand } from "./shortcuts.js";
+import {
+  activateWorkspace,
+  cancelSwitcher,
+  commitSwitcher,
+  cycleMonitor,
+  cycleSwitcher,
+  cycleWorkspace,
+  dismissToast,
+  focusedOnWorkspace,
+  frameOf,
+  initialCompositor,
+  isVisible,
+  logicalDelta,
+  monitorViews,
+  moveFrame,
+  paintedFrame,
+  publishToasts,
+  resizeFrame,
+  shiftWindowWorkspace,
+  syncWindows,
+  toggleFullscreen,
+  viewTransform,
+  WINDOW_TITLES,
+  windowMonitor,
+  windowWorkspace,
+  type CompositorState,
+} from "./compositor.js";
 import { voiceControlEnabled, voiceSummary, type VoiceStatus } from "./voice.js";
 import {
   activateWindow,
-  clampSize,
   closeWindow,
-  focusedWindow,
   focusWindow,
-  initialWindowState,
   isWindowId,
   minimizeWindow,
   openWindow,
@@ -85,7 +109,8 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 
 export type HealthFetcher = (input: string) => Promise<Response>;
 
-let windowState: WindowState = initialWindowState();
+let compositor: CompositorState = initialCompositor();
+let windowState: WindowState = compositor.windows;
 let desktopView: DesktopView | null = null;
 let submittedObjective: string | null = null;
 let selectedMissionId: string | null = null;
@@ -471,6 +496,15 @@ function paintNotifications(): void {
     return;
   }
   const notices = noticesFromEvents(desktopView.events);
+  const toasted = publishToasts(
+    compositor,
+    notices.map((notice) => ({ id: notice.id, text: notice.text })),
+  );
+  if (toasted !== compositor) {
+    compositor = toasted;
+    windowState = toasted.windows;
+    paintToasts();
+  }
   const rendered = `${detailLevel}\n${notices
     .map((notice) => `${notice.id}:${notice.text}`)
     .join("\n")}`;
@@ -1542,38 +1576,208 @@ async function refresh(status: HTMLElement, detail: HTMLElement): Promise<void> 
   await refreshDesktop(coreUrl, coreOk);
 }
 
-function paintWindows(state: WindowState): void {
-  const focus = focusedWindow(state);
+function desktopViewport(): { width: number; height: number } {
+  const desktop = document.getElementById("desktop");
+  if (!(desktop instanceof HTMLElement)) {
+    return { width: 1280, height: 720 };
+  }
+  return { width: Math.max(1, desktop.clientWidth), height: Math.max(1, desktop.clientHeight) };
+}
+
+function paintWindows(): void {
+  const state = compositor.windows;
+  const focus = compositor.switcher[0] ?? focusedOnWorkspace(compositor);
+  const view = desktopViewport();
   for (const id of WINDOW_IDS) {
     const frame = document.querySelector(`[data-window="${id}"]`);
-    const minimized = state.minimized.includes(id);
-    const open = state.open.includes(id);
+    const visible = isVisible(compositor, id);
+    const onWorkspace = windowWorkspace(compositor, id) === compositor.activeWorkspace;
     if (frame instanceof HTMLElement) {
-      frame.hidden = !open || minimized;
+      frame.hidden = !visible;
       frame.style.zIndex = String(windowZ(state, id));
       frame.classList.toggle("is-focused", id === focus);
-      frame.classList.toggle("is-maximized", state.maximized.includes(id) && !minimized);
+      frame.classList.toggle(
+        "is-maximized",
+        state.maximized.includes(id) && compositor.fullscreen !== id,
+      );
+      frame.classList.toggle("is-fullscreen", compositor.fullscreen === id);
+      const painted = paintedFrame(compositor, id, view);
+      if (painted !== null) {
+        frame.style.left = `${painted.x}px`;
+        frame.style.top = `${painted.y}px`;
+        frame.style.width = `${painted.width}px`;
+        frame.style.height = `${painted.height}px`;
+        frame.style.right = "auto";
+      }
     }
     const task = document.querySelector(`[data-task="${id}"]`);
     if (task instanceof HTMLButtonElement) {
-      task.hidden = !open;
+      task.hidden = !state.open.includes(id) || !onWorkspace;
       task.setAttribute("aria-pressed", id === focus ? "true" : "false");
     }
     const icon = document.querySelector(`.icons [data-launch="${id}"]`);
     if (icon instanceof HTMLButtonElement) {
-      icon.setAttribute("aria-pressed", open ? "true" : "false");
+      icon.setAttribute("aria-pressed", visible ? "true" : "false");
     }
+  }
+  document
+    .getElementById("desktop")
+    ?.classList.toggle("has-fullscreen", compositor.fullscreen !== null);
+  paintMonitors(view);
+  paintPager();
+  paintSwitcher();
+  paintToasts();
+  const presence = document.getElementById("presence");
+  const regions = monitorViews(compositor, view);
+  const monitorId =
+    focus === null || focus === undefined
+      ? compositor.monitors[0]?.id
+      : windowMonitor(compositor, focus);
+  const region = regions.find((item) => item.id === monitorId) ?? regions[0];
+  if (presence instanceof HTMLElement && region !== undefined) {
+    presence.style.left = `${region.x + region.width / 2}px`;
+    presence.style.top = `${region.y + region.height / 2}px`;
+    presence.style.transform = "translate(-50%, -54%)";
+  }
+  const icons = document.querySelector(".icons");
+  const main = regions.find((item) => item.id === "main") ?? regions[0];
+  if (icons instanceof HTMLElement && main !== undefined) {
+    icons.style.left = `${main.x + 14}px`;
+    icons.style.top = `${main.y + 18}px`;
   }
 }
 
-function applyWindows(next: WindowState): void {
+function paintMonitors(view: { width: number; height: number }): void {
+  const layer = document.getElementById("monitor-layer");
+  if (!(layer instanceof HTMLElement)) {
+    return;
+  }
+  layer.replaceChildren();
+  for (const monitor of monitorViews(compositor, view)) {
+    const region = document.createElement("div");
+    region.className = "monitor-region";
+    region.style.left = `${monitor.x}px`;
+    region.style.top = `${monitor.y}px`;
+    region.style.width = `${monitor.width}px`;
+    region.style.height = `${monitor.height}px`;
+    const label = document.createElement("span");
+    label.textContent = monitor.name;
+    region.append(label);
+    layer.append(region);
+  }
+}
+
+function paintPager(): void {
+  const host = document.getElementById("workspaces");
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  host.replaceChildren();
+  for (const workspace of compositor.workspaces) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = workspace.name;
+    button.setAttribute(
+      "aria-pressed",
+      workspace.id === compositor.activeWorkspace ? "true" : "false",
+    );
+    button.addEventListener("click", () => {
+      applyCompositor(activateWorkspace(compositor, workspace.id));
+    });
+    host.append(button);
+  }
+}
+
+function paintSwitcher(): void {
+  const host = document.getElementById("switcher");
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  host.hidden = compositor.switcher.length === 0;
+  host.replaceChildren();
+  for (const id of compositor.switcher) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = WINDOW_TITLES[id];
+    button.setAttribute("aria-selected", id === compositor.switcher[0] ? "true" : "false");
+    button.addEventListener("click", () => {
+      applyCompositor(commitSwitcher({ ...compositor, switcher: [id] }));
+    });
+    host.append(button);
+  }
+}
+
+function paintToasts(): void {
+  const host = document.getElementById("toasts");
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  host.replaceChildren();
+  for (const toast of compositor.toasts) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "toast";
+    button.textContent = toast.text;
+    button.addEventListener("click", () => {
+      applyCompositor(dismissToast(compositor, toast.id));
+    });
+    host.append(button);
+  }
+}
+
+function applyCompositor(next: CompositorState): void {
   const wasGraph = windowState.open.includes("graph") && !windowState.minimized.includes("graph");
-  windowState = next;
-  paintWindows(windowState);
+  compositor = next;
+  windowState = next.windows;
+  paintWindows();
   const graphVisible =
     windowState.open.includes("graph") && !windowState.minimized.includes("graph");
   if (graphVisible && !wasGraph) {
     void refreshGraph(readCoreUrl(window.location.search));
+  }
+}
+
+function applyWindows(next: WindowState): void {
+  applyCompositor(syncWindows(compositor, next));
+}
+
+function runDesktopCommand(command: DesktopCommand): void {
+  const focus = focusedOnWorkspace(compositor);
+  if (command === "switch-next" || command === "switch-previous") {
+    applyCompositor(cycleSwitcher(compositor, command === "switch-next" ? 1 : -1));
+    return;
+  }
+  if (command === "fullscreen" && focus !== null) {
+    applyCompositor(toggleFullscreen(compositor, focus));
+    return;
+  }
+  if (command === "maximize" && focus !== null) {
+    applyWindows(toggleMaximize(windowState, focus));
+    return;
+  }
+  if (command === "minimize" && focus !== null) {
+    applyWindows(minimizeWindow(windowState, focus));
+    return;
+  }
+  if (command === "close-window" && focus !== null) {
+    applyWindows(closeWindow(windowState, focus));
+    return;
+  }
+  if (command === "workspace-next" || command === "workspace-previous") {
+    applyCompositor(cycleWorkspace(compositor, command === "workspace-next" ? 1 : -1));
+    return;
+  }
+  if (
+    (command === "window-workspace-next" || command === "window-workspace-previous") &&
+    focus !== null
+  ) {
+    applyCompositor(
+      shiftWindowWorkspace(compositor, focus, command === "window-workspace-next" ? 1 : -1),
+    );
+    return;
+  }
+  if (command === "monitor-next" && focus !== null) {
+    applyCompositor(cycleMonitor(compositor, focus));
   }
 }
 
@@ -1588,29 +1792,23 @@ function bindWindow(id: WindowId): void {
   const titlebar = frame.querySelector(".titlebar");
   if (titlebar instanceof HTMLElement) {
     titlebar.addEventListener("pointerdown", (event) => {
-      if (!(event instanceof PointerEvent) || frame.classList.contains("is-maximized")) {
+      if (!(event instanceof PointerEvent)) {
         return;
       }
       if (event.target instanceof Element && event.target.closest("button") !== null) {
         return;
       }
-      const bounds = frame.getBoundingClientRect();
+      const start = frameOf(compositor, id);
       const originX = event.clientX;
       const originY = event.clientY;
-      const startLeft = bounds.left;
-      const startTop = bounds.top;
       titlebar.setPointerCapture(event.pointerId);
       const move = (moveEvent: PointerEvent): void => {
-        const nextLeft = Math.min(
-          window.innerWidth - 72,
-          Math.max(-bounds.width + 72, startLeft + moveEvent.clientX - originX),
+        const delta = logicalDelta(
+          viewTransform(compositor.monitors, desktopViewport()),
+          moveEvent.clientX - originX,
+          moveEvent.clientY - originY,
         );
-        const nextTop = Math.min(
-          window.innerHeight - 92,
-          Math.max(0, startTop + moveEvent.clientY - originY),
-        );
-        frame.style.left = `${nextLeft}px`;
-        frame.style.top = `${nextTop}px`;
+        applyCompositor(moveFrame(compositor, id, start.x + delta.x, start.y + delta.y));
       };
       const stop = (stopEvent: PointerEvent): void => {
         titlebar.removeEventListener("pointermove", move);
@@ -1631,24 +1829,21 @@ function bindWindow(id: WindowId): void {
       if (!(event instanceof PointerEvent) || frame.classList.contains("is-maximized")) {
         return;
       }
+      if (frame.classList.contains("is-fullscreen")) {
+        return;
+      }
       event.stopPropagation();
-      const bounds = frame.getBoundingClientRect();
+      const start = frameOf(compositor, id);
       const originX = event.clientX;
       const originY = event.clientY;
       handle.setPointerCapture(event.pointerId);
       const move = (moveEvent: PointerEvent): void => {
-        const size = clampSize(
-          bounds.width + moveEvent.clientX - originX,
-          bounds.height + moveEvent.clientY - originY,
-          {
-            minWidth: 280,
-            minHeight: 160,
-            maxWidth: Math.max(280, window.innerWidth - 96),
-            maxHeight: Math.max(160, window.innerHeight - 96),
-          },
+        const delta = logicalDelta(
+          viewTransform(compositor.monitors, desktopViewport()),
+          moveEvent.clientX - originX,
+          moveEvent.clientY - originY,
         );
-        frame.style.width = `${size.width}px`;
-        frame.style.height = `${size.height}px`;
+        applyCompositor(resizeFrame(compositor, id, start.width + delta.x, start.height + delta.y));
       };
       const stop = (stopEvent: PointerEvent): void => {
         handle.removeEventListener("pointermove", move);
@@ -1663,13 +1858,26 @@ function bindWindow(id: WindowId): void {
       handle.addEventListener("pointercancel", stop);
     });
   }
+  const fullscreen = frame.querySelector("[data-close]");
+  if (fullscreen instanceof HTMLElement && frame.querySelector("[data-fullscreen]") === null) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "frame";
+    button.dataset["fullscreen"] = id;
+    button.setAttribute("aria-label", `Fullscreen ${WINDOW_TITLES[id]}`);
+    button.textContent = "⛶";
+    fullscreen.before(button);
+  }
 }
 
 function bindDesktop(): void {
   if (document.getElementById("desktop") === null) {
     return;
   }
-  applyWindows(initialWindowState());
+  applyCompositor(initialCompositor());
+  window.addEventListener("resize", () => {
+    paintWindows();
+  });
   for (const id of WINDOW_IDS) {
     bindWindow(id);
   }
@@ -1717,6 +1925,15 @@ function bindDesktop(): void {
       }
     });
   });
+  document.querySelectorAll("[data-fullscreen]").forEach((node) => {
+    node.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const id = node.getAttribute("data-fullscreen");
+      if (id !== null && isWindowId(id)) {
+        applyCompositor(toggleFullscreen(compositor, id));
+      }
+    });
+  });
   const detailButton = document.getElementById("detail-level");
   if (detailButton instanceof HTMLButtonElement) {
     detailButton.addEventListener("click", () => {
@@ -1754,7 +1971,27 @@ function bindDesktop(): void {
       return;
     }
     if (event.key === "Escape") {
+      if (compositor.switcher.length > 0) {
+        applyCompositor(cancelSwitcher(compositor));
+        return;
+      }
+      if (compositor.fullscreen !== null) {
+        applyCompositor(toggleFullscreen(compositor, compositor.fullscreen));
+        return;
+      }
       hideStartMenu();
+      return;
+    }
+    const desktopCommand = matchDesktopCommand({
+      key: event.key,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+    });
+    if (desktopCommand !== null) {
+      event.preventDefault();
+      runDesktopCommand(desktopCommand);
       return;
     }
     const shortcut = matchShortcut(event);
@@ -1775,6 +2012,11 @@ function bindDesktop(): void {
       return;
     }
     applyWindows(openWindow(windowState, shortcut.target));
+  });
+  document.addEventListener("keyup", (event) => {
+    if ((event.key === "Alt" || event.key === "Meta") && compositor.switcher.length > 0) {
+      applyCompositor(commitSwitcher(compositor));
+    }
   });
   document.getElementById("desktop")?.addEventListener("pointerdown", (event) => {
     if (!(event.target instanceof Element) || event.target.closest(".window, .icons") !== null) {

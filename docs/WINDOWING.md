@@ -106,14 +106,15 @@ unknown window, monitor, or workspace applies nothing and emits nothing.
 
 ## Shell
 
-`shell/src/windowing.ts` parses the `GET /windowing` document. The page still draws the launcher and
-tasks windows in `shell/src/windows.ts`. The parser is the contract for a later host that can show
-compositor windows beside that page.
+`shell/src/windowing.ts` parses the `GET /windowing` document. The desktop the person sees is
+`shell/src/compositor.ts`. That compositor moves, resizes, minimizes, maximizes, and fullscreens its
+own windows, keeps them on a workspace and a monitor, switches the front window, and raises a
+notification. It does not send those changes to labwc.
 
 ## What this revision does not do
 
 - It does not start labwc or install it.
 - It does not change the host graphical session.
-- It does not tile, stack, or animate windows.
+- It does not tile windows or animate them. The shell stacks its own windows by focus.
 - It does not map the shell URL into a Wayland layer. That remains the desktop surface in
   `docs/GRAPHICS_ARCHITECTURE.md`.
