@@ -1,7 +1,11 @@
 """Browser tools.
 
+``browser.open`` and ``browser.search`` keep their existing interface.
 Navigation runs only when ``browser_command`` is configured. Otherwise the
 tool reports that browser tooling is unavailable and does not contact the URL.
+
+Session actions live beside that interface. They go through the browser
+service and do not start a shell.
 """
 
 from __future__ import annotations
@@ -10,7 +14,10 @@ from typing import Any
 from urllib.parse import urlparse
 
 from core.tools.base import ToolContext, ToolError
+from core.tools.browser.actions import _BrowserAction, session_tools
 from core.tools.command import SubprocessCommands
+from omne.browser.select import browser_service
+from omne.browser.service import BrowserService
 
 
 class _BrowserTool:
@@ -77,7 +84,15 @@ class BrowserSearchTool(_BrowserTool):
 
 
 def browser_tools(
-    command: str = "", commands: SubprocessCommands | None = None
-) -> list[_BrowserTool]:
+    command: str = "",
+    commands: SubprocessCommands | None = None,
+    *,
+    service: BrowserService | None = None,
+) -> list[_BrowserTool | _BrowserAction]:
     active = commands or SubprocessCommands()
-    return [BrowserOpenTool(command, active), BrowserSearchTool(command, active)]
+    bound = service if service is not None else browser_service("testing")
+    return [
+        BrowserOpenTool(command, active),
+        BrowserSearchTool(command, active),
+        *session_tools(bound),
+    ]

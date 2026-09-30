@@ -41,6 +41,8 @@ from core.voice.service import VoiceService
 from core.world.state import WorldStateService
 from omne.applications.select import application_service
 from omne.applications.service import ApplicationService
+from omne.browser.select import browser_service
+from omne.browser.service import BrowserService
 
 
 def build_OMNE(settings: Settings) -> OMNE:
@@ -58,9 +60,11 @@ def build_OMNE(settings: Settings) -> OMNE:
     cache = ModelCache()
     evaluator = PermissionEvaluator()
     applications = _application_service(settings, events, evaluator)
+    browser = _browser_service(settings, events, evaluator)
     tools = build_registry(
         browser_command=settings.browser_command,
         applications=applications,
+        browser=browser,
     )
     gateway = ToolGateway(
         tools,
@@ -142,6 +146,7 @@ def build_OMNE(settings: Settings) -> OMNE:
         cancel_shortcut=settings.cancel_shortcut,
         push_to_talk_shortcut=settings.push_to_talk_shortcut,
         applications=applications,
+        browser=browser,
     )
     executor._context_text = omne.context_for
     return omne
@@ -173,6 +178,34 @@ def _application_service(
         return result.decision.value, result.reason
 
     return application_service(settings.environment, sink=sink, authorize=authorize)
+
+
+def _browser_service(
+    settings: Settings,
+    events: EventBus,
+    evaluator: PermissionEvaluator,
+) -> BrowserService:
+    def sink(event_type: str, payload: dict[str, Any]) -> None:
+        events.publish(event_type, source="browser", payload=payload)
+
+    def authorize(
+        tool_id: str,
+        arguments: dict[str, object],
+        grants: Mapping[str, Sequence[str]],
+        environment: str,
+    ) -> tuple[str, str]:
+        result = evaluator.evaluate(
+            PermissionRequest(
+                tool_id=tool_id,
+                arguments=dict(arguments),
+                grants={key: list(value) for key, value in grants.items()},
+                environment=environment,
+                workspace_root=str(settings.workspace_root),
+            )
+        )
+        return result.decision.value, result.reason
+
+    return browser_service(settings.environment, sink=sink, authorize=authorize)
 
 
 def _model_is_available(settings: Settings, provider: str) -> bool:

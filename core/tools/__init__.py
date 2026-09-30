@@ -13,6 +13,8 @@ from core.tools.registry import ToolRegistry
 from core.tools.system import system_tools
 from omne.applications.select import application_service
 from omne.applications.service import ApplicationService
+from omne.browser.select import browser_service
+from omne.browser.service import BrowserService
 
 __all__ = [
     "ToolGateway",
@@ -32,17 +34,19 @@ def build_registry(
     *,
     browser_command: str = "",
     applications: ApplicationService | None = None,
+    browser: BrowserService | None = None,
 ) -> ToolRegistry:
     """Register the built-in tools."""
 
     registry = ToolRegistry()
     catalog = applications if applications is not None else application_service("testing")
+    browsers = browser if browser is not None else browser_service("testing")
     for tool in (
         *filesystem_tools(),
         *process_tools(),
         *system_tools(),
         *git_tools(),
-        *browser_tools(browser_command),
+        *browser_tools(browser_command, service=browsers),
         *application_tools(catalog),
     ):
         registry.register(cast(Tool, tool))

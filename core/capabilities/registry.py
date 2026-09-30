@@ -63,6 +63,9 @@ _HIGH_CAPABILITIES = frozenset(
         "input.bind",
         "application.launch",
         "application.close",
+        "browser.launch",
+        "browser.screenshot",
+        "browser.automate",
     }
 )
 

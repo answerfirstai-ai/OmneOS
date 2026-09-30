@@ -74,5 +74,8 @@ path and deny system, boot, and device paths, including a symlink or `..` that r
 `POST /storage` is not a route. Application launch, focus, and close require `application:launch`,
 `application:focus`, and `application:close`. The launcher does not accept a shell command, and a
 desktop `Exec` line that uses a shell is not launchable. The Linux provider does not spawn a
-process. `POST /applications` is not a route. The ISO script does not write `OMNE-OS.iso`. No
+process. `POST /applications` is not a route. Browser launch, session navigation, inspection,
+research, screenshots, user control, and automation each require their own `browser:` grant. The
+shipped browser agent holds navigation only. Automation does not accept a secret, and Playwright is
+not imported. `POST /browser` is not a route. The ISO script does not write `OMNE-OS.iso`. No
 physical disk installation is performed.

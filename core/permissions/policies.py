@@ -35,6 +35,13 @@ TOOL_GRANTS: dict[str, tuple[str, str]] = {
     "git.commit": ("git", "commit"),
     "browser.open": ("browser", "navigate"),
     "browser.search": ("browser", "navigate"),
+    "browser.launch": ("browser", "launch"),
+    "browser.navigate": ("browser", "session"),
+    "browser.inspect": ("browser", "inspect"),
+    "browser.research": ("browser", "research"),
+    "browser.screenshot": ("browser", "render"),
+    "browser.interact": ("browser", "interact"),
+    "browser.automate": ("browser", "automate"),
     "voice.transmit": ("voice", "transmit"),
     "network.scan": ("network", "scan"),
     "network.connect": ("network", "configure"),
@@ -68,6 +75,9 @@ HIGH_RISK_TOOLS = frozenset(
         "input.bind",
         "application.launch",
         "application.close",
+        "browser.launch",
+        "browser.screenshot",
+        "browser.automate",
     }
 )
 FILESYSTEM_TOOLS = frozenset(
