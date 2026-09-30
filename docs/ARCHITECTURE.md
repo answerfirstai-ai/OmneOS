@@ -192,4 +192,5 @@ replace systemd-networkd. See `docs/NETWORK.md`. `omne.audio` reads PipeWire, Wi
 and does not open a microphone. Speech recognition is not implemented. See
 `docs/AUDIO_ARCHITECTURE.md`. `omne.input` reads configured shortcuts and published keyboards and
 mice. It does not read the keyboard stream. See `docs/INPUT_ARCHITECTURE.md`. `omne.storage` reads
-disks, partitions, and mounts and does not format them. See `docs/STORAGE.md`.
+disks, partitions, and mounts and does not format them. See `docs/STORAGE.md`. `omne.applications`
+reads desktop entries and does not start a shell. See `docs/APPLICATIONS.md`.

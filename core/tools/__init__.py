@@ -2,6 +2,7 @@
 
 from typing import cast
 
+from core.tools.applications import application_tools
 from core.tools.base import Tool, ToolResult
 from core.tools.browser import browser_tools
 from core.tools.filesystem import filesystem_tools
@@ -10,11 +11,14 @@ from core.tools.git import git_tools
 from core.tools.processes import process_tools
 from core.tools.registry import ToolRegistry
 from core.tools.system import system_tools
+from omne.applications.select import application_service
+from omne.applications.service import ApplicationService
 
 __all__ = [
     "ToolGateway",
     "ToolRegistry",
     "ToolResult",
+    "application_tools",
     "browser_tools",
     "build_registry",
     "filesystem_tools",
@@ -24,16 +28,22 @@ __all__ = [
 ]
 
 
-def build_registry(*, browser_command: str = "") -> ToolRegistry:
+def build_registry(
+    *,
+    browser_command: str = "",
+    applications: ApplicationService | None = None,
+) -> ToolRegistry:
     """Register the built-in tools."""
 
     registry = ToolRegistry()
+    catalog = applications if applications is not None else application_service("testing")
     for tool in (
         *filesystem_tools(),
         *process_tools(),
         *system_tools(),
         *git_tools(),
         *browser_tools(browser_command),
+        *application_tools(catalog),
     ):
         registry.register(cast(Tool, tool))
     from core.tools.terminal import TerminalTool

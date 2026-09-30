@@ -71,6 +71,19 @@ def plan_objective(objective: str) -> list[PlanNode]:
     if lowered.startswith("open http") or "browser" in lowered:
         url = _url(text) or "https://example.com"
         return [_tool_node("browser", text, "browser_navigation", "browser.open", {"url": url})]
+    opened = re.match(r"^open (?P<name>.+)$", text, re.IGNORECASE)
+    if opened is not None:
+        name = opened.group("name").strip()
+        if name and not any(character in name for character in "|&;<>`$()"):
+            return [
+                _tool_node(
+                    "application",
+                    text,
+                    "application_launch",
+                    "application.launch",
+                    {"name": name},
+                )
+            ]
     metrics = [name for name in _METRICS if name in lowered]
     if metrics and ("independently" in lowered or "in parallel" in lowered) and len(metrics) >= 2:
         return [

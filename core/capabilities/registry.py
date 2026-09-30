@@ -61,6 +61,8 @@ _HIGH_CAPABILITIES = frozenset(
         "audio.set_volume",
         "audio.set_mute",
         "input.bind",
+        "application.launch",
+        "application.close",
     }
 )
 

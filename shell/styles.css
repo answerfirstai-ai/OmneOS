@@ -556,6 +556,21 @@ input {
   font-size: 0.78rem;
 }
 
+.applications {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 9rem;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.applications button {
+  text-align: left;
+}
+
 .command-surface label {
   color: var(--ink);
   font-size: 0.95rem;

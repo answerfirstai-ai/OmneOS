@@ -45,6 +45,7 @@ import {
 } from "./graph-layout.js";
 import { hudText, readCompute, resourcePressure, type HudLine } from "./hud.js";
 import { readAudioStatus, type AudioStatusView } from "./audio-status.js";
+import { applicationObjective, readApplications, type ApplicationView } from "./applications.js";
 import { chordMatches, readInputStatus, type InputStatusView } from "./input-status.js";
 import { readNetworkStatus, type NetworkStatusView } from "./network-status.js";
 import { coreHealthUrl, parseHealth, type CoreHealth } from "./health.js";
@@ -102,6 +103,8 @@ let inputStatus: InputStatusView = {
   revision: 0,
 };
 let inputSeen = -1;
+let applicationFlight = false;
+let applications: ApplicationView[] = [];
 let graphFlight = false;
 
 /** Read the core base URL from a page query string. */
@@ -822,6 +825,30 @@ function paintProject(): void {
   );
 }
 
+function paintApplications(): void {
+  const list = document.getElementById("applications");
+  if (!(list instanceof HTMLUListElement)) {
+    return;
+  }
+  list.replaceChildren();
+  for (const app of applications) {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset["application"] = app.id;
+    button.textContent = app.name;
+    button.addEventListener("click", () => {
+      const objective = document.getElementById("objective");
+      if (objective instanceof HTMLInputElement) {
+        objective.value = applicationObjective(app.name);
+        objective.focus();
+      }
+    });
+    item.append(button);
+    list.append(item);
+  }
+}
+
 function paintInput(): void {
   const element = listElement("input-status");
   if (element === null) {
@@ -1157,6 +1184,21 @@ async function refreshDesktop(coreUrl: string, coreOk: boolean): Promise<void> {
   } finally {
     desktopFlight = false;
   }
+}
+
+async function refreshApplications(coreUrl: string): Promise<void> {
+  if (applicationFlight) {
+    return;
+  }
+  applicationFlight = true;
+  try {
+    applications = readApplications(await fetchJson(coreApiUrl(coreUrl, "/applications")));
+  } catch {
+    applications = [];
+  } finally {
+    applicationFlight = false;
+  }
+  paintApplications();
 }
 
 async function refreshInput(coreUrl: string): Promise<void> {
@@ -1652,6 +1694,7 @@ function bootstrap(): void {
     void refreshNetwork(coreUrl);
     void refreshAudio(coreUrl);
     void refreshInput(coreUrl);
+    void refreshApplications(coreUrl);
     window.setInterval(() => {
       void refresh(status, detail);
       void refreshGraph(coreUrl);
@@ -1661,6 +1704,7 @@ function bootstrap(): void {
       void refreshNetwork(coreUrl);
       void refreshAudio(coreUrl);
       void refreshInput(coreUrl);
+      void refreshApplications(coreUrl);
     }, 4000);
   } catch (error) {
     console.error(error);

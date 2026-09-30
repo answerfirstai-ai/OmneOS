@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from core.agents.communication import AgentMailbox
 from core.agents.lifecycle import AgentLifecycle
@@ -31,11 +33,14 @@ from core.orchestrator.service import OMNE
 from core.orchestrator.store import TaskStore
 from core.permissions.audit import AuditLog
 from core.permissions.evaluator import PermissionEvaluator
+from core.permissions.policies import PermissionRequest
 from core.project.context import inspect_project
 from core.tools import build_registry
 from core.tools.gateway import ToolGateway
 from core.voice.service import VoiceService
 from core.world.state import WorldStateService
+from omne.applications.select import application_service
+from omne.applications.service import ApplicationService
 
 
 def build_OMNE(settings: Settings) -> OMNE:
@@ -51,8 +56,12 @@ def build_OMNE(settings: Settings) -> OMNE:
     monitor = SystemMonitor()
     compute = ComputeScheduler(monitor)
     cache = ModelCache()
-    tools = build_registry(browser_command=settings.browser_command)
     evaluator = PermissionEvaluator()
+    applications = _application_service(settings, events, evaluator)
+    tools = build_registry(
+        browser_command=settings.browser_command,
+        applications=applications,
+    )
     gateway = ToolGateway(
         tools,
         evaluator,
@@ -132,9 +141,38 @@ def build_OMNE(settings: Settings) -> OMNE:
         activation_shortcut=settings.activation_shortcut,
         cancel_shortcut=settings.cancel_shortcut,
         push_to_talk_shortcut=settings.push_to_talk_shortcut,
+        applications=applications,
     )
     executor._context_text = omne.context_for
     return omne
+
+
+def _application_service(
+    settings: Settings,
+    events: EventBus,
+    evaluator: PermissionEvaluator,
+) -> ApplicationService:
+    def sink(event_type: str, payload: dict[str, Any]) -> None:
+        events.publish(event_type, source="applications", payload=payload)
+
+    def authorize(
+        tool_id: str,
+        arguments: dict[str, object],
+        grants: Mapping[str, Sequence[str]],
+        environment: str,
+    ) -> tuple[str, str]:
+        result = evaluator.evaluate(
+            PermissionRequest(
+                tool_id=tool_id,
+                arguments=dict(arguments),
+                grants={key: list(value) for key, value in grants.items()},
+                environment=environment,
+                workspace_root=str(settings.workspace_root),
+            )
+        )
+        return result.decision.value, result.reason
+
+    return application_service(settings.environment, sink=sink, authorize=authorize)
 
 
 def _model_is_available(settings: Settings, provider: str) -> bool:
