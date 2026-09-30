@@ -6,40 +6,39 @@
  * without changing backend state.
  */
 
-import { characterAsset, characterState } from "./character.js";
-import { environmentState, type EnvironmentInput, type EnvironmentState } from "./environment.js";
+import { characterAsset, characterMode, characterState, type CharacterMode } from "./character.js";
+import { type EnvironmentInput } from "./environment.js";
 
 export type PresenceMotion = "still" | "steady";
 
 export interface PresenceView {
-  state: EnvironmentState;
-  label: string;
+  state: CharacterMode;
+  label: CharacterMode;
   motion: PresenceMotion;
   asset: string | null;
+  ask: string | null;
 }
 
 export interface CharacterRenderer {
   render(host: HTMLElement, view: PresenceView): void;
 }
 
-const STEADY: ReadonlySet<EnvironmentState> = new Set([
-  "LISTENING",
-  "UNDERSTANDING",
-  "PLANNING",
-  "ROUTING",
-  "WORKING",
-  "VERIFYING",
+const STEADY: ReadonlySet<CharacterMode> = new Set([
+  "THINKING",
+  "RESEARCHING",
+  "EXECUTING",
   "WAITING",
 ]);
 
-/** Build the view a renderer paints. Motion is optional; the label is the state. */
+/** Build the view a renderer paints. The label is the live system state. */
 export function presenceView(input: EnvironmentInput): PresenceView {
-  const state = environmentState(input);
+  const state = characterMode(input);
   return {
     state,
     label: state,
     motion: STEADY.has(state) ? "steady" : "still",
     asset: characterAsset(characterState(input)),
+    ask: state === "IDLE" ? "What can I do?" : null,
   };
 }
 

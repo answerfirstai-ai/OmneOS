@@ -17,7 +17,9 @@
             <circle class="ring core" cx="60" cy="60" r="8"></circle>
           </svg>
         </div>
+        <p class="presence-name">OMNE CORE</p>
         <p id="presence-label" data-presence-label>IDLE</p>
+        <p id="presence-ask" class="presence-ask">What can I do?</p>
         <p id="presence-objective" class="presence-objective">No active mission</p>
         <p id="presence-attention" class="presence-attention"></p>
       </div>
@@ -139,7 +141,7 @@
           aria-labelledby="launcher-title"
         >
           <header class="titlebar">
-            <h2 id="launcher-title">Command</h2>
+            <h2 id="launcher-title">OMNE</h2>
             <div class="chrome">
               <button
                 type="button"
@@ -169,7 +171,9 @@
           </header>
           <form id="launcher" class="window-body command-surface">
             <p class="command-mark">OMNE</p>
-            <label for="objective">What do you want me to do?</label>
+            <p id="launcher-prompt">What do you want to do?</p>
+            <ul id="launcher-actions" class="launcher-actions"></ul>
+            <label for="objective">Or describe it</label>
             <input id="objective" name="objective" type="text" placeholder="Build me a website" />
             <ul id="applications" class="applications"></ul>
             <button type="submit">Send</button>

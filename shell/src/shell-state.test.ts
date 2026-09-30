@@ -86,7 +86,9 @@ test("presence keeps a visible label and does not invent an asset", () => {
   assert.equal(idle.motion, "still");
   assert.equal(idle.asset, null);
   assert.equal(working.motion, "steady");
-  assert.equal(working.label, "WORKING");
+  assert.equal(working.label, "EXECUTING");
+  assert.equal(working.ask, null);
+  assert.equal(idle.ask, "What can I do?");
 });
 
 test("lifecycle stays pending until selection evidence exists", () => {

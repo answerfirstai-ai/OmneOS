@@ -67,7 +67,21 @@ def plan_objective(objective: str) -> list[PlanNode]:
     if "git status" in lowered:
         return [_tool_node("git-status", text, "software_development", "git.status", {})]
     if lowered.startswith("research") or " research " in f" {lowered} ":
-        return [_research_node(text)]
+        return [_research_node(text, query=_search_query(text))]
+    if "system resource" in lowered:
+        return [_resource_node(text)]
+    if "coding agent" in lowered or ("build" in lowered and "project" in lowered):
+        return [_coding_node(text)]
+    if "find" in lowered and "file" in lowered:
+        return [
+            _tool_node(
+                "files",
+                text,
+                "software_development",
+                "filesystem.search",
+                {"query": ".", "path": "."},
+            )
+        ]
     if lowered.startswith("open http") or "browser" in lowered:
         url = _url(text) or "https://example.com"
         return [_tool_node("browser", text, "browser_navigation", "browser.open", {"url": url})]
@@ -113,7 +127,7 @@ def plan_objective(objective: str) -> list[PlanNode]:
 
 def _website(objective: str) -> list[PlanNode]:
     return [
-        _research_node("Collect local sources for the website"),
+        _research_node("Collect local sources for the website", query="website"),
         PlanNode(
             key="design",
             objective="Design the website",
@@ -161,17 +175,44 @@ def _website(objective: str) -> list[PlanNode]:
     ]
 
 
-def _research_node(objective: str) -> PlanNode:
+def _research_node(objective: str, *, query: str) -> PlanNode:
     return PlanNode(
         key="research",
         objective=objective,
         capability="source_collection",
         calls=[
-            PlannedCall(kind="tool", tool_id="filesystem.search", arguments={"query": "website"}),
+            PlannedCall(kind="tool", tool_id="filesystem.search", arguments={"query": query}),
             PlannedCall(kind="research_note"),
         ],
         required_tools=["filesystem.search"],
     )
+
+
+def _resource_node(objective: str) -> PlanNode:
+    names = ("cpu", "memory", "disk")
+    calls = [PlannedCall(kind="tool", tool_id=_METRICS[name], arguments={}) for name in names]
+    return PlanNode(
+        key="resources",
+        objective=objective,
+        capability="system_inspection",
+        calls=calls,
+        required_tools=[call.tool_id for call in calls],
+    )
+
+
+def _coding_node(objective: str) -> PlanNode:
+    return PlanNode(
+        key="coding",
+        objective=objective,
+        capability="software_development",
+        calls=[PlannedCall(kind="model", prompt=objective)],
+    )
+
+
+def _search_query(objective: str) -> str:
+    skip = {"research", "the", "latest", "my", "a", "an", "for", "and", "of", "s"}
+    words = [word for word in re.findall(r"[A-Za-z0-9]+", objective) if word.lower() not in skip]
+    return words[0] if words else "notes"
 
 
 def _write_node(path: str, content: str) -> PlanNode:

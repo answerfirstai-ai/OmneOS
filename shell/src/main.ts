@@ -58,7 +58,9 @@ import { coreHealthUrl, parseHealth, type CoreHealth } from "./health.js";
 import { inspectMission } from "./mission-view.js";
 import { noticesFromEvents } from "./notify.js";
 import { permissionPrompt } from "./permission-view.js";
+import { LAUNCHER_ACTIONS } from "./launcher.js";
 import { coreRenderer, presenceView } from "./presence.js";
+import { readRecovery, type RecoveryState } from "./recovery.js";
 import { matchShortcut } from "./shortcuts.js";
 import { voiceControlEnabled, voiceSummary, type VoiceStatus } from "./voice.js";
 import {
@@ -111,6 +113,7 @@ let inputStatus: InputStatusView = {
 let inputSeen = -1;
 let applicationFlight = false;
 let applications: ApplicationView[] = [];
+let recoveryState: RecoveryState | null = null;
 let graphFlight = false;
 
 /** Read the core base URL from a page query string. */
@@ -203,29 +206,11 @@ function showSync(message: string): void {
   }
 }
 
-function paintPresence(coreOk: boolean): void {
-  const host = listElement("presence");
-  const tray = listElement("character");
-  if (desktopView === null) {
-    const view = presenceView({ coreOk, voiceListening: false, statuses: [] });
-    if (host !== null) {
-      coreRenderer.render(host, view);
-    }
-    if (tray !== null) {
-      tray.dataset["state"] = view.state;
-      tray.textContent = view.label;
-    }
-    return;
-  }
-  const missions = desktopView.missions.map((mission) => mission.status);
-  const latest = desktopView.events[desktopView.events.length - 1];
-  const view = presenceView({
-    coreOk,
-    voiceListening: desktopView.voice.listening,
-    statuses: parentTasks(desktopView.tasks).map((task) => task.status),
-    ...(missions.length > 0 ? { missionStatuses: missions } : {}),
-    ...(latest === undefined ? {} : { latestEvent: latest.type }),
-  });
+function paintCharacter(
+  host: HTMLElement | null,
+  tray: HTMLElement | null,
+  view: ReturnType<typeof presenceView>,
+): void {
   if (host !== null) {
     coreRenderer.render(host, view);
   }
@@ -233,6 +218,48 @@ function paintPresence(coreOk: boolean): void {
     tray.dataset["state"] = view.state;
     tray.textContent = view.label;
   }
+  const ask = listElement("presence-ask");
+  if (ask !== null) {
+    ask.hidden = view.ask === null;
+    ask.textContent = view.ask ?? "";
+  }
+}
+
+function paintPresence(coreOk: boolean): void {
+  const host = listElement("presence");
+  const tray = listElement("character");
+  if (desktopView === null) {
+    const view = presenceView({
+      coreOk,
+      voiceListening: false,
+      statuses: [],
+      recovery: recoveryState,
+    });
+    paintCharacter(host, tray, view);
+    return;
+  }
+  const missions = desktopView.missions.map((mission) => mission.status);
+  const latest = desktopView.events[desktopView.events.length - 1];
+  const live = new Set(["ANALYZING", "PLANNING", "RUNNING", "RECOVERING", "VERIFYING", "WAITING"]);
+  const activeAgents = [
+    ...desktopView.activity
+      .filter((item) => live.has(item.status) && item.assigned_agent !== null)
+      .map((item) => item.assigned_agent ?? ""),
+    ...desktopView.workers
+      .filter((worker) => worker.status === "RUNNING")
+      .map((worker) => worker.agent_id),
+  ];
+  const view = presenceView({
+    coreOk,
+    voiceListening: desktopView.voice.listening,
+    statuses: parentTasks(desktopView.tasks).map((task) => task.status),
+    activeAgents,
+    recovery: recoveryState,
+    waitingForUser: desktopView.confirmations.length > 0 || desktopView.questions.length > 0,
+    ...(missions.length > 0 ? { missionStatuses: missions } : {}),
+    ...(latest === undefined ? {} : { latestEvent: latest.type }),
+  });
+  paintCharacter(host, tray, view);
   const objective = listElement("presence-objective");
   const current = activeMission(desktopView.missions);
   if (objective !== null) {
@@ -884,6 +911,29 @@ function paintProject(): void {
   );
 }
 
+function paintLauncherActions(): void {
+  const list = document.getElementById("launcher-actions");
+  if (!(list instanceof HTMLUListElement) || list.childElementCount > 0) {
+    return;
+  }
+  for (const action of LAUNCHER_ACTIONS) {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset["launcherAction"] = action.id;
+    button.textContent = action.label;
+    button.addEventListener("click", () => {
+      const objective = document.getElementById("objective");
+      if (objective instanceof HTMLInputElement) {
+        objective.value = action.objective;
+      }
+      void runObjective(action.objective);
+    });
+    item.append(button);
+    list.append(item);
+  }
+}
+
 function paintApplications(): void {
   const list = document.getElementById("applications");
   if (!(list instanceof HTMLUListElement)) {
@@ -1401,6 +1451,53 @@ async function confirmTask(taskId: string, approved: boolean): Promise<void> {
   }
 }
 
+function runObjective(objective: string): Promise<void> {
+  const launcher = document.getElementById("launcher");
+  const submit = launcher?.querySelector("button[type='submit']");
+  const actions = Array.from(
+    document.querySelectorAll<HTMLButtonElement>("[data-launcher-action]"),
+  );
+  if (submit instanceof HTMLButtonElement && submit.disabled) {
+    return Promise.resolve();
+  }
+  if (submit instanceof HTMLButtonElement) {
+    submit.disabled = true;
+  }
+  for (const action of actions) {
+    action.disabled = true;
+  }
+  const status = requireElement("status");
+  const detail = requireElement("detail");
+  return submitObjective(readCoreUrl(window.location.search), objective)
+    .then(() => refresh(status, detail))
+    .catch((error: unknown) => {
+      const result = listElement("launch-result");
+      if (result !== null) {
+        result.textContent = error instanceof Error ? error.message : "run failed";
+      }
+    })
+    .finally(() => {
+      if (submit instanceof HTMLButtonElement) {
+        submit.disabled = false;
+      }
+      for (const action of actions) {
+        action.disabled = false;
+      }
+    });
+}
+
+async function loadRecovery(coreUrl: string): Promise<RecoveryState | null> {
+  try {
+    const payload = await fetchJson(coreApiUrl(coreUrl, "/recovery"));
+    if (typeof payload !== "object" || payload === null || !("recovery" in payload)) {
+      return null;
+    }
+    return readRecovery(payload.recovery).state;
+  } catch {
+    return null;
+  }
+}
+
 async function submitObjective(coreUrl: string, objective: string): Promise<void> {
   const result = listElement("launch-result");
   if (result !== null) {
@@ -1431,7 +1528,9 @@ async function refresh(status: HTMLElement, detail: HTMLElement): Promise<void> 
       health.status,
       `${health.service} ${health.version} · ${health.environment}`,
     );
+    recoveryState = await loadRecovery(coreUrl);
   } catch (error) {
+    recoveryState = null;
     showCoreStatus(
       status,
       detail,
@@ -1735,32 +1834,14 @@ function bootstrap(): void {
     if (launcher instanceof HTMLFormElement && objective instanceof HTMLInputElement) {
       launcher.addEventListener("submit", (event) => {
         event.preventDefault();
-        const submit = launcher.querySelector("button[type='submit']");
-        if (submit instanceof HTMLButtonElement && submit.disabled) {
-          return;
-        }
         const text = objective.value.trim();
         if (text === "") {
           return;
         }
-        if (submit instanceof HTMLButtonElement) {
-          submit.disabled = true;
-        }
-        void submitObjective(readCoreUrl(window.location.search), text)
-          .then(() => refresh(status, detail))
-          .catch((error: unknown) => {
-            const result = listElement("launch-result");
-            if (result !== null) {
-              result.textContent = error instanceof Error ? error.message : "run failed";
-            }
-          })
-          .finally(() => {
-            if (submit instanceof HTMLButtonElement) {
-              submit.disabled = false;
-            }
-          });
+        void runObjective(text);
       });
     }
+    paintLauncherActions();
     const listen = document.getElementById("voice-listen");
     if (listen instanceof HTMLButtonElement) {
       listen.disabled = true;
