@@ -91,6 +91,7 @@ _MODEL_CAPABILITY = {
     "process_inspection": "tool_use",
 }
 
+
 def _required_model_capability(capability: str) -> str:
     if capability in {"reasoning", "coding", "planning", "tool_use", "vision"}:
         return capability
@@ -502,9 +503,7 @@ class OMNE:
             "fallbacks": fallbacks,
         }
 
-    async def reason(
-        self, objective: str, *, capability: str = "reasoning"
-    ) -> StructuredDecision:
+    async def reason(self, objective: str, *, capability: str = "reasoning") -> StructuredDecision:
         """Ask the routed model for a decision. Tool requests are not executed."""
 
         if self._cortex is None:

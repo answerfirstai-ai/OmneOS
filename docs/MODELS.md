@@ -13,10 +13,10 @@ stays `unknown`. The mock adapter reports `none` because it does not use an acce
 
 ## Registry
 
-Manifests live in `models/manifests/*.toml`. A manifest names the provider (`mock`, `xai`,
-`local`, or `nvidia`), the model name, capabilities, whether it is local, a context window when one
-is known, and resource requirements. Unknown memory stays unknown. `local-default` ships with
-`ram_known` and `vram_known` false, so the allocator defers it instead of inventing a size.
+Manifests live in `models/manifests/*.toml`. A manifest names the provider (`mock`, `xai`, `local`,
+or `nvidia`), the model name, capabilities, whether it is local, a context window when one is known,
+and resource requirements. Unknown memory stays unknown. `local-default` ships with `ram_known` and
+`vram_known` false, so the allocator defers it instead of inventing a size.
 
 NVIDIA cloud manifests declare `vram_mb = 0` and `vram_known = true`. A cloud reservation is a
 `CLOUD_MODEL_RESOURCE` and does not hold local video memory. A local model reservation is a
@@ -25,22 +25,22 @@ NVIDIA cloud manifests declare `vram_mb = 0` and `vram_known = true`. A cloud re
 ## NVIDIA NIM
 
 NVIDIA is the first cloud intelligence provider. It is not a boot dependency. `OMNE check`, the unit
-tests, and the VM boot path do not call the API. Without `NVIDIA_API_KEY`, Core still starts and
-the router uses the next permitted provider.
+tests, and the VM boot path do not call the API. Without `NVIDIA_API_KEY`, Core still starts and the
+router uses the next permitted provider.
 
 The adapter posts to `https://integrate.api.nvidia.com/v1/chat/completions`. The key is read from
 `NVIDIA_API_KEY`, or from a stored `model/nvidia` secret addressed to `core`. It is not a setting,
 not a manifest field, and not written to SQLite, events, logs, or prompts. `NVIDIA_MODEL`, or
 `OMNE_NVIDIA_MODEL`, selects the catalog id. The default is the current API Catalog model
-`nvidia/nemotron-3-super-120b-a12b`. Other shipped manifests use catalog ids that were published
-for chat:
+`nvidia/nemotron-3-super-120b-a12b`. Other shipped manifests use catalog ids that were published for
+chat:
 
-| OMNE id | Catalog id | Used for |
-| --- | --- | --- |
-| `nvidia-reasoning` | `nvidia/nemotron-3-super-120b-a12b` | reasoning, coding, tools |
-| `nvidia-coding` | `mistralai/mistral-nemotron` | coding and tool calling |
-| `nvidia-fast` | `nvidia/nemotron-3.5-lightning-30b-a3b` | lower-latency chat |
-| `nvidia-vision` | `meta/llama-3.2-11b-vision-instruct` | vision |
+| OMNE id            | Catalog id                              | Used for                 |
+| ------------------ | --------------------------------------- | ------------------------ |
+| `nvidia-reasoning` | `nvidia/nemotron-3-super-120b-a12b`     | reasoning, coding, tools |
+| `nvidia-coding`    | `mistralai/mistral-nemotron`            | coding and tool calling  |
+| `nvidia-fast`      | `nvidia/nemotron-3.5-lightning-30b-a3b` | lower-latency chat       |
+| `nvidia-vision`    | `meta/llama-3.2-11b-vision-instruct`    | vision                   |
 
 `OMNE_MODEL_ROUTE` is `auto`, `mock`, `local`, or `nvidia`. Development and production default to
 `auto`, which prefers NVIDIA, then a local model, then mock. Testing defaults to `mock`. An explicit
@@ -56,8 +56,8 @@ OMNE models test nvidia
 
 `OMNE models` prints whether NVIDIA is `CONFIGURED` or `NOT CONFIGURED` and does not contact the
 network. `OMNE models test nvidia` sends one short prompt only when `NVIDIA_API_KEY` is set. It
-prints the provider, model, latency, and `PASS` or `FAIL`. It does not print the key and it does
-not execute tools.
+prints the provider, model, latency, and `PASS` or `FAIL`. It does not print the key and it does not
+execute tools.
 
 ## Engines
 

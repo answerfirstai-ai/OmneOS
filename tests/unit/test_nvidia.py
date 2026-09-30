@@ -185,17 +185,13 @@ def test_timeout_network_rate_limit_and_server_failure(monkeypatch: pytest.Monke
 
     limited, limited_attempts = scripted([429, 429])
     with pytest.raises(ProviderError) as rate:
-        asyncio.run(
-            _ask(_provider(limited, retries=1))
-        )
+        asyncio.run(_ask(_provider(limited, retries=1)))
     assert rate.value.code == "rate_limited"
     assert limited_attempts["count"] == 2
 
     failed, failed_attempts = scripted([503, 503])
     with pytest.raises(ProviderError) as server:
-        asyncio.run(
-            _ask(_provider(failed, retries=1))
-        )
+        asyncio.run(_ask(_provider(failed, retries=1)))
     assert server.value.code == "unavailable"
     assert failed_attempts["count"] == 2
 
@@ -207,9 +203,7 @@ def test_malformed_and_streaming_responses() -> None:
         return 200, b"not-json"
 
     with pytest.raises(ProviderError) as malformed:
-        asyncio.run(
-            _ask(_provider(bad_json, retries=0))
-        )
+        asyncio.run(_ask(_provider(bad_json, retries=0)))
     assert malformed.value.code == "invalid_response"
 
     def bad_shape(

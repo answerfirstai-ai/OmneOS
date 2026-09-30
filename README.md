@@ -43,8 +43,8 @@ runs an objective. `OMNE execute` prints JSON `{"id","status"}` and exits 0 when
 
 `NVIDIA_API_KEY` selects the NVIDIA NIM provider when it is present. OMNE still starts, and
 `OMNE check` still passes, when the variable is absent. `OMNE models` shows whether NVIDIA is
-configured. `OMNE models test nvidia` runs one short completion only when the key is set. The key
-is not stored in the repository. See `docs/MODELS.md`.
+configured. `OMNE models test nvidia` runs one short completion only when the key is set. The key is
+not stored in the repository. See `docs/MODELS.md`.
 
 `XAI_API_KEY` is read in development and testing when the xAI provider is called and no stored
 `model/xai` secret is addressed to core. Production does not read that variable. The default route

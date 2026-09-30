@@ -3,8 +3,8 @@
 A provider implements `generate`, `stream`, and `tool_call`. `tool_call` returns a name and
 arguments. It does not execute the tool.
 
-Manifests live in `models/manifests/*.toml`. Fields are `id`, `provider` (`mock`, `xai`, `local`,
-or `nvidia`), `model_name`, `capabilities`, `local`, `priority`, `requirements`, and the metrics
+Manifests live in `models/manifests/*.toml`. Fields are `id`, `provider` (`mock`, `xai`, `local`, or
+`nvidia`), `model_name`, `capabilities`, `local`, `priority`, `requirements`, and the metrics
 `cost_input`, `cost_output`, and `latency`. Unknown metrics stay the string `unknown`.
 
 The router keeps models that declare every requested capability, sorts by priority, and accepts the
