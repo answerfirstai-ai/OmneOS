@@ -57,6 +57,9 @@ _HIGH_CAPABILITIES = frozenset(
         "network.disconnect",
         "network.enable",
         "network.disable",
+        "audio.set_default",
+        "audio.set_volume",
+        "audio.set_mute",
     }
 )
 

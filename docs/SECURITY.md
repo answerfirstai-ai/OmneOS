@@ -63,5 +63,8 @@ compositor. `window: own` covers windows that agent launched. `window: manage` d
 this revision. Hardware diagnostics only read sysfs and proc. They do not load drivers or write
 device configuration, and `POST /hardware` is not a route. Network diagnostics only read sysfs and
 proc. Connect, disconnect, enable, and disable require `network:configure` and are not an HTTP
-route. A password is not stored on a network record or an event. `POST /network` is not a route. The
-ISO script does not write `OMNE-OS.iso`. No physical disk installation is performed.
+route. A password is not stored on a network record or an event. `POST /network` is not a route.
+Audio diagnostics only read the published stack. Volume, mute, and the default device require
+`audio:configure` and are not an HTTP route. Microphone audio is not captured or transmitted, and
+`voice.transmit` stays denied. `POST /audio` is not a route. The ISO script does not write
+`OMNE-OS.iso`. No physical disk installation is performed.

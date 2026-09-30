@@ -56,10 +56,14 @@ Python:
 - Network reads. The testing API uses an empty mock session. A Linux fixture supplies Ethernet,
   loopback, Wi-Fi signal, DNS, and a default route. A password in a supplicant file is not part of
   the record. `POST /network` stays 404.
+- Audio diagnostics. The testing API uses an empty mock session and keeps voice denied. A Linux
+  fixture supplies a PipeWire dump with speakers, a microphone, Bluetooth audio, volume, mute,
+  defaults, and a capture stream. An ALSA fixture leaves volume null. `POST /audio` stays 404.
 
 TypeScript:
 
-- Health parsing, core URL selection, the windowing state parser, and the network tray parser.
+- Health parsing, core URL selection, the windowing state parser, and the network and audio tray
+  parsers.
 - Character states, including a missing asset and mission-driven analyzing, verifying, and waiting.
 - Environment state, lifecycle stages, mission inspection, permission copy, verification evidence,
   error summaries, notifications, graph layout, the current-mission graph, command copy, detail
@@ -77,5 +81,6 @@ refusing to write when not root. The boot checklist is tested against a fixture 
 core: an unavailable GPU is not a check. Display launch readiness is tested against a fixture DRM
 tree. Window commands are tested against the in-memory record and a snapshot file. Hardware
 discovery is tested against a fixture sysfs tree. Network state is tested against an in-memory
-session and a fixture route table. The default suite does not run `debootstrap`, QEMU, or labwc.
-Live xAI, a physical GPU workload, and hardware installation are outside the default suite.
+session and a fixture route table. Audio state is tested against an in-memory mixer and fixture ALSA
+and PipeWire records. The default suite does not run `debootstrap`, QEMU, or labwc. Live xAI, a
+physical GPU workload, and hardware installation are outside the default suite.

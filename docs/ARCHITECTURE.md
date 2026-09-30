@@ -188,4 +188,6 @@ assignment on top of that choice. Close and move require a grant, and the record
 labwc. See `docs/WINDOWING.md`. `omne.hardware` reads CPU, memory, buses, and peripherals from sysfs
 and proc. It does not load drivers or write device configuration. See `docs/HARDWARE.md`.
 `omne.network` reads interfaces, addresses, DNS, and routes from the Linux stack and does not
-replace systemd-networkd. See `docs/NETWORK.md`.
+replace systemd-networkd. See `docs/NETWORK.md`. `omne.audio` reads PipeWire, WirePlumber, or ALSA
+and does not open a microphone. Speech recognition is not implemented. See
+`docs/AUDIO_ARCHITECTURE.md`.

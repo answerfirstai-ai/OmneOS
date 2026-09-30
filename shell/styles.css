@@ -254,6 +254,7 @@ input:focus-visible {
 }
 
 #status,
+#audio-status,
 #network-status,
 #tray-status,
 #character,
@@ -269,12 +270,14 @@ input:focus-visible {
 }
 
 #status[data-state="ok"],
+#audio-status[data-state="present"],
 #network-status[data-state="up"],
 #tray-status[data-state="ok"],
 #character[data-state="success"] {
   color: var(--ok);
 }
 
+#audio-status[data-state="active"],
 #status[data-state="checking"],
 #tray-status[data-state="checking"],
 #character[data-state="thinking"],
@@ -291,6 +294,9 @@ input:focus-visible {
 }
 
 #status[data-state="unavailable"],
+#audio-status[data-state="muted"],
+#audio-status[data-state="absent"],
+#audio-status[data-state="unknown"],
 #network-status[data-state="down"],
 #network-status[data-state="unreachable"],
 #network-status[data-state="unknown"],
@@ -463,6 +469,7 @@ input {
 }
 
 #character,
+#audio-status,
 #network-status,
 #tray-status,
 #clock {

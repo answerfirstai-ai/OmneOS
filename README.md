@@ -83,7 +83,8 @@ exits 2 and does not write an image. `scripts/linux/vm-boot.sh --run` starts QEM
 OVMF are present. `OMNE display` reports DRM and labwc readiness and does not start a compositor.
 `OMNE windowing` reports the window record and does not command labwc. `OMNE hardware` reports
 devices Linux has already published and does not change drivers. `OMNE network` reports the Linux
-network stack and does not change it. Physical hardware installation is not implemented.
+network stack and does not change it. `OMNE audio` reports the Linux audio stack and does not open a
+microphone. Physical hardware installation is not implemented.
 
 ## License
 
