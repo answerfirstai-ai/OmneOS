@@ -25,7 +25,8 @@ ProtectClock=true
 RestrictSUIDSGID=true
 LockPersonality=true
 CapabilityBoundingSet=
-InaccessiblePaths=/boot /efi /etc/shadow /etc/gshadow /etc/sudoers /etc/ssh
+# A leading '-' skips a path that is not on this image. /efi is absent on the live ISO.
+InaccessiblePaths=-/boot -/efi -/etc/shadow -/etc/gshadow -/etc/sudoers -/etc/ssh
 
 [Install]
 WantedBy=omne.target

@@ -236,6 +236,11 @@ def test_stage_places_services_on_the_ubuntu_base(tmp_path: Path) -> None:
     assert "Conflicts=getty@tty1.service" in boot
     assert "StandardOutput=journal+console" in boot
     assert "DeviceAllow=/dev/ttyS0 rw" in boot
+    assert "InaccessiblePaths=-/boot -/efi" in core
+    assert "InaccessiblePaths=-/boot -/efi" in shell
+    assert "InaccessiblePaths=-/boot -/efi" in boot
+    diag = (dest / "etc/systemd/system/omne-diag.service").read_text(encoding="utf-8")
+    assert "InaccessiblePaths=-/boot -/efi" in diag
     assert (dest / "usr/bin/omne-boot").is_file()
     assert (dest / "usr/bin/omne-diag").is_file()
     assert (dest / "usr/lib/omne/agents/coding/agent.toml").is_file()

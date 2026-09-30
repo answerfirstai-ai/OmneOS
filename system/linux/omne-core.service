@@ -45,7 +45,8 @@ CPUQuota=200%
 LimitNOFILE=1024
 ReadWritePaths=/var/lib/omne
 ReadOnlyPaths=/etc/omne/OMNE.toml
-InaccessiblePaths=/boot /efi /root /etc/shadow /etc/gshadow /etc/sudoers /etc/ssh
+# A leading '-' skips a path that is not on this image. /efi is absent on the live ISO.
+InaccessiblePaths=-/boot -/efi -/root -/etc/shadow -/etc/gshadow -/etc/sudoers -/etc/ssh
 StateDirectory=omne
 StateDirectoryMode=0750
 
