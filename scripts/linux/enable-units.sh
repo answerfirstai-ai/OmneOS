@@ -10,7 +10,7 @@ enable_omne_units() {
   # omne-doctor is pulled in by omne-session. Linking it from multi-user
   # creates an ordering cycle and systemd skips the doctor.
   for unit in \
-    omne.target omne-session.service omne-diag.service omne-reboot-listen.service
+    omne.target omne-login.service omne-session.service omne-diag.service omne-reboot-listen.service
   do
     if [[ -e "${system}/${unit}" ]]; then
       ln -sfn "/etc/systemd/system/${unit}" "${multi}/${unit}"

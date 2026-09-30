@@ -68,6 +68,13 @@ def test_installed_machine_keeps_the_operator_after_reboot(
     assert 'id="desktop"' in shell
     assert (wants / "omne.target").is_symlink()
     assert (wants / "omne-session.service").is_symlink()
+    assert (wants / "omne-login.service").is_symlink()
+    assert installed["login"] == "omne-login.service"
+    assert installed["startup"] == ["power", "login", "user_session", "core", "shell", "desktop"]
+    assert json.loads((root / "etc" / "omne" / "operator.json").read_text(encoding="utf-8")) == {
+        "enrolled": True,
+        "name": "omne",
+    }
     assert not (wants / "omne-doctor.service").exists()
     unit = (root / "etc" / "systemd" / "system" / "omne-session.service").read_text(
         encoding="utf-8"

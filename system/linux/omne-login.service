@@ -1,0 +1,35 @@
+[Unit]
+Description=OMNE login
+After=systemd-user-sessions.service
+Before=omne-user-session.service getty@tty1.service
+Conflicts=getty@tty1.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=omne
+Group=omne
+WorkingDirectory=/var/lib/omne
+StateDirectory=omne
+StateDirectoryMode=0750
+ExecStart=/usr/bin/omne-login
+StandardOutput=journal+console
+StandardError=journal+console
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+ReadOnlyPaths=-/etc/omne/operator.json
+# A leading '-' skips a path that is not on this image. /efi is absent on the live ISO.
+InaccessiblePaths=-/boot -/efi -/root -/etc/shadow -/etc/gshadow -/etc/sudoers -/etc/ssh
+
+[Install]
+WantedBy=multi-user.target

@@ -21,6 +21,8 @@ _UNITS = (
     "omne-core.service",
     "omne-shell.service",
     "omne-session.service",
+    "omne-login.service",
+    "omne-user-session.service",
     "omne-boot.service",
     "omne-diag.service",
     "omne.target",
@@ -33,13 +35,20 @@ _EXECUTABLES = (
     ("omne-boot", "usr/bin/omne-boot"),
     ("omne-diag", "usr/bin/omne-diag"),
     ("omne-session", "usr/bin/omne-session"),
+    ("omne-login", "usr/bin/omne-login"),
+    ("omne-user-session", "usr/bin/omne-user-session"),
     ("omne-prove", "usr/bin/omne-prove"),
     ("OMNE", "usr/bin/OMNE"),
     ("request-reboot", "usr/lib/omne/request-reboot"),
     ("omne-reboot-listen", "usr/bin/omne-reboot-listen"),
     ("omne-hello", "usr/lib/omne/applications/omne-hello"),
 )
-_TARGET_WANTS = ("omne-core.service", "omne-shell.service", "omne-boot.service")
+_TARGET_WANTS = (
+    "omne-user-session.service",
+    "omne-core.service",
+    "omne-shell.service",
+    "omne-boot.service",
+)
 
 
 class InstallRecord(TypedDict):
@@ -53,6 +62,8 @@ class InstallRecord(TypedDict):
     environment: str
     shell_surface: str
     session: str
+    login: str
+    startup: list[str]
     target: str
     state_dir: str
     disk_format: bool
@@ -111,6 +122,8 @@ def _record() -> InstallRecord:
         "environment": "production",
         "shell_surface": SHELL_SURFACE,
         "session": "omne-session.service",
+        "login": "omne-login.service",
+        "startup": ["power", "login", "user_session", "core", "shell", "desktop"],
         "target": "multi-user.target",
         "state_dir": "/var/lib/omne/memory",
         "disk_format": False,
@@ -131,12 +144,18 @@ def _write(source: Path, dest: Path, record: InstallRecord) -> None:
     if "nvapi-" in config or "api_key" in config:
         raise InstallError("installed configuration must not carry a credential")
     (etc / "OMNE.toml").write_text(config, encoding="utf-8")
+    shutil.copy2(linux / "operator.json", etc / "operator.json")
+    operator = dest / "var" / "lib" / "omne" / "operator.json"
+    shutil.copy2(linux / "operator.json", operator)
     (etc / "install.json").write_text(
         json.dumps(record, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     for name in _UNITS:
         shutil.copy2(linux / name, units / name)
+    dropin = units / "omne-core.service.d"
+    dropin.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(linux / "omne-core.service.d" / "user-session.conf", dropin / "user-session.conf")
     for name, relative in _EXECUTABLES:
         target = dest / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -158,6 +177,7 @@ def _write(source: Path, dest: Path, record: InstallRecord) -> None:
     if bundle.is_dir():
         _replace_tree(bundle, shell / "dist")
     _link(units / "multi-user.target.wants", "omne.target", "../omne.target")
+    _link(units / "multi-user.target.wants", "omne-login.service", "../omne-login.service")
     _link(
         units / "multi-user.target.wants",
         "omne-session.service",

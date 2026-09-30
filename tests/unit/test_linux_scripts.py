@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -269,6 +270,13 @@ def test_stage_places_services_on_the_ubuntu_base(tmp_path: Path) -> None:
     assert "WAYLAND_DISPLAY" not in session
     assert "ExecStart=/usr/bin/omne-session" in session
     assert (dest / "usr/bin/omne-session").is_file()
+    assert (dest / "usr/bin/omne-login").is_file()
+    assert (dest / "usr/bin/omne-user-session").is_file()
+    assert "Requires=omne-user-session.service" in (
+        dest / "etc/systemd/system/omne-core.service.d/user-session.conf"
+    ).read_text(encoding="utf-8")
+    operator = json.loads((dest / "etc/omne/operator.json").read_text(encoding="utf-8"))
+    assert operator["enrolled"] is True
     assert (dest / "usr/bin/omne-prove").is_file()
     assert (dest / "usr/bin/omne-reboot-listen").is_file()
     assert (dest / "etc/systemd/system/omne-doctor.service").is_file()
@@ -335,6 +343,11 @@ def test_packages_are_services_without_a_kernel(tmp_path: Path) -> None:
     assert "./usr/bin/omne-boot" in system
     assert "./usr/bin/omne-diag" in system
     assert "./usr/bin/omne-session" in system
+    assert "./usr/bin/omne-login" in system
+    assert "./usr/bin/omne-user-session" in system
+    assert "./etc/omne/operator.json" in system
+    assert "./etc/systemd/system/omne-login.service" in system
+    assert "./etc/systemd/system/omne-core.service.d/user-session.conf" in system
     assert "./usr/bin/omne-prove" in system
     assert "./etc/systemd/system/omne-doctor.service" in system
     assert "./usr/lib/modules-load.d/omne.conf" in system
@@ -536,8 +549,8 @@ def test_vm_boot_starts_qemu_on_the_desktop_chain(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert "desktop: automatic" in result.stdout
-    assert "QEMU -> UEFI -> systemd-boot -> Linux -> systemd -> OMNE services" in result.stdout
-    assert "graphical session -> OMNE Shell" in result.stdout
+    assert "QEMU -> UEFI -> systemd-boot -> Linux -> systemd -> OMNE LOGIN" in result.stdout
+    assert "USER SESSION -> OMNE CORE -> OMNE SHELL -> DESKTOP" in result.stdout
     assert "dry-run" not in result.stdout
     recorded = log.read_text(encoding="utf-8")
     assert "virtio-vga" in recorded
@@ -562,6 +575,7 @@ def test_enable_units_links_the_session_without_systemctl(tmp_path: Path) -> Non
     system.mkdir(parents=True)
     for name in (
         "omne.target",
+        "omne-login.service",
         "omne-session.service",
         "omne-diag.service",
         "omne-doctor.service",
@@ -581,6 +595,7 @@ def test_enable_units_links_the_session_without_systemctl(tmp_path: Path) -> Non
     assert result.returncode == 0, result.stderr
     wants = system / "multi-user.target.wants"
     assert (wants / "omne-session.service").is_symlink()
+    assert (wants / "omne-login.service").is_symlink()
     assert not (wants / "omne-doctor.service").exists()
     assert (wants / "omne-diag.service").is_symlink()
     assert (system / "sockets.target.wants" / "omne-reboot.socket").is_symlink()

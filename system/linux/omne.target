@@ -1,6 +1,6 @@
 [Unit]
 Description=OMNE system
-Wants=omne-boot.service omne-core.service omne-shell.service
+Wants=omne-boot.service omne-user-session.service omne-core.service omne-shell.service
 After=network.target omne-core.service
 
 [Install]

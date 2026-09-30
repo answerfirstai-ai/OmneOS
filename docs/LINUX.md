@@ -64,32 +64,41 @@ The machine firmware is UEFI. OMNE does not build a kernel. `scripts/linux/build
 Ubuntu's `linux-image-generic` and the initramfs that package generates, then writes a GPT disk:
 
 ```text
-UEFI
+POWER
+    → UEFI
     → systemd-boot
     → Ubuntu kernel
     → initramfs
     → systemd
-    → omne-boot, OMNE Core, OMNE Shell
+    → OMNE LOGIN
+    → USER SESSION
+    → OMNE CORE
+    → OMNE SHELL
+    → DESKTOP
 ```
 
 The disk installs `systemd-sysv`, so `/sbin/init` is systemd. `systemd-boot` is Ubuntu's
 `systemd-boot-efi` package from universe. When the build machine cannot mount FAT, `mtools` writes
 that EFI system partition. The bootloader waits zero seconds and loads one entry, titled OMNE. The
 default target is `multi-user.target`. `ubuntu-desktop`, `gdm3`, `lightdm`, and `plymouth` are
-refused, and `getty@tty1` and `serial-getty@ttyS0` are masked on the disk so a login prompt does not
-replace the console. Ethernet matches `en*` and `eth*` and requests DHCP through systemd-networkd. A
-link that stays down is reported as network down. OMNE does not replace that stack. `omne.network`
-reads the interfaces, addresses, DNS, and routes systemd-networkd already published. A later image
-can use iwd for Wi-Fi association and leave addressing with systemd-networkd, and only after an
-explicit grant. This image does not scan a radio or write a network unit. See `docs/NETWORK.md`.
-Audio on a later image is PipeWire with WirePlumber. OMNE reads that session and does not replace
-it. This image does not open a microphone. See `docs/AUDIO_ARCHITECTURE.md`. Input chords are
-configuration. The image does not grab the keyboard. See `docs/INPUT_ARCHITECTURE.md`. Storage is
-the layout Linux already published. The image does not format a disk. See `docs/STORAGE.md`.
-Installed applications are the desktop entries Linux already published. The image does not start
-those programs from the application reader. See `docs/APPLICATIONS.md`. Browser automation is not
-installed with the image. Playwright is documented and not imported. See `docs/BROWSER.md`. Process
-inspection reads `/proc` and does not signal a running process. See `docs/PROCESSES.md`.
+refused, and `getty@tty1` and `serial-getty@ttyS0` are masked on the disk so a terminal does not
+replace the console. `omne-login` is that console program. One enrolled operator in
+`/etc/omne/operator.json` receives the user session. systemd then starts OMNE Core, the shell, and
+the labwc desktop. A person does not start `python server.py`. A record that is missing or not
+enrolled leaves the machine at OMNE LOGIN. Ethernet matches `en*` and `eth*` and requests DHCP
+through systemd-networkd. A link that stays down is reported as network down. OMNE does not replace
+that stack. `omne.network` reads the interfaces, addresses, DNS, and routes systemd-networkd already
+published. A later image can use iwd for Wi-Fi association and leave addressing with
+systemd-networkd, and only after an explicit grant. This image does not scan a radio or write a
+network unit. See `docs/NETWORK.md`. Audio on a later image is PipeWire with WirePlumber. OMNE reads
+that session and does not replace it. This image does not open a microphone. See
+`docs/AUDIO_ARCHITECTURE.md`. Input chords are configuration. The image does not grab the keyboard.
+See `docs/INPUT_ARCHITECTURE.md`. Storage is the layout Linux already published. The image does not
+format a disk. See `docs/STORAGE.md`. Installed applications are the desktop entries Linux already
+published. The image does not start those programs from the application reader. See
+`docs/APPLICATIONS.md`. Browser automation is not installed with the image. Playwright is documented
+and not imported. See `docs/BROWSER.md`. Process inspection reads `/proc` and does not signal a
+running process. See `docs/PROCESSES.md`.
 
 `omne-boot` prints Hardware, Storage, Network, GPU, Core, and Models from the live machine and from
 `GET /health` and `GET /models`. A check is printed only when that probe succeeds. An unavailable
@@ -98,7 +107,7 @@ models are shown either way. The unit sends that checklist to the journal and to
 the program also writes `/dev/ttyS0`, so a serial boot log can see it. `ipc ok` is printed only
 after `GET /health` returns the core payload. `omne-diag` runs after `multi-user.target` and records
 unit state and the journal. It does not delay that target, start a session, or enter recovery.
-`omne-session` starts labwc after the same target, with no display manager. It prints
+`omne-session` starts labwc after the user session and the shell, with no display manager. It prints
 `labwc running` only after the Wayland socket exists.
 
 ```bash
