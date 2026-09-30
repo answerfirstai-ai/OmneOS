@@ -56,6 +56,7 @@ from omne.processes.service import (
     application_id_for,
     worker_id_for,
 )
+from omne.recovery.select import recovery_service
 from omne.secrets.audit import SecretAuditLog
 from omne.secrets.select import select_provider
 from omne.secrets.service import SecretService
@@ -100,10 +101,11 @@ def build_OMNE(settings: Settings) -> OMNE:
     )
     agents = AgentRegistry()
     agents.discover(settings.agents_dir, known_tools=tools.ids())
-    for manifest in agents.all():
-        lifecycle.register(manifest.id)
     models = ModelRegistry()
     models.discover(settings.models_dir)
+    _apply_recovery(settings, agents, models, events)
+    for manifest in agents.all():
+        lifecycle.register(manifest.id)
     for model in models.enabled():
         cache.register(model.id, size_bytes=None, requirements=model.requirements)
     credential = xai_api_key(settings, secrets)
@@ -380,6 +382,35 @@ def _providers(
         names[model.id] = model.model_name
         labels[model.id] = model.provider
     return providers, names, labels
+
+
+def _apply_recovery(
+    settings: Settings,
+    agents: AgentRegistry,
+    models: ModelRegistry,
+    events: EventBus,
+) -> None:
+    """Disable third-party agents and optional models when safe mode is active."""
+
+    service = recovery_service(
+        settings.environment,
+        settings.data_dir / "recovery",
+        updates_dir=settings.data_dir / "updates",
+        port=settings.port,
+    )
+    status = service.assess()
+    for agent_id in service.disabled_agent_ids(agent.id for agent in agents.all()):
+        agents.disable(agent_id)
+    pairs = ((model.id, model.provider) for model in models.all())
+    for model_id in service.disabled_model_ids(pairs):
+        models.disable(model_id)
+    if status.state == "NORMAL":
+        return
+    events.publish(
+        "recovery.assessed",
+        source="recovery",
+        payload={"state": status.state, "explanation": status.explanation},
+    )
 
 
 def _secret_service(

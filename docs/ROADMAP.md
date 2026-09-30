@@ -26,6 +26,7 @@
 | —     | Security profiles for system, core, agent, worker, model, shell, and application |
 | —     | Scoped secrets for models, APIs, browsers, networks, applications, and services  |
 | —     | Signed update catalogs, pending slots, and rollback without host installation    |
+| —     | Recovery states, safe mode, and startup failure explanations                     |
 
 ## Not done
 
@@ -62,7 +63,8 @@ path. `docs/WORKERS.md` describes agent definitions and in-memory workers. `docs
 describes resident model loading. `docs/SECURITY_MODEL.md` describes the profile boundary that sits
 behind the permission evaluator. `docs/SECRETS.md` describes scoped credentials and the Linux
 keyring. `docs/UPDATE_ARCHITECTURE.md` describes signed catalogs and apt plans. The development host
-is not updated.
+is not updated. `docs/RECOVERY.md` describes startup checks, safe mode, and recovery commands. User
+data is not erased, and the operating system is not reinstalled.
 
 The intelligence layer in this revision is the mission, world state, intent engine, decision engine,
 capability registry, worker slots, context builder, verifier, trace ids, command classes, dry-run,

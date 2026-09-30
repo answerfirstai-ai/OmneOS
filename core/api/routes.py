@@ -47,6 +47,8 @@ def route_get(
         return HTTPStatus.OK, {"storage": runtime.storage_view()}
     if path == "/updates":
         return HTTPStatus.OK, {"updates": runtime.updates_view()}
+    if path == "/recovery":
+        return HTTPStatus.OK, {"recovery": runtime.recovery_view()}
     if path == "/applications":
         return HTTPStatus.OK, {"applications": runtime.applications_view()}
     if path == "/browser":

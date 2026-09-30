@@ -63,6 +63,8 @@ from omne.network.select import network_service
 from omne.network.service import NetworkService
 from omne.processes.select import process_service
 from omne.processes.service import ProcessService
+from omne.recovery.select import recovery_service
+from omne.recovery.service import RecoveryService
 from omne.storage.select import storage_service
 from omne.storage.service import StorageService
 from omne.updates.service import UpdateService
@@ -177,6 +179,7 @@ class OMNE:
         self._input: InputService | None = None
         self._storage: StorageService | None = None
         self._updates: UpdateService | None = None
+        self._recovery: RecoveryService | None = None
         self._data_dir = data_dir
         self._applications = applications
         self._browser = browser
@@ -590,6 +593,20 @@ class OMNE:
         self._input = service
         return service
 
+    def recovery_view(self) -> dict[str, object]:
+        with self._lock:
+            return self._recovery_service().assess().model_dump(mode="json")
+
+    def _recovery_service(self) -> RecoveryService:
+        service = self._recovery
+        if service is not None:
+            return service
+        directory = None if self._data_dir is None else self._data_dir / "recovery"
+        updates = None if self._data_dir is None else self._data_dir / "updates"
+        service = recovery_service(self._environment, directory, updates_dir=updates)
+        self._recovery = service
+        return service
+
     def updates_view(self) -> dict[str, object]:
         with self._lock:
             return self._update_service().status().model_dump(mode="json")
@@ -963,6 +980,7 @@ class OMNE:
                 "security.",
                 "secret.",
                 "update.",
+                "recovery.",
             )
         ):
             self._world.invalidate()

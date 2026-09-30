@@ -34,7 +34,8 @@ The target wants both services, so a boot reaches OMNE without a user launching 
 the kernel keyring through `libkeyutils` and are not written into `OMNE.toml`. See
 `docs/SECURITY_MODEL.md` and `docs/SECRETS.md`. Later package changes stay with apt and dpkg.
 `omne.updates` checks a signed catalog and records a pending slot. It does not run `apt-get` on the
-development host. See `docs/UPDATE_ARCHITECTURE.md`.
+development host. See `docs/UPDATE_ARCHITECTURE.md`. Recovery reads Linux, systemd, and the OMNE
+units and does not start them. Safe mode does not erase `/var/lib/omne`. See `docs/RECOVERY.md`.
 
 `scripts/linux/install.sh` is still the user unit for a checkout. It is not the system install.
 
