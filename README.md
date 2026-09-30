@@ -81,18 +81,20 @@ The development base is Ubuntu 24.04. System packages and `omne.target` start OM
 `scripts/linux/build-disk.sh` writes a UEFI disk with systemd-boot and Ubuntu's kernel. The console
 is the OMNE checklist, not a desktop. `scripts/linux/build-iso.sh` writes an ISO on Ubuntu 24.04
 x86-64 when run as root; otherwise it exits 2 and writes nothing. See `docs/ISO_BUILD.md`.
-`scripts/linux/vm-boot.sh --run` starts QEMU when the disk and OVMF are present. `OMNE display`
-reports DRM and labwc readiness and does not start a compositor. `OMNE windowing` reports the window
-record and does not command labwc. `OMNE hardware` reports devices Linux has already published and
-does not change drivers. `OMNE network` reports the Linux network stack and does not change it.
-`OMNE audio` reports the Linux audio stack and does not open a microphone. `OMNE input` reports
-configured shortcuts and does not read the keyboard. `OMNE storage` reports disks and mounts and
-does not format them. `OMNE applications` reports installed desktop applications and does not start
-a shell. `OMNE browser` reports browser availability and does not launch a browser or import
-Playwright. `OMNE processes` reports the process table and does not signal a process. `OMNE updates`
-reports signed catalog status and does not install packages. `OMNE recover` explains startup
-failures and does not erase user data or reinstall the OS. `OMNE models` reports the model registry
-and does not download weights. Physical hardware installation is not implemented.
+`scripts/linux/vm-boot.sh --run` starts QEMU when the image and OVMF are present.
+`scripts/linux/vm-test.sh` boots the ISO headlessly and is OS-ready only when the OMNE desktop
+appears. See `docs/VM_TEST.md`. `OMNE display` reports DRM and labwc readiness and does not start a
+compositor. `OMNE windowing` reports the window record and does not command labwc. `OMNE hardware`
+reports devices Linux has already published and does not change drivers. `OMNE network` reports the
+Linux network stack and does not change it. `OMNE audio` reports the Linux audio stack and does not
+open a microphone. `OMNE input` reports configured shortcuts and does not read the keyboard.
+`OMNE storage` reports disks and mounts and does not format them. `OMNE applications` reports
+installed desktop applications and does not start a shell. `OMNE browser` reports browser
+availability and does not launch a browser or import Playwright. `OMNE processes` reports the
+process table and does not signal a process. `OMNE updates` reports signed catalog status and does
+not install packages. `OMNE recover` explains startup failures and does not erase user data or
+reinstall the OS. `OMNE models` reports the model registry and does not download weights. Physical
+hardware installation is not implemented.
 
 ## License
 

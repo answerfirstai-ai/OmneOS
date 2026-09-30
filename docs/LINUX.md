@@ -100,10 +100,12 @@ core. Network, GPU, and models are shown either way.
 sudo bash scripts/linux/build-disk.sh --rootfs /var/tmp/omne-rootfs --dest /var/tmp/OMNE-OS.img
 bash scripts/linux/vm-boot.sh --dry-run /var/tmp/OMNE-OS.img
 bash scripts/linux/vm-boot.sh --run /var/tmp/OMNE-OS.img
+bash scripts/linux/vm-test.sh --iso /var/tmp/OMNE-OS.iso
 ```
 
 `--dry-run` writes nothing and does not start QEMU. `--run` needs `qemu-system-x86_64` and OVMF.
-`scripts/linux/build-iso.sh` writes a bootable ISO in a temporary directory when it is root on
-Ubuntu 24.04 x86-64. The build is described in `docs/ISO_BUILD.md`. The graphical session is labwc,
-described in `docs/GRAPHICS_ARCHITECTURE.md`. The ISO installs labwc and does not start it. A
-physical install is later.
+`vm-test.sh` is the headless ISO boot test. It exits 0 only when the guest reaches the OMNE desktop.
+See `docs/VM_TEST.md`. `scripts/linux/build-iso.sh` writes a bootable ISO in a temporary directory
+when it is root on Ubuntu 24.04 x86-64. The build is described in `docs/ISO_BUILD.md`. The graphical
+session is labwc, described in `docs/GRAPHICS_ARCHITECTURE.md`. The ISO installs labwc and does not
+start it. A physical install is later.

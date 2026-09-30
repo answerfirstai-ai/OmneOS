@@ -198,7 +198,9 @@ does not change the bootloader. The system tree, packages, and rootfs builder ar
 Ubuntu's kernel, an initramfs, and systemd-boot on a UEFI disk, and the console is `omne-boot`
 rather than a display manager. `scripts/linux/build-iso.sh` writes that same boot chain to an ISO
 when run as root on Ubuntu 24.04 x86-64, and exits 2 otherwise. See `docs/ISO_BUILD.md`.
-`vm-boot.sh` starts QEMU only when `--run` is passed and OVMF is installed.
+`vm-boot.sh` starts QEMU only when `--run` is passed and OVMF is installed. `vm-test.sh` records a
+headless boot and does not call the image OS-ready until the OMNE desktop is reached. See
+`docs/VM_TEST.md`.
 
 Graphics stay on Linux. `omne.display` reports DRM, monitors, and whether labwc can launch. Core
 does not link a compositor, and the diagnostics do not start one. See

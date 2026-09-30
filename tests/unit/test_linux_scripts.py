@@ -398,6 +398,48 @@ def test_disk_refuses_boot_directory() -> None:
     assert not Path("/boot/omne.img").exists()
 
 
+def test_vm_refuses_a_physical_disk(tmp_path: Path) -> None:
+    image = tmp_path / "OMNE-OS.iso"
+    image.write_bytes(b"not a disk")
+    boot = _run(["bash", "scripts/linux/vm-boot.sh", "--dry-run", "/dev/sda"])
+    test = _run(["bash", "scripts/linux/vm-test.sh", "--dry-run", "--iso", "/dev/nvme0n1"])
+    source = (ROOT / "scripts/linux/vm-boot.sh").read_text(encoding="utf-8")
+
+    assert boot.returncode == 2
+    assert "refusing" in boot.stderr
+    assert "no virtual machine was started" in boot.stderr
+    assert test.returncode == 2
+    assert "refusing" in test.stderr
+    assert "file=/dev" not in source
+    assert "of=/dev" not in source
+    assert "virtio-vga" in source
+    assert "virtio-net" in source
+    assert "usb-kbd" in source
+    assert "usb-tablet" in source
+    assert "ich9-intel-hda" in source
+    assert "-snapshot" in source
+    assert not image.exists() or image.read_bytes() == b"not a disk"
+
+
+def test_vm_test_dry_run_lists_checks_without_booting(tmp_path: Path) -> None:
+    image = tmp_path / "OMNE-OS.iso"
+    image.write_bytes(b"not an iso")
+    result = _run(["bash", "scripts/linux/vm-test.sh", "--dry-run", "--iso", str(image)])
+
+    assert result.returncode == 0
+    assert "firmware: UEFI" in result.stdout
+    assert "bootloader: systemd-boot" in result.stdout
+    assert "desktop: not started" in result.stdout
+    assert "iso-boots" in result.stdout
+    assert "graphical-session" in result.stdout
+    assert "omne-shell" in result.stdout
+    assert "recovery" in result.stdout
+    assert "OS-ready requires the OMNE desktop" in result.stdout
+    assert "dry-run: no virtual machine was started" in result.stdout
+    assert "OS-ready: yes" not in result.stdout
+    assert "starting virtual machine" not in result.stdout
+
+
 def test_vm_dry_run_does_not_start(tmp_path: Path) -> None:
     image = tmp_path / "OMNE-OS.img"
     image.write_bytes(b"not a disk")

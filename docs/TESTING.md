@@ -63,7 +63,8 @@ Python:
 - The installer refusing `/boot`, the Ubuntu 24.04 system tree, the three system packages, the
   rootfs and UEFI disk builders refusing to write without root, the ISO script refusing a non-root
   or non-Linux build, ISO structure validation on a tiny fixture, and the VM script exiting without
-  a boot unless `vm-boot.sh --run` is passed.
+  a boot unless `vm-boot.sh --run` is passed. `vm-test.sh` is tested for its dry-run and for
+  refusing a physical disk. The default suite does not boot QEMU.
 - Display diagnostics. The testing API uses the mock provider and does not invent a monitor. The
   labwc provider reads a fixture filesystem and does not start a compositor.
 - Window records. The testing API uses the mock window provider and starts with no windows. A grant
@@ -119,8 +120,10 @@ TypeScript:
 
 `scripts/linux/build-iso.sh` is tested for its refusal without root and on a non-Linux system. The
 default suite does not produce `OMNE-OS.iso`. `scripts/linux/validate-iso.sh` is tested against a
-tiny ISO, which passes the structure profile and fails `--os`. `scripts/linux/vm-boot.sh` does not
-start a virtual machine unless `--run` is passed. `scripts/linux/build-base.sh` and
+tiny ISO, which passes the structure profile and fails `--os`. `scripts/linux/vm-boot.sh` and
+`scripts/linux/vm-test.sh` do not start QEMU unless `--run` is passed to the boot script, or
+`vm-test.sh` is given a real image outside this suite. They refuse block devices. A headless boot is
+not OS-ready unless the OMNE desktop appears. `scripts/linux/build-base.sh` and
 `scripts/linux/build-disk.sh` are tested for their plans and for refusing to write when not root.
 The boot checklist is tested against a fixture machine and a local core: an unavailable GPU is not a
 check. Display launch readiness is tested against a fixture DRM tree. Window commands are tested
