@@ -41,6 +41,8 @@ Python:
 - Memory scope checks, provenance columns on older databases, agent manifests, and lifecycle edges.
 - Missions, world-state revisions, intent, decisions, capabilities, workers, verification, traces,
   dry-run, command classes, and the new HTTP routes.
+- Worker lifecycle, reuse, cancellation, failure, resource limits, and concurrent slot limits. A
+  hundred workers stay in-process records.
 - Objective execution, dependency order, retry escalation, parallel work, and voice silence.
 - The installer refusing `/boot`, the Ubuntu 24.04 system tree, the three system packages, the
   rootfs and UEFI disk builders refusing to write without root, and the ISO and VM scripts exiting

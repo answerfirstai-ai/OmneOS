@@ -277,13 +277,15 @@ function paintAgents(): void {
   const board = agentBoard(desktopView.agents, desktopView.workers);
   const rendered = `${detailLevel}\n${board.definitions.map((agent) => agent.id).join(",")}\n${board.active
     .map((worker) => worker.id + worker.status)
-    .join(",")}\n${board.idle.map((worker) => worker.id).join(",")}`;
+    .join(",")}\n${board.paused.map((worker) => worker.id).join(",")}\n${board.idle
+    .map((worker) => worker.id)
+    .join(",")}`;
   if (!shouldRepaint(element.dataset["rendered"] ?? null, rendered)) {
     return;
   }
   element.dataset["rendered"] = rendered;
   element.replaceChildren();
-  element.append(heading("Agents"));
+  element.append(heading("Agent definitions"));
   element.append(
     linesOrEmpty(
       board.definitions.map((agent) => agentDefinition(agent)),
@@ -297,6 +299,15 @@ function paintAgents(): void {
       "No active workers",
     ),
   );
+  if (board.paused.length > 0) {
+    element.append(heading("Paused workers"));
+    element.append(
+      linesOrEmpty(
+        board.paused.map((worker) => workerBoardLine(worker)),
+        "none",
+      ),
+    );
+  }
   if (detailLevel !== "normal") {
     element.append(heading("Idle workers"));
     element.append(
@@ -318,7 +329,7 @@ function agentDefinition(agent: {
     return agentLine({ id: agent.id, state: agent.state, enabled: agent.enabled });
   }
   if (detailLevel === "inspect") {
-    return `${agent.name} ${agent.state}`;
+    return `${agent.name} definition ${agent.state}`;
   }
   return agent.name;
 }
@@ -643,13 +654,22 @@ function paintWorkers(): void {
   element.dataset["rendered"] = rendered || "empty";
   element.replaceChildren();
   const board = agentBoard(desktopView.agents, desktopView.workers);
-  element.append(heading("Active workers"));
+  element.append(heading("Runtime workers"));
   element.append(
     linesOrEmpty(
       board.active.map((worker) => workerBoardLine(worker)),
       "No active workers",
     ),
   );
+  if (board.paused.length > 0) {
+    element.append(heading("Paused workers"));
+    element.append(
+      linesOrEmpty(
+        board.paused.map((worker) => workerBoardLine(worker)),
+        "none",
+      ),
+    );
+  }
   if (detailLevel === "normal" && board.idle.length > 0) {
     element.append(linesOrEmpty([`${board.idle.length} idle`], "none"));
   }
@@ -661,6 +681,15 @@ function paintWorkers(): void {
         "No idle workers",
       ),
     );
+    if (board.stopped.length > 0) {
+      element.append(heading("Stopped workers"));
+      element.append(
+        linesOrEmpty(
+          board.stopped.map((worker) => workerBoardLine(worker)),
+          "none",
+        ),
+      );
+    }
   }
 }
 

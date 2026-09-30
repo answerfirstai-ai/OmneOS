@@ -52,10 +52,26 @@ function noticeText(event: EventDocument): string {
       return verificationNotice(event.payload?.["status"]);
     case "decision.selected":
       return decisionNotice(event.payload?.["decision"]);
+    case "worker.discovered":
+      return "A worker was discovered.";
+    case "worker.spawned":
+      return "A worker was created.";
     case "worker.started":
       return "A worker started.";
+    case "worker.reused":
+      return "A worker was reused.";
+    case "worker.resumed":
+      return "A worker resumed.";
+    case "worker.idle":
+      return "A worker is idle.";
+    case "worker.paused":
+      return "A worker is paused.";
     case "worker.completed":
       return "A worker finished.";
+    case "worker.cancelled":
+      return "A worker was cancelled.";
+    case "worker.terminated":
+      return "A worker stopped.";
     case "worker.failed":
       return "A worker failed.";
     case "task.started":

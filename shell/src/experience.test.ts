@@ -13,6 +13,7 @@ import {
   modelLines,
   modelStateLabel,
   nameWorkers,
+  statusWord,
   taskSurface,
   verificationLine,
 } from "./present.js";
@@ -145,7 +146,29 @@ test("workers are numbered from the ones that exist", () => {
   );
   assert.equal(board.active.length, 1);
   assert.equal(board.idle.length, 1);
+  assert.equal(board.paused.length, 0);
   assert.equal(board.active[0]?.name, "Coding Worker #1");
+});
+
+test("agent definitions stay separate from worker lifecycles", () => {
+  const board = agentBoard(
+    [{ id: "coding", state: "AVAILABLE", enabled: true }],
+    [
+      { worker_id: "a", agent_id: "coding", status: "RUNNING" },
+      { worker_id: "b", agent_id: "coding", status: "PAUSED" },
+      { worker_id: "c", agent_id: "coding", status: "IDLE" },
+      { worker_id: "d", agent_id: "coding", status: "FAILED" },
+    ],
+  );
+  assert.equal(board.definitions[0]?.name, "Coding");
+  assert.equal(board.definitions[0]?.name.includes("Worker"), false);
+  assert.equal(board.active.length, 1);
+  assert.equal(board.paused.length, 1);
+  assert.equal(board.idle.length, 1);
+  assert.equal(board.stopped.length, 1);
+  assert.equal(board.active[0]?.name.includes("Worker"), true);
+  assert.equal(statusWord("SPAWNED"), "STARTING");
+  assert.equal(statusWord("TERMINATED"), "STOPPED");
 });
 
 test("models hide provider names until inspection", () => {

@@ -193,7 +193,11 @@ class TaskScheduler:
             if batch and any(bool(item.metadata.get("exclusive")) for item in batch):
                 continue
             agent_id = child.assigned_agent
-            if agent_id and not self._has_worker_slot(agent_id, used_agents.get(agent_id, 0)):
+            if agent_id and not self._has_worker_slot(
+                agent_id,
+                used_agents.get(agent_id, 0),
+                cpu_percent=snapshot.cpu.usage_percent,
+            ):
                 continue
             decision = self._compute.request(
                 child.required_resources,
@@ -216,13 +220,25 @@ class TaskScheduler:
         except KeyError:
             return 1
 
-    def _has_worker_slot(self, agent_id: str, already_batched: int) -> bool:
+    def _has_worker_slot(
+        self, agent_id: str, already_batched: int, *, cpu_percent: float | None
+    ) -> bool:
         limit = self._worker_limit(agent_id)
-        if self._runtime.active(agent_id) + already_batched >= limit:
+        if limit <= 1 and not self._agent_free(agent_id):
             return False
-        if limit > 1:
-            return True
-        return self._agent_free(agent_id)
+        try:
+            manifest = self._agents.get(agent_id)
+            requested = manifest.resources.ram_mb
+        except KeyError:
+            requested = 0
+        decision = self._runtime.pool.can_start(
+            agent_id=agent_id,
+            max_workers=limit,
+            requested_ram_mb=requested,
+            cpu_percent=cpu_percent,
+            extra_active=already_batched,
+        )
+        return decision == "ALLOW"
 
     def _agent_free(self, agent_id: str) -> bool:
         try:
