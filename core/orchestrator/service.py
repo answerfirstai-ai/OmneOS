@@ -63,6 +63,8 @@ from omne.audio.service import AudioService
 from omne.browser.select import browser_service
 from omne.browser.service import BrowserService
 from omne.display.select import diagnose_display
+from omne.firstboot import apply_theme, load_theme, public_setup, unlock
+from omne.firstboot import finish_setup as finish_first_boot
 from omne.hardware.capabilities import machine_capabilities
 from omne.hardware.model import HardwareInventory
 from omne.hardware.select import hardware_service
@@ -360,6 +362,37 @@ class OMNE:
             "questions": self._open_questions(),
             "project": project_document(self._project),
         }
+
+    def setup_status(self) -> dict[str, object]:
+        """Boot gate for the shell. The password verifier is not included."""
+
+        return public_setup(self._state_dir())
+
+    def finish_setup(self, payload: Mapping[str, object]) -> dict[str, object]:
+        """Save setup once into OMNE state."""
+
+        return finish_first_boot(self._state_dir(), payload)
+
+    def unlock_desktop(self, password: str) -> bool:
+        """Check the stored verifier. A miss does not change the record."""
+
+        return unlock(self._state_dir(), password)
+
+    def theme_status(self) -> dict[str, object]:
+        """The theme document the desktop paints."""
+
+        return load_theme(self._state_dir()).model_dump()
+
+    def apply_desktop_theme(self, document: Mapping[str, object]) -> dict[str, object]:
+        """Replace the theme data file and nothing else."""
+
+        apply_theme(self._state_dir(), document)
+        return load_theme(self._state_dir()).model_dump()
+
+    def _state_dir(self) -> Path:
+        if self._data_dir is None:
+            raise ValueError("OMNE state is not configured")
+        return self._data_dir
 
     def get_task(self, task_id: str) -> Task:
         return self._store.get(task_id)

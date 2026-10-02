@@ -1,0 +1,11 @@
+{
+  "colors": {
+    "accent": "#e4c27a",
+    "desktop": "#152433",
+    "glass": "#12171d",
+    "ink": "#f3efe6",
+    "muted": "#c5c0b6"
+  },
+  "type": "\"Segoe UI\", ui-sans-serif, system-ui, sans-serif",
+  "wallpaper": "radial-gradient(ellipse 70% 45% at 78% 108%, rgba(214, 146, 72, 0.55), transparent 58%), linear-gradient(180deg, #24384c 0%, #152433 46%, #1a1612 100%)"
+}

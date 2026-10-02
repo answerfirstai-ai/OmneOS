@@ -6,8 +6,53 @@
     <title>OMNE OS</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
-    <div class="desktop" id="desktop">
+  <body data-gate="hold">
+    <section id="boot-gate" class="boot-gate" data-surface="hold" aria-labelledby="boot-title">
+      <div class="boot-card">
+        <p class="boot-mark">OMNE</p>
+        <h1 id="boot-title">OMNE</h1>
+        <p id="boot-copy">Starting</p>
+        <div id="setup-panel" hidden>
+          <div id="setup-name-row" hidden>
+            <label for="setup-name">Your name</label>
+            <input id="setup-name" type="text" autocomplete="nickname" maxlength="40" />
+          </div>
+          <fieldset id="setup-look" hidden>
+            <legend>Look</legend>
+            <p class="choice-label">Color</p>
+            <div id="setup-colors" class="choice-row"></div>
+            <p class="choice-label">Type</p>
+            <div id="setup-types" class="choice-row"></div>
+            <p class="choice-label">Wallpaper</p>
+            <div id="setup-wallpapers" class="choice-row"></div>
+          </fieldset>
+          <div id="setup-password-row" hidden>
+            <label for="setup-password">Password</label>
+            <input id="setup-password" type="password" autocomplete="new-password" />
+            <label for="setup-confirm">Confirm password</label>
+            <input id="setup-confirm" type="password" autocomplete="new-password" />
+          </div>
+          <p id="setup-error" class="boot-error" role="alert"></p>
+          <p class="boot-note">
+            These pieces are already staged. Model weights are not downloaded.
+          </p>
+          <ol id="setup-dependencies" class="boot-deps"></ol>
+          <div class="boot-actions">
+            <button type="button" id="setup-back" hidden>Back</button>
+            <button type="button" id="setup-next">Next</button>
+          </div>
+        </div>
+        <form id="unlock-panel" hidden>
+          <label for="unlock-password">Password</label>
+          <input id="unlock-password" type="password" autocomplete="current-password" />
+          <p id="unlock-error" class="boot-error" role="alert"></p>
+          <div class="boot-actions">
+            <button type="submit" id="unlock-submit">Unlock</button>
+          </div>
+        </form>
+      </div>
+    </section>
+    <div class="desktop" id="desktop" inert>
       <div class="presence" id="presence" data-state="IDLE" data-motion="still">
         <div class="orbit" id="orbit" aria-hidden="true"></div>
         <div class="core-mark" aria-hidden="true">
@@ -549,7 +594,7 @@
       <button type="button" data-launch="voice">Voice</button>
     </div>
 
-    <footer class="taskbar">
+    <footer class="taskbar" inert>
       <button
         type="button"
         id="start"

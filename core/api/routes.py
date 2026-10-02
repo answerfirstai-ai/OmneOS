@@ -5,9 +5,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from http import HTTPStatus
 
+from pydantic import ValidationError
+
 from core.memory.retrieval import MemoryAccessError
 from core.mission.model import InvalidMissionTransition
 from core.orchestrator.service import OMNE, mission_document, task_document
+from omne.firstboot import SetupClosed, ThemePathError
 
 Payload = dict[str, object]
 
@@ -19,6 +22,10 @@ def route_get(
         return HTTPStatus.SERVICE_UNAVAILABLE, {"error": "runtime_unavailable"}
     if path == "/desktop":
         return HTTPStatus.OK, runtime.desktop_view()
+    if path == "/setup":
+        return HTTPStatus.OK, runtime.setup_status()
+    if path == "/theme":
+        return HTTPStatus.OK, {"theme": runtime.theme_status()}
     if path == "/tasks":
         return HTTPStatus.OK, {"tasks": [task_document(task) for task in runtime.list_tasks()]}
     if path == "/events":
@@ -114,6 +121,36 @@ def route_post(
         return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method_not_allowed"}
     if runtime is None:
         return HTTPStatus.SERVICE_UNAVAILABLE, {"error": "runtime_unavailable"}
+    if path == "/setup":
+        try:
+            return HTTPStatus.OK, runtime.finish_setup(body)
+        except SetupClosed:
+            return HTTPStatus.CONFLICT, {"error": "setup_complete", "gate": "password"}
+        except ThemePathError as exc:
+            return HTTPStatus.BAD_REQUEST, {"error": str(exc)}
+        except (ValidationError, ValueError):
+            return HTTPStatus.BAD_REQUEST, {"error": "setup was not accepted", "gate": "setup"}
+    if path == "/unlock":
+        password = body.get("password")
+        if not isinstance(password, str) or password == "":
+            return HTTPStatus.BAD_REQUEST, {
+                "error": "password is required",
+                "gate": "password",
+                "unlocked": False,
+            }
+        if runtime.unlock_desktop(password):
+            return HTTPStatus.OK, {"unlocked": True, "gate": "desktop"}
+        return HTTPStatus.UNAUTHORIZED, {"unlocked": False, "gate": "password"}
+    if path == "/theme":
+        document = body.get("theme", body)
+        if not isinstance(document, dict):
+            return HTTPStatus.BAD_REQUEST, {"error": "theme was not accepted"}
+        try:
+            return HTTPStatus.OK, {"theme": runtime.apply_desktop_theme(document)}
+        except ThemePathError as exc:
+            return HTTPStatus.BAD_REQUEST, {"error": str(exc)}
+        except (ValidationError, ValueError):
+            return HTTPStatus.BAD_REQUEST, {"error": "theme was not accepted"}
     if path == "/tasks":
         objective = body.get("objective")
         if not isinstance(objective, str) or not objective.strip():

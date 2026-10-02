@@ -12,7 +12,7 @@
   --accent: #e4c27a;
   --taskbar: 52px;
   --shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
-  font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--type, "Segoe UI", ui-sans-serif, system-ui, sans-serif);
 }
 
 * {
@@ -56,8 +56,9 @@ input:focus-visible {
   position: fixed;
   inset: 0 0 var(--taskbar) 0;
   overflow: hidden;
-  background-color: #152433;
-  background-image:
+  background-color: var(--desktop, #152433);
+  background-image: var(
+    --wallpaper,
     radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.75), transparent),
     radial-gradient(1px 1px at 22% 32%, rgba(255, 255, 255, 0.45), transparent),
     radial-gradient(1.5px 1.5px at 70% 16%, rgba(255, 255, 255, 0.7), transparent),
@@ -65,7 +66,8 @@ input:focus-visible {
     radial-gradient(1px 1px at 48% 12%, rgba(255, 255, 255, 0.55), transparent),
     radial-gradient(ellipse 70% 45% at 78% 108%, rgba(214, 146, 72, 0.55), transparent 58%),
     radial-gradient(ellipse 40% 30% at 18% 8%, rgba(92, 140, 170, 0.28), transparent 60%),
-    linear-gradient(180deg, #24384c 0%, #152433 46%, #1a1612 100%);
+    linear-gradient(180deg, #24384c 0%, #152433 46%, #1a1612 100%)
+  );
 }
 
 .icons {
@@ -929,4 +931,128 @@ input {
     right: 8px;
     width: 140px;
   }
+}
+
+body:not([data-gate="open"]) .desktop,
+body:not([data-gate="open"]) .taskbar,
+body:not([data-gate="open"]) .start-menu {
+  visibility: hidden;
+}
+
+.boot-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(ellipse 70% 45% at 78% 108%, rgba(214, 146, 72, 0.35), transparent 58%),
+    linear-gradient(180deg, #24384c 0%, #101820 100%);
+  color: var(--ink);
+}
+
+.boot-gate[hidden] {
+  display: none;
+}
+
+.boot-card {
+  width: min(480px, 100%);
+  padding: 32px 32px 24px;
+  border: 1px solid var(--line);
+  background: var(--glass-solid);
+  box-shadow: var(--shadow);
+}
+
+.boot-mark {
+  margin: 0;
+  color: var(--accent);
+  letter-spacing: 0.18em;
+  font-size: 0.78rem;
+}
+
+.boot-card h1 {
+  margin: 10px 0 8px;
+  font-size: 2rem;
+  font-weight: 500;
+}
+
+.boot-card p {
+  margin: 0 0 16px;
+}
+
+.boot-card label,
+.choice-label {
+  display: block;
+  margin: 12px 0 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.boot-card input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: #0c1014;
+  padding: 8px 10px;
+}
+
+.boot-card fieldset {
+  margin: 8px 0 0;
+  border: 0;
+  padding: 0;
+}
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice-row button {
+  border: 1px solid var(--line);
+  background: transparent;
+  padding: 6px 12px;
+}
+
+.choice-row button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.boot-note,
+.boot-deps {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.boot-deps {
+  margin: 0 0 16px;
+  padding-left: 18px;
+}
+
+.boot-error {
+  min-height: 1.2em;
+  color: var(--unavailable);
+}
+
+.boot-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#setup-next,
+#unlock-submit {
+  border: 0;
+  background: var(--accent);
+  color: #1a1612;
+  padding: 8px 18px;
+}
+
+#setup-back {
+  border: 1px solid var(--line);
+  background: transparent;
+  padding: 8px 18px;
 }

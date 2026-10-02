@@ -91,6 +91,45 @@ scripts/linux/        User installer, system packages, rootfs, disk, and ISO bui
 system/linux/         User unit, system units, and the Ubuntu 24.04 base pin
 ```
 
+## USB image and first boot
+
+Build the USB image with the existing ISO script. It uses Ubuntu's kernel from that script. Do not
+add another kernel.
+
+```bash
+sudo bash scripts/linux/build-iso.sh --dest /var/tmp/OMNE-OS.iso
+```
+
+Write that file to a USB stick. `lsblk` shows the stick. Replace `sdX` with that device, not the
+computer's disk. This erases the stick.
+
+```bash
+sudo dd if=/var/tmp/OMNE-OS.iso of=/dev/sdX bs=4M conv=fsync status=progress
+```
+
+Run the PC-boot simulation without writing a disk:
+
+```bash
+bash scripts/linux/vm-boot.sh --dry-run /var/tmp/OMNE-OS.iso
+bash scripts/linux/vm-boot.sh --run --headless /var/tmp/OMNE-OS.iso
+bash scripts/linux/vm-test.sh --dry-run --iso /var/tmp/OMNE-OS.iso
+bash scripts/linux/vm-test.sh --iso /var/tmp/OMNE-OS.iso
+```
+
+On Windows, `scripts/windows/install-simulation.cmd` installs the tools, builds the shell, and opens
+the desktop. See `docs/ISO_BUILD.md` and `docs/VM_TEST.md`.
+
+The first time the shell starts, OMNE shows setup: a name, a look (color, type, and wallpaper), and
+a password. Staged dependencies are listed while that happens. Model weights are not downloaded.
+Finishing setup stores a done flag and a password hash in the data directory (`memory/` here,
+`/var/lib/omne/memory/` on a machine). Later boots show only the password screen. The correct
+password opens the desktop. A wrong password stays on that screen. Setup does not run again.
+
+Colors, type, and wallpaper come from `theme.json` in that data directory.
+`OMNE theme apply configs/development/theme.json` writes that file and refuses boot, package, and
+unit paths. The ISO keeps `/var` in memory (`systemd.volatile=state`), so a repeated boot of the ISO
+image starts setup again. A machine install and this simulation keep the data directory on disk.
+
 ## Limits
 
 The development base is Ubuntu 24.04. System packages and `omne.target` start OMNE with the machine.

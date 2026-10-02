@@ -1,5 +1,23 @@
 import { coreApiUrl, fetchJson } from "./api.js";
 import {
+  COLOR_PRESETS,
+  TYPE_PRESETS,
+  WALLPAPER_PRESETS,
+  bootSurface,
+  nextSetupStep,
+  postJson,
+  previousSetupStep,
+  readSetup,
+  readTheme,
+  stageDependencies,
+  surfaceAfterUnlock,
+  themeFromDraft,
+  themeVariables,
+  type SetupDraft,
+  type SetupStep,
+  type ThemeDocument,
+} from "./firstboot.js";
+import {
   activeMission,
   agentLine,
   attentionLine,
@@ -2061,7 +2079,346 @@ function hideStartMenu(): void {
   }
 }
 
-function bootstrap(): void {
+let desktopStarted = false;
+let bootFlight = false;
+const setupDraft: SetupDraft = {
+  name: "",
+  color: "dusk",
+  type: "interface",
+  wallpaper: "dusk",
+  password: "",
+  confirm: "",
+};
+let setupStep: SetupStep = "welcome";
+let setupWired = false;
+
+function applyTheme(theme: ThemeDocument): void {
+  const variables = themeVariables(theme);
+  if (variables === null) {
+    return;
+  }
+  for (const [key, value] of Object.entries(variables)) {
+    document.documentElement.style.setProperty(key, value);
+  }
+}
+
+function paintDependencies(step: SetupStep): void {
+  const list = document.getElementById("setup-dependencies");
+  if (!(list instanceof HTMLElement)) {
+    return;
+  }
+  list.replaceChildren();
+  for (const item of stageDependencies(step)) {
+    const row = document.createElement("li");
+    row.textContent = `${item.state === "staged" ? "Staged" : "Waiting"}  ${item.label}`;
+    list.append(row);
+  }
+}
+
+function paintSetupStep(): void {
+  const gate = document.getElementById("boot-gate");
+  const setup = document.getElementById("setup-panel");
+  const unlock = document.getElementById("unlock-panel");
+  const title = document.getElementById("boot-title");
+  const copy = document.getElementById("boot-copy");
+  const next = document.getElementById("setup-next");
+  const back = document.getElementById("setup-back");
+  if (
+    !(gate instanceof HTMLElement) ||
+    !(setup instanceof HTMLElement) ||
+    !(unlock instanceof HTMLElement) ||
+    !(title instanceof HTMLElement) ||
+    !(copy instanceof HTMLElement) ||
+    !(next instanceof HTMLButtonElement) ||
+    !(back instanceof HTMLButtonElement)
+  ) {
+    return;
+  }
+  document.body.dataset["gate"] = "setup";
+  gate.hidden = false;
+  gate.dataset["surface"] = "setup";
+  setup.hidden = false;
+  unlock.hidden = true;
+  const nameRow = document.getElementById("setup-name-row");
+  const look = document.getElementById("setup-look");
+  const passwordRow = document.getElementById("setup-password-row");
+  if (nameRow instanceof HTMLElement) {
+    nameRow.hidden = setupStep !== "name";
+  }
+  if (look instanceof HTMLElement) {
+    look.hidden = setupStep !== "look";
+  }
+  if (passwordRow instanceof HTMLElement) {
+    passwordRow.hidden = setupStep !== "password";
+  }
+  back.hidden = setupStep === "welcome";
+  const titles: Record<SetupStep, [string, string, string]> = {
+    welcome: ["Welcome", "Set up OMNE once. Later boots ask only for your password.", "Next"],
+    name: ["Your name", "What should OMNE call you?", "Next"],
+    look: ["Look", "Choose a color, a type, and a wallpaper.", "Next"],
+    password: ["Password", "Choose a password. OMNE stores a hash, not the password.", "Start"],
+  };
+  const [heading, message, label] = titles[setupStep];
+  title.textContent = heading;
+  copy.textContent = message;
+  next.textContent = label;
+  paintDependencies(setupStep);
+  applyTheme(themeFromDraft(setupDraft));
+  markChoices();
+}
+
+function markChoices(): void {
+  for (const button of Array.from(document.querySelectorAll("#setup-look button"))) {
+    if (!(button instanceof HTMLButtonElement)) {
+      continue;
+    }
+    const group = button.dataset["group"];
+    const value = button.dataset["value"];
+    const selected =
+      (group === "color" && value === setupDraft.color) ||
+      (group === "type" && value === setupDraft.type) ||
+      (group === "wallpaper" && value === setupDraft.wallpaper);
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+  }
+}
+
+function showPasswordGate(name: string): void {
+  const gate = document.getElementById("boot-gate");
+  const setup = document.getElementById("setup-panel");
+  const unlock = document.getElementById("unlock-panel");
+  const title = document.getElementById("boot-title");
+  const copy = document.getElementById("boot-copy");
+  if (
+    !(gate instanceof HTMLElement) ||
+    !(setup instanceof HTMLElement) ||
+    !(unlock instanceof HTMLElement) ||
+    !(title instanceof HTMLElement) ||
+    !(copy instanceof HTMLElement)
+  ) {
+    return;
+  }
+  document.body.dataset["gate"] = "password";
+  gate.hidden = false;
+  gate.dataset["surface"] = "password";
+  setup.hidden = true;
+  unlock.hidden = false;
+  title.textContent = name.trim() === "" ? "Unlock" : name.trim();
+  copy.textContent = "Enter your password to unlock OMNE.";
+  const error = document.getElementById("unlock-error");
+  if (error instanceof HTMLElement) {
+    error.textContent = "";
+  }
+}
+
+function revealDesktop(coreUrl: string): void {
+  const gate = document.getElementById("boot-gate");
+  if (gate instanceof HTMLElement) {
+    gate.hidden = true;
+    gate.dataset["surface"] = "desktop";
+  }
+  document.body.dataset["gate"] = "open";
+  document.getElementById("desktop")?.removeAttribute("inert");
+  document.querySelector(".taskbar")?.removeAttribute("inert");
+  startDesktop(coreUrl);
+}
+
+function readDraftFields(): void {
+  const name = document.getElementById("setup-name");
+  const password = document.getElementById("setup-password");
+  const confirm = document.getElementById("setup-confirm");
+  if (name instanceof HTMLInputElement) {
+    setupDraft.name = name.value;
+  }
+  if (password instanceof HTMLInputElement) {
+    setupDraft.password = password.value;
+  }
+  if (confirm instanceof HTMLInputElement) {
+    setupDraft.confirm = confirm.value;
+  }
+}
+
+function wireSetup(coreUrl: string): void {
+  if (setupWired) {
+    return;
+  }
+  setupWired = true;
+  fillChoices("setup-colors", "color", COLOR_PRESETS);
+  fillChoices("setup-types", "type", TYPE_PRESETS);
+  fillChoices("setup-wallpapers", "wallpaper", WALLPAPER_PRESETS);
+  document.getElementById("setup-next")?.addEventListener("click", () => {
+    readDraftFields();
+    const result = nextSetupStep(setupStep, setupDraft);
+    const error = document.getElementById("setup-error");
+    if (error instanceof HTMLElement) {
+      error.textContent = result.error ?? "";
+    }
+    if (result.error !== null) {
+      return;
+    }
+    if (result.step === "finish") {
+      void finishSetup(coreUrl);
+      return;
+    }
+    setupStep = result.step;
+    paintSetupStep();
+  });
+  document.getElementById("setup-back")?.addEventListener("click", () => {
+    readDraftFields();
+    setupStep = previousSetupStep(setupStep);
+    const error = document.getElementById("setup-error");
+    if (error instanceof HTMLElement) {
+      error.textContent = "";
+    }
+    paintSetupStep();
+  });
+  document.getElementById("unlock-panel")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void submitPassword(coreUrl);
+  });
+}
+
+function fillChoices(
+  id: string,
+  group: "color" | "type" | "wallpaper",
+  choices: readonly { id: string; label: string }[],
+): void {
+  const host = document.getElementById(id);
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  host.replaceChildren();
+  for (const choice of choices) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = choice.label;
+    button.dataset["group"] = group;
+    button.dataset["value"] = choice.id;
+    button.addEventListener("click", () => {
+      setupDraft[group] = choice.id;
+      applyTheme(themeFromDraft(setupDraft));
+      markChoices();
+    });
+    host.append(button);
+  }
+}
+
+async function finishSetup(coreUrl: string): Promise<void> {
+  const next = document.getElementById("setup-next");
+  if (next instanceof HTMLButtonElement) {
+    next.disabled = true;
+  }
+  const error = document.getElementById("setup-error");
+  try {
+    const result = await postJson(coreApiUrl(coreUrl, "/setup"), {
+      name: setupDraft.name.trim(),
+      password: setupDraft.password,
+      confirm: setupDraft.confirm,
+      theme: themeFromDraft(setupDraft),
+    });
+    if (result.status === 200) {
+      const theme = readTheme(isThemePayload(result.body) ? result.body["theme"] : null);
+      if (theme !== null) {
+        applyTheme(theme);
+      }
+      revealDesktop(coreUrl);
+      return;
+    }
+    if (result.status === 409) {
+      showPasswordGate(setupDraft.name);
+      return;
+    }
+    if (error instanceof HTMLElement) {
+      error.textContent = "Setup was not saved.";
+    }
+  } catch (caught) {
+    if (error instanceof HTMLElement) {
+      error.textContent = caught instanceof Error ? caught.message : "Setup was not saved.";
+    }
+  } finally {
+    if (next instanceof HTMLButtonElement) {
+      next.disabled = false;
+    }
+  }
+}
+
+async function submitPassword(coreUrl: string): Promise<void> {
+  const field = document.getElementById("unlock-password");
+  const error = document.getElementById("unlock-error");
+  const password = field instanceof HTMLInputElement ? field.value : "";
+  try {
+    const result = await postJson(coreApiUrl(coreUrl, "/unlock"), { password });
+    const unlocked =
+      result.status === 200 && isRecord(result.body) && result.body["unlocked"] === true;
+    if (surfaceAfterUnlock(unlocked) === "desktop") {
+      revealDesktop(coreUrl);
+      return;
+    }
+    if (error instanceof HTMLElement) {
+      error.textContent = "That password does not unlock OMNE.";
+    }
+    if (field instanceof HTMLInputElement) {
+      field.select();
+    }
+  } catch (caught) {
+    if (error instanceof HTMLElement) {
+      error.textContent = caught instanceof Error ? caught.message : "OMNE did not answer.";
+    }
+  }
+}
+
+function isThemePayload(value: unknown): value is Record<string, unknown> {
+  return isRecord(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function enterShell(coreUrl: string): Promise<void> {
+  if (bootFlight || desktopStarted) {
+    return;
+  }
+  bootFlight = true;
+  let settled = false;
+  try {
+    const payload = await fetchJson(coreApiUrl(coreUrl, "/setup"));
+    const view = readSetup(payload);
+    const theme = readTheme(isRecord(payload) ? payload["theme"] : null);
+    if (theme !== null) {
+      applyTheme(theme);
+    }
+    const surface = bootSurface(view);
+    if (surface === "hold") {
+      return;
+    }
+    wireSetup(coreUrl);
+    if (surface === "password") {
+      showPasswordGate(view?.name ?? "");
+    } else {
+      setupStep = "welcome";
+      paintSetupStep();
+    }
+    settled = true;
+  } catch {
+    const copy = document.getElementById("boot-copy");
+    if (copy instanceof HTMLElement && document.body.dataset["gate"] !== "setup") {
+      copy.textContent = "Waiting for OMNE.";
+    }
+  } finally {
+    bootFlight = false;
+  }
+  if (!settled && !desktopStarted) {
+    window.setTimeout(() => {
+      void enterShell(coreUrl);
+    }, 800);
+  }
+}
+
+function startDesktop(coreUrl: string): void {
+  if (desktopStarted) {
+    return;
+  }
+  desktopStarted = true;
   try {
     const status = requireElement("status");
     const detail = requireElement("detail");
@@ -2090,7 +2447,6 @@ function bootstrap(): void {
     }
     bindDesktop();
     paintHud();
-    const coreUrl = readCoreUrl(window.location.search);
     void refresh(status, detail);
     void refreshCompute(coreUrl);
     void refreshNetwork(coreUrl);
@@ -2111,6 +2467,11 @@ function bootstrap(): void {
   } catch (error) {
     console.error(error);
   }
+}
+
+function bootstrap(): void {
+  const coreUrl = readCoreUrl(window.location.search);
+  void enterShell(coreUrl);
 }
 
 if (typeof document !== "undefined") {

@@ -98,6 +98,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_processes(settings)
     if args.command == "models":
         return _run_models(settings, args)
+    if args.command == "theme":
+        return _run_theme(settings, args)
     return _run_inspection(settings, args)
 
 
@@ -171,6 +173,13 @@ def _build_parser() -> argparse.ArgumentParser:
     model_commands.add_parser("list", help="list models")
     model_test = model_commands.add_parser("test", help="run one provider smoke test")
     model_test.add_argument("provider", choices=["nvidia"])
+    theme = commands.add_parser("theme", help="print or replace the desktop theme data")
+    theme_commands = theme.add_subparsers(dest="theme_command", required=True)
+    theme_commands.add_parser("show", help="print the theme document from OMNE state")
+    apply = theme_commands.add_parser(
+        "apply", help="write a theme document into OMNE state and nowhere else"
+    )
+    apply.add_argument("document", type=Path, help="JSON theme document to read")
     commands.add_parser("capabilities", help="list capabilities")
     trace = commands.add_parser("trace", help="show one trace")
     trace.add_argument("trace_id")
@@ -300,6 +309,37 @@ def _inspection_payload(runtime: OMNE, args: argparse.Namespace) -> object:
             "records": runtime.list_memory(scope=args.scope, scope_key=args.scope_key, limit=20)
         }
     raise ValueError(f"unknown command {args.command}")
+
+
+def _run_theme(settings: Settings, args: argparse.Namespace) -> int:
+    from pydantic import ValidationError
+
+    from omne.firstboot import ThemePathError, apply_theme, load_theme
+
+    if args.theme_command == "show":
+        print(json.dumps(load_theme(settings.data_dir).model_dump(), sort_keys=True))
+        return 0
+    if args.theme_command != "apply":
+        print("error: unknown theme command", file=sys.stderr)
+        return 2
+    try:
+        loaded = json.loads(Path(args.document).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if not isinstance(loaded, dict):
+        print("error: theme document must be an object", file=sys.stderr)
+        return 2
+    try:
+        path = apply_theme(settings.data_dir, loaded)
+    except ThemePathError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except (ValidationError, ValueError):
+        print("error: wallpaper must be a gradient", file=sys.stderr)
+        return 2
+    print(json.dumps({"applied": True, "theme": str(path)}, sort_keys=True))
+    return 0
 
 
 def _run_compute(settings: Settings) -> int:

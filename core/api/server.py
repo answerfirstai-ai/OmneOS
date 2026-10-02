@@ -188,6 +188,8 @@ def _is_runtime_path(path: str) -> bool:
         "/network",
         "/voice",
         "/desktop",
+        "/setup",
+        "/theme",
         "/missions",
         "/world",
         "/capabilities",
