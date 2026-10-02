@@ -29,6 +29,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck disable=SC1091
+source "${script_root}/system/linux/state.conf"
 
 if [[ -n "${dest}" ]]; then
   case "${dest}" in
@@ -46,6 +48,7 @@ echo "initramfs: initramfs-tools"
 echo "init: systemd"
 echo "default target: multi-user.target"
 echo "desktop: not installed"
+echo "state: ${OMNE_STATE_LABEL} mounted at ${OMNE_STATE_MOUNT}"
 
 if [[ "${dry_run}" -eq 1 ]]; then
   echo "dry-run: no disk was written"
@@ -110,30 +113,33 @@ truncate -s 4G "${dest}"
 if command -v sgdisk >/dev/null 2>&1; then
   sgdisk -o "${dest}" >/dev/null
   sgdisk -n 1:2048:+256M -t 1:ef00 -c 1:ESP "${dest}" >/dev/null
-  sgdisk -n 2:0:0 -t 2:8300 -c 2:root "${dest}" >/dev/null
+  sgdisk -n 2:0:-64M -t 2:8300 -c 2:root "${dest}" >/dev/null
+  sgdisk -n 3:0:0 -t 3:8300 -c 3:"${OMNE_STATE_LABEL}" "${dest}" >/dev/null
 else
   parted -s "${dest}" mklabel gpt
   parted -s "${dest}" mkpart ESP fat32 1MiB 257MiB
   parted -s "${dest}" set 1 esp on
-  parted -s "${dest}" mkpart root ext4 257MiB 100%
+  parted -s "${dest}" mkpart root ext4 257MiB -64MiB
+  parted -s "${dest}" mkpart "${OMNE_STATE_LABEL}" ext4 -64MiB 100%
 fi
 
 loop="$(losetup --find --show "${dest}")"
 partx -d "${loop}" >/dev/null 2>&1 || true
 partx -a "${loop}" >/dev/null 2>&1 || true
 for _ in 1 2 3 4 5; do
-  if [[ -b "${loop}p1" && -b "${loop}p2" ]]; then
+  if [[ -b "${loop}p1" && -b "${loop}p2" && -b "${loop}p3" ]]; then
     break
   fi
   sleep 0.2
 done
-if [[ ! -b "${loop}p1" || ! -b "${loop}p2" ]]; then
+if [[ ! -b "${loop}p1" || ! -b "${loop}p2" || ! -b "${loop}p3" ]]; then
   echo "disk partitions were not created; no disk was written" >&2
   exit 2
 fi
 
 mkfs.vfat -F 32 -n ESP "${loop}p1" >/dev/null
 mkfs.ext4 -L omne -F "${loop}p2" >/dev/null
+mkfs.ext4 -L "${OMNE_STATE_LABEL}" -F "${loop}p3" >/dev/null
 root_uuid="$(blkid -s UUID -o value "${loop}p2")"
 esp_uuid="$(blkid -s UUID -o value "${loop}p1")"
 if [[ -z "${root_uuid}" || -z "${esp_uuid}" ]]; then
@@ -157,6 +163,7 @@ bash "${script_root}/scripts/linux/install-kernel.sh" --rootfs "${work}/root"
 cat > "${work}/root/etc/fstab" <<EOF
 UUID=${root_uuid} / ext4 defaults 0 1
 UUID=${esp_uuid} /boot/efi vfat umask=0077 0 2
+LABEL=${OMNE_STATE_LABEL} ${OMNE_STATE_MOUNT} ext4 nofail,noatime,x-systemd.device-timeout=10s,x-systemd.after=var.mount,x-systemd.before=omne-core.service 0 2
 EOF
 ln -sfn /usr/lib/systemd/system/multi-user.target "${work}/root/etc/systemd/system/default.target"
 mkdir -p \
@@ -269,4 +276,5 @@ fi
 
 echo "disk written to ${dest}"
 echo "UEFI systemd-boot kernel initramfs systemd OMNE"
+echo "state partition: ${OMNE_STATE_LABEL}"
 echo "no desktop was installed"

@@ -773,3 +773,56 @@ def test_validate_iso_checks_structure_and_refuses_a_tiny_os_image(tmp_path: Pat
     assert "checksum does not match" in checksum.stderr
     assert missing_omne.returncode == 2
     assert "missing path: /usr/bin/OMNE" in missing_omne.stderr
+
+
+def test_state_disk_dry_run_writes_nothing(tmp_path: Path) -> None:
+    dest = tmp_path / "OMNE-STATE.img"
+    result = _run(["bash", "scripts/linux/build-state-disk.sh", "--dry-run", "--dest", str(dest)])
+
+    assert result.returncode == 0
+    assert "bootloader: systemd-boot" in result.stdout
+    assert "kernel: linux-image-generic" in result.stdout
+    assert "state: OMNE-STATE mounted at /var/lib/omne" in result.stdout
+    assert "volatile /var: kept" in result.stdout
+    assert "dry-run: no disk was written" in result.stdout
+    assert "state disk written" not in result.stdout
+    assert not dest.exists()
+
+
+def test_state_disk_refuses_boot_and_block_devices(tmp_path: Path) -> None:
+    boot = _run(["bash", "scripts/linux/build-state-disk.sh", "--dry-run", "--dest", "/boot/omne.img"])
+    block = _run(["bash", "scripts/linux/build-state-disk.sh", "--dest", "/dev/sda"])
+    source = _run(
+        ["bash", "scripts/linux/build-state-disk.sh", "--dry-run", "--dest", str(ROOT / "OMNE-STATE.img")]
+    )
+    text = (ROOT / "scripts/linux/build-state-disk.sh").read_text(encoding="utf-8")
+    assemble = (ROOT / "scripts/linux/assemble-disk-image.sh").read_text(encoding="utf-8")
+
+    assert boot.returncode == 2
+    assert "refusing" in boot.stderr
+    assert block.returncode == 2
+    assert "refusing" in block.stderr
+    assert "no disk was written" in block.stderr
+    assert source.returncode == 2
+    assert "source tree" in source.stderr
+    assert "losetup" not in text
+    assert "of=/dev" not in text
+    assert "losetup" not in assemble
+    assert "of=/dev" not in assemble
+    assert "systemd.volatile=state" in text
+    assert "OMNE-STATE" in (ROOT / "scripts/linux/build-disk.sh").read_text(encoding="utf-8")
+    assert not (tmp_path / "OMNE-STATE.img").exists()
+    assert not Path("/boot/omne.img").exists()
+
+
+def test_assemble_dry_run_writes_nothing(tmp_path: Path) -> None:
+    dest = tmp_path / "disk.img"
+    result = _run(
+        ["bash", "scripts/linux/assemble-disk-image.sh", "--dry-run", "--dest", str(dest), "--esp-dir", str(tmp_path)]
+    )
+
+    assert result.returncode == 0
+    assert "partitions: ESP root OMNE-STATE" in result.stdout
+    assert "host disk: not written" in result.stdout
+    assert "dry-run: no disk was written" in result.stdout
+    assert not dest.exists()

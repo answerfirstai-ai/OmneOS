@@ -1,0 +1,58 @@
+#!/bin/busybox sh
+# PID 1 for the state disk. systemd.volatile=state keeps /var in memory.
+# OMNE-STATE is mounted at /var/lib/omne from the labeled partition.
+# Commands go through busybox directly. This build's applets are not on PATH.
+# A full build-disk.sh / build-iso.sh rootfs replaces this with systemd.
+export PYTHONHOME=/usr
+export PYTHONPATH=/usr/lib/omne/python:/usr/lib/omne/site
+export LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib
+
+/bin/busybox mkdir -p /proc /sys /dev /tmp /var /var/lib/omne /var/log
+/bin/busybox mount -t proc proc /proc
+/bin/busybox mount -t sysfs sysfs /sys
+/bin/busybox mount -t devtmpfs devtmpfs /dev
+/bin/busybox mkdir -p /dev/pts /tmp /var /var/lib/omne /var/log
+/bin/busybox mount -t devpts devpts /dev/pts
+/bin/busybox mount -t tmpfs -o mode=1777 tmpfs /tmp
+
+exec >/dev/console 2>&1
+/bin/busybox echo "OMNE state disk"
+
+if /bin/busybox grep -q "systemd.volatile=state" /proc/cmdline; then
+  /bin/busybox mount -t tmpfs -o mode=755 tmpfs /var
+  /bin/busybox mkdir -p /var/lib/omne /var/log
+  /bin/busybox echo "volatile /var: tmpfs"
+fi
+
+if [ -f /etc/omne/modules.load ]; then
+  while IFS= read -r module; do
+    if [ -n "${module}" ]; then
+      /bin/busybox insmod "${module}" || /bin/busybox echo "module failed ${module}"
+    fi
+  done < /etc/omne/modules.load
+fi
+
+waited=0
+while [ "${waited}" -lt 15 ]; do
+  if [ -b /dev/vda ] || [ -b /dev/sda ]; then
+    break
+  fi
+  waited=$((waited + 1))
+  /bin/busybox sleep 1
+done
+
+/usr/bin/python3 /usr/lib/omne/state-gate.py
+code=$?
+/bin/busybox sync
+if /bin/busybox grep -q " /var/lib/omne " /proc/mounts; then
+  /bin/busybox mount -o remount,ro /var/lib/omne || true
+fi
+if [ "${code}" -eq 10 ]; then
+  /bin/busybox echo "rebooting into the password gate"
+  /bin/busybox reboot -f
+fi
+if [ "${code}" -eq 0 ] && [ -c /dev/tty0 ]; then
+  /bin/busybox printf "\033[2J\033[HOMNE\n\nPassword\n" >/dev/tty0
+fi
+/bin/busybox echo "password gate holding"
+/bin/busybox poweroff -f
