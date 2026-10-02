@@ -1,0 +1,50 @@
+#!/bin/sh
+# Mount the OMNE-STATE filesystem on /var/lib/omne.
+# systemd.volatile=state keeps the rest of /var in memory. This mount is the
+# setup flag and the password verifier. The script does not format a disk and
+# does not open a device other than the labeled filesystem udev published.
+set -eu
+label="OMNE-STATE"
+target="/var/lib/omne"
+if [ -f /etc/omne/state.conf ]; then
+  # shellcheck disable=SC1091
+  . /etc/omne/state.conf
+  label="${OMNE_STATE_LABEL:-$label}"
+  target="${OMNE_STATE_MOUNT:-$target}"
+fi
+case "${label}" in
+  *[!A-Za-z0-9-]*)
+    echo "omne-persist: refusing state label" >&2
+    exit 1
+    ;;
+esac
+case "${target}" in
+  /var/lib/omne) ;;
+  *)
+    echo "omne-persist: refusing state mount ${target}" >&2
+    exit 1
+    ;;
+esac
+device="/dev/disk/by-label/${label}"
+mkdir -p "${target}"
+volatile=0
+if [ -r /proc/cmdline ] && grep -q 'systemd.volatile=state' /proc/cmdline; then
+  volatile=1
+fi
+if [ "${volatile}" -eq 1 ]; then
+  waited=0
+  while [ ! -e "${device}" ] && [ "${waited}" -lt 15 ]; do
+    waited=$((waited + 1))
+    sleep 0.2
+  done
+fi
+if [ -e "${device}" ] && ! mountpoint -q "${target}"; then
+  if ! mount -o noatime -t ext4 "${device}" "${target}"; then
+    echo "omne-persist: ${label} did not mount; setup will not survive reboot" >&2
+  fi
+fi
+mkdir -p "${target}/memory" "${target}/workspace"
+if id omne >/dev/null 2>&1; then
+  chown omne:omne "${target}" "${target}/memory" "${target}/workspace" || \
+    echo "omne-persist: could not give state to omne" >&2
+fi

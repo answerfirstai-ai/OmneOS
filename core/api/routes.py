@@ -7,6 +7,7 @@ from http import HTTPStatus
 
 from pydantic import ValidationError
 
+from core.agents.create import AgentPathError
 from core.memory.retrieval import MemoryAccessError
 from core.mission.model import InvalidMissionTransition
 from core.orchestrator.service import OMNE, mission_document, task_document
@@ -172,6 +173,14 @@ def route_post(
             return HTTPStatus.OK, runtime.select_local_model(model_id)
         except (ConnectionPathError, ValueError):
             return HTTPStatus.BAD_REQUEST, {"error": "model was not selected"}
+    if path == "/agents":
+        task = body.get("task")
+        if not isinstance(task, str):
+            return HTTPStatus.BAD_REQUEST, {"error": "task was not accepted"}
+        try:
+            return HTTPStatus.OK, runtime.create_task_agent(task)
+        except (AgentPathError, ValueError):
+            return HTTPStatus.BAD_REQUEST, {"error": "task was not accepted"}
     if path == "/tasks":
         objective = body.get("objective")
         if not isinstance(objective, str) or not objective.strip():

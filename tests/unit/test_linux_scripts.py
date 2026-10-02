@@ -94,6 +94,8 @@ def test_iso_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert "labwc" in result.stdout
     assert "systemd-networkd" in result.stdout
     assert "recovery: included" in result.stdout
+    assert "state: OMNE-STATE mounted at /var/lib/omne" in result.stdout
+    assert "volatile /var: kept" in result.stdout
     assert "physical installation: not performed" in result.stdout
     assert "dry-run: no ISO was written" in result.stdout
     assert "validation passed" not in result.stdout
@@ -145,11 +147,19 @@ def test_iso_script_stays_off_the_host_disk() -> None:
     text = (ROOT / "scripts/linux/build-iso.sh").read_text(encoding="utf-8")
     assert "mktemp" in text
     assert "systemd.volatile=state" in text
+    assert "${work}/omne-state.img" in text
+    assert "append_partition 3 0x83" in text
+    assert "mkfs.ext4 -q -F -L" in text
+    assert "mkfs.ext4 /dev" not in text
     assert "validate-iso.sh" in text
     assert "root=LABEL=${OMNE_ISO_VOLUME_ID}" in text
     assert "grub-install" not in text
     assert "of=/dev" not in text
     assert "bootctl install" not in text
+    persist = (ROOT / "system/linux/omne-persist").read_text(encoding="utf-8")
+    assert "mkfs" not in persist
+    assert "/dev/sd" not in persist
+    assert "/var/lib/omne" in persist
 
 
 def test_iso_config_pins_image_packages() -> None:
@@ -288,6 +298,11 @@ def test_stage_places_services_on_the_ubuntu_base(tmp_path: Path) -> None:
     assert "After=multi-user.target" not in reboot
     assert (dest / "usr/bin/omne-boot").is_file()
     assert (dest / "usr/bin/omne-diag").is_file()
+    assert (dest / "usr/bin/omne-persist").is_file()
+    assert "OMNE_STATE_LABEL=OMNE-STATE" in (dest / "etc/omne/state.conf").read_text(
+        encoding="utf-8"
+    )
+    assert (dest / "etc/systemd/system/omne-persist.service").is_file()
     assert (dest / "usr/lib/omne/agents/coding/agent.toml").is_file()
     assert (dest / "usr/lib/omne/models/manifests/mock-default.toml").is_file()
     assert (dest / "usr/share/omne/shell/dist/main.js").is_file()
@@ -580,6 +595,7 @@ def test_enable_units_links_the_session_without_systemctl(tmp_path: Path) -> Non
         "omne-diag.service",
         "omne-doctor.service",
         "omne-reboot.socket",
+        "omne-persist.service",
     ):
         (system / name).write_text("[Unit]\n", encoding="utf-8")
     result = _run(
@@ -599,6 +615,7 @@ def test_enable_units_links_the_session_without_systemctl(tmp_path: Path) -> Non
     assert not (wants / "omne-doctor.service").exists()
     assert (wants / "omne-diag.service").is_symlink()
     assert (system / "sockets.target.wants" / "omne-reboot.socket").is_symlink()
+    assert (system / "local-fs.target.wants" / "omne-persist.service").is_symlink()
     assert "systemctl" not in (ROOT / "scripts/linux/enable-units.sh").read_text(encoding="utf-8")
     guest = tmp_path / "etc/systemd/system/omne-session.service"
     link = wants / "omne-session.service"

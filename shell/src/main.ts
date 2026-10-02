@@ -77,7 +77,14 @@ import { inspectMission } from "./mission-view.js";
 import { noticesFromEvents } from "./notify.js";
 import { permissionPrompt } from "./permission-view.js";
 import { LAUNCHER_ACTIONS } from "./launcher.js";
-import { intelligenceBanner, maySendObjective, readIntelligence, sessionLine } from "./session.js";
+import {
+  agentTaskPayload,
+  intelligenceBanner,
+  maySendObjective,
+  readCreatedAgent,
+  readIntelligence,
+  sessionLine,
+} from "./session.js";
 import { coreRenderer, presenceView } from "./presence.js";
 import { readRecovery, type RecoveryState } from "./recovery.js";
 import { matchDesktopCommand, matchShortcut, type DesktopCommand } from "./shortcuts.js";
@@ -2458,6 +2465,7 @@ function startDesktop(coreUrl: string): void {
     bindDesktop();
     paintHud();
     wireIntelligence(coreUrl);
+    wireAgentCreate(coreUrl);
     void refreshIntelligence(coreUrl);
     void refresh(status, detail);
     void refreshCompute(coreUrl);
@@ -2522,6 +2530,41 @@ function wireIntelligence(coreUrl: string): void {
       const note = document.getElementById("intelligence-note");
       if (note instanceof HTMLElement) {
         note.textContent = "That model id was not accepted. Weights are not downloaded.";
+      }
+    });
+  });
+}
+
+function wireAgentCreate(coreUrl: string): void {
+  document.getElementById("agent-create")?.addEventListener("click", () => {
+    const field = document.getElementById("agent-task");
+    const note = document.getElementById("agent-create-note");
+    if (!(field instanceof HTMLInputElement)) {
+      return;
+    }
+    const payload = agentTaskPayload(field.value);
+    if (payload === null) {
+      if (note instanceof HTMLElement) {
+        note.textContent = "Name the task.";
+      }
+      return;
+    }
+    void postJson(coreApiUrl(coreUrl, "/agents"), payload).then((result) => {
+      const created = readCreatedAgent(result.body);
+      if (result.status === 200 && created !== null) {
+        field.value = "";
+        if (note instanceof HTMLElement) {
+          note.textContent = `Agent ${created} is ready. No model weights were downloaded.`;
+        }
+        const status = document.getElementById("status");
+        const detail = document.getElementById("detail");
+        if (status instanceof HTMLElement && detail instanceof HTMLElement) {
+          void refresh(status, detail);
+        }
+        return;
+      }
+      if (note instanceof HTMLElement) {
+        note.textContent = "That task did not create an agent.";
       }
     });
   });

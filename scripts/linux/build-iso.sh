@@ -29,13 +29,19 @@ script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "${script_root}/system/linux/base"
 # shellcheck disable=SC1091
 source "${script_root}/system/linux/iso.conf"
+# shellcheck disable=SC1091
+source "${script_root}/system/linux/state.conf"
+if [[ "${OMNE_ISO_STATE_LABEL}" != "${OMNE_STATE_LABEL}" ]]; then
+  echo "state label does not match ${OMNE_STATE_LABEL}; no image was built" >&2
+  exit 2
+fi
 
 supported_path() {
   cat >&2 <<'EOF'
-Supported build path: Ubuntu 24.04 x86-64 with root, debootstrap, xorriso, sgdisk, and mtools.
+Supported build path: Ubuntu 24.04 x86-64 with root, debootstrap, xorriso, sgdisk, mtools, and e2fsprogs.
   sudo bash scripts/linux/build-iso.sh --dest /var/tmp/OMNE-OS.iso
 Privileged container:
-  docker run --privileged --rm -v "$PWD":/src -w /src ubuntu:24.04 bash -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y debootstrap xorriso gdisk mtools dosfstools python3 python3-pip && bash scripts/linux/build-iso.sh --dest /var/tmp/OMNE-OS.iso'
+  docker run --privileged --rm -v "$PWD":/src -w /src ubuntu:24.04 bash -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y debootstrap xorriso gdisk mtools dosfstools e2fsprogs python3 python3-pip && bash scripts/linux/build-iso.sh --dest /var/tmp/OMNE-OS.iso'
 CI: an ubuntu-24.04 runner with sudo. Run the same command from workflow_dispatch. The image is not built on every pull request.
 Physical installation is not performed.
 EOF
@@ -89,6 +95,8 @@ echo "compositor: labwc"
 echo "network: systemd-networkd"
 echo "recovery: included"
 echo "graphics: labwc installed, not started"
+echo "state: ${OMNE_STATE_LABEL} mounted at ${OMNE_STATE_MOUNT}"
+echo "volatile /var: kept"
 echo "physical installation: not performed"
 
 if [[ "${dry_run}" -eq 1 ]]; then
@@ -102,7 +110,7 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 2
 fi
 
-for tool in debootstrap xorriso sgdisk mcopy mmd mkfs.vfat sha256sum python3; do
+for tool in debootstrap xorriso sgdisk mcopy mmd mkfs.vfat mkfs.ext4 sha256sum python3; do
   if ! command -v "${tool}" >/dev/null 2>&1; then
     echo "${tool} is missing; no image was built" >&2
     supported_path
@@ -251,11 +259,12 @@ EOF
 cat > "${rootfs}/etc/fstab" <<EOF
 LABEL=${OMNE_ISO_VOLUME_ID} / iso9660 ro 0 0
 tmpfs /tmp tmpfs defaults,mode=1777 0 0
+LABEL=${OMNE_STATE_LABEL} ${OMNE_STATE_MOUNT} ext4 nofail,noatime,x-systemd.device-timeout=10s,x-systemd.after=var.mount,x-systemd.before=omne-core.service 0 2
 EOF
 
 modules="${rootfs}/etc/initramfs-tools/modules"
 touch "${modules}"
-for module in iso9660 overlay cdrom sr_mod; do
+for module in iso9660 ext4 overlay cdrom sr_mod; do
   if ! grep -qx "${module}" "${modules}"; then
     printf '%s\n' "${module}" >> "${modules}"
   fi
@@ -295,6 +304,9 @@ for required in \
   "${rootfs}/etc/systemd/system/omne-core.service.d/user-session.conf" \
   "${rootfs}/etc/systemd/system/multi-user.target.wants/omne-login.service" \
   "${rootfs}/etc/systemd/system/multi-user.target.wants/omne-session.service" \
+  "${rootfs}/etc/systemd/system/local-fs.target.wants/omne-persist.service" \
+  "${rootfs}/usr/bin/omne-persist" \
+  "${rootfs}/etc/omne/state.conf" \
   "${rootfs}/etc/systemd/system/omne-doctor.service" \
   "${rootfs}/usr/lib/systemd/systemd" \
   "${rootfs}/usr/share/omne/shell/dist/main.js" \
@@ -321,6 +333,7 @@ build_id="$(
     printf 'kernel=%s\n' "linux-image-generic"
     printf 'initramfs=%s\n' "initramfs-tools"
     printf 'packages=%s\n' "${package_pin}"
+    printf 'state=%s %s\n' "${OMNE_STATE_LABEL}" "${OMNE_ISO_STATE_MIB}"
   } | sha256sum | awk '{print substr($1, 1, 16)}'
 )"
 base_distribution="${OMNE_BASE_ID} ${OMNE_BASE_VERSION} (${OMNE_BASE_CODENAME})"
@@ -381,6 +394,21 @@ cp -a "${work}/esp/loader/." "${rootfs}/loader/"
 cp -a "${work}/esp/omne/." "${rootfs}/omne/"
 cp "${work}/efiboot.img" "${rootfs}/boot/efiboot.img"
 
+echo "creating state partition image"
+state_image="${work}/omne-state.img"
+case "${state_image}" in
+  /dev | /dev/*)
+    echo "refusing to format a block device; no image was built" >&2
+    exit 2
+    ;;
+esac
+if [[ -b "${state_image}" ]]; then
+  echo "refusing to format a block device; no image was built" >&2
+  exit 2
+fi
+truncate -s "${OMNE_ISO_STATE_MIB}M" "${state_image}"
+mkfs.ext4 -q -F -L "${OMNE_STATE_LABEL}" "${state_image}"
+
 echo "writing ISO"
 xorriso -as mkisofs \
   -R -J \
@@ -389,6 +417,7 @@ xorriso -as mkisofs \
   -e boot/efiboot.img \
   -no-emul-boot \
   -append_partition 2 0xef "${rootfs}/boot/efiboot.img" \
+  -append_partition 3 0x83 "${state_image}" \
   "${rootfs}"
 cp "${rootfs}/etc/omne/image.json" "${dest}.json"
 sha256sum "${dest}" > "${dest}.sha256"

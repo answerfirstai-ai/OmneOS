@@ -23,6 +23,7 @@ from omne.firstboot import (
     public_setup,
     unlock,
 )
+from omne.persist import PersistPathError, attach_state, volatile_discards
 
 PASSWORD = "correct-horse"
 PAYLOAD = {
@@ -209,3 +210,25 @@ def test_theme_command_writes_only_the_data_file(
     assert main(["theme", "apply", str(bad)]) == 2
     assert "gradient" in capsys.readouterr().err
     assert json.loads(written.read_text(encoding="utf-8"))["colors"]["accent"] == "#7eb6d6"
+
+
+def test_volatile_reboot_keeps_the_setup_flag_and_verifier(tmp_path: Path) -> None:
+    assert volatile_discards(Path("/var/log/journal")) is True
+    assert volatile_discards(Path("/var/lib/omne/memory/setup.json")) is False
+    persistent = tmp_path / "OMNE-STATE"
+    persistent.mkdir()
+    finish_setup(persistent / "memory", PAYLOAD)
+
+    volatile = tmp_path / "var"
+    first = attach_state(volatile, persistent)
+    assert boot_gate(first / "memory") == "password"
+    assert unlock(first / "memory", PASSWORD) is True
+
+    second = attach_state(volatile, persistent)
+    assert boot_gate(second / "memory") == "password"
+    assert unlock(second / "memory", "wrong-password") is False
+    assert unlock(second / "memory", PASSWORD) is True
+    assert (persistent / "memory" / "setup.json").is_file()
+    assert boot_gate(tmp_path / "wiped" / "memory") == "setup"
+    with pytest.raises(PersistPathError):
+        attach_state(Path("/var"), persistent)

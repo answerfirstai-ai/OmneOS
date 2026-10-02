@@ -47,3 +47,25 @@ export function sessionLine(wifi: string): string {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+/** Body for POST /agents. A blank task is not sent. */
+export function agentTaskPayload(task: string): { task: string } | null {
+  const cleaned = task.trim().replace(/\s+/g, " ");
+  if (cleaned.length < 2) {
+    return null;
+  }
+  return { task: cleaned };
+}
+
+/** The created agent id. A response that claims downloaded weights is ignored. */
+export function readCreatedAgent(payload: unknown): string | null {
+  if (!isRecord(payload) || payload["weights"] !== false) {
+    return null;
+  }
+  const agent = payload["agent"];
+  if (!isRecord(agent) || typeof agent["id"] !== "string") {
+    return null;
+  }
+  const id = agent["id"].trim();
+  return id === "" ? null : id;
+}

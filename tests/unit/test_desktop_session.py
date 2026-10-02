@@ -148,3 +148,32 @@ def test_intelligence_route_does_not_echo_a_key(tmp_path: Path) -> None:
     assert status.value == 200
     assert body["local_model"] == "local-notes"
     assert list((tmp_path / "memory").rglob("*.gguf")) == []
+
+
+def test_unlocked_shell_can_create_an_agent_without_downloading_weights(tmp_path: Path) -> None:
+    omne = build_OMNE(runtime_settings(tmp_path))
+    status, body = route_post(omne, "/intelligence/local", {"model_id": "local-notes"})
+    assert status.value == 200
+    assert body["enabled"] is True
+
+    status, body = route_post(omne, "/agents", {"task": "review my notes"})
+
+    assert status.value == 200
+    assert body["weights"] is False
+    assert body["agent"]["id"] == "review-my-notes"
+    assert body["agent"]["created"] is True
+    assert body["model"] == "local-notes"
+    assert body["models"] == ["local-notes"]
+    written = tmp_path / "memory" / "agents" / "review-my-notes" / "agent.toml"
+    assert written.is_file()
+    stored = written.read_text(encoding="utf-8")
+    assert SECRET not in stored
+    assert list((tmp_path / "memory").rglob("*.gguf")) == []
+    status, again = route_post(omne, "/agents", {"task": "review my notes"})
+    assert status.value == 200
+    assert again["agent"]["created"] is False
+    status, listing = route_get(omne, "/agents", {})
+    assert "review-my-notes" in {item["id"] for item in listing["agents"]}
+    rebooted = build_OMNE(runtime_settings(tmp_path))
+    status, listing = route_get(rebooted, "/agents", {})
+    assert "review-my-notes" in {item["id"] for item in listing["agents"]}

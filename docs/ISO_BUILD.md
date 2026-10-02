@@ -30,9 +30,15 @@ larger than the El Torito catalog can size. The kernel command line mounts that 
 root=LABEL=OMNE rootfstype=iso9660 ro rootwait systemd.unit=multi-user.target systemd.volatile=state
 ```
 
-`systemd.volatile=state` puts `/var` on a tmpfs, so OMNE state and the recovery journal can be
-written in memory and disappear on reboot. Journald storage is volatile for the same reason. The ISO
-itself is not modified.
+`systemd.volatile=state` puts `/var` on a tmpfs. Journald storage is volatile for the same reason.
+OMNE state is the exception. The builder formats a 64 MiB ext4 file labeled `OMNE-STATE` inside its
+temporary directory and appends that file as MBR partition 3 (type `0x83`). It does not format a
+host block device. `fstab` mounts `LABEL=OMNE-STATE` at `/var/lib/omne` after `var.mount`, and
+`omne-persist.service` mounts it if `fstab` has not, then creates `memory/` and `workspace/`. The
+setup flag and the password verifier are files on that filesystem, so they survive a reboot of a USB
+stick written with `dd`. The ISO 9660 root stays read-only. A firmware or QEMU CD-ROM boot that
+never exposes the appended partition still loses state, because there is nowhere else to write it.
+The partition is 64 MiB; it is not the free space after the image on a larger stick.
 
 `labwc`, seatd, and the Mesa and libinput libraries are installed from Ubuntu. No display manager is
 installed. `ubuntu-desktop`, `gdm3`, `lightdm`, `plymouth`, `grub-pc`, and `grub-efi-amd64` are
@@ -102,7 +108,7 @@ On Windows, build inside a privileged Ubuntu 24.04 container:
 
 ```bash
 docker run --privileged --rm -v "$PWD":/src -w /src ubuntu:24.04 \
-  bash -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y debootstrap xorriso gdisk mtools dosfstools python3 python3-pip && bash scripts/linux/build-iso.sh --dest /var/tmp/OMNE-OS.iso'
+  bash -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y debootstrap xorriso gdisk mtools dosfstools e2fsprogs python3 python3-pip && bash scripts/linux/build-iso.sh --dest /var/tmp/OMNE-OS.iso'
 ```
 
 The shell bundle must already exist, or Node must be added to that container so `npm run build` can

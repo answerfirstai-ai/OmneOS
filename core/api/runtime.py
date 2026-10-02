@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from core.agents.communication import AgentMailbox
+from core.agents.create import load_saved_agents
 from core.agents.lifecycle import AgentLifecycle
 from core.agents.registry import AgentRegistry
 from core.agents.runtime import AgentRuntime
@@ -122,6 +123,7 @@ def build_OMNE(settings: Settings) -> OMNE:
     )
     agents = AgentRegistry()
     agents.discover(settings.agents_dir, known_tools=tools.ids())
+    load_saved_agents(agents, settings.data_dir / "agents", known_tools=tools.ids())
     models = ModelRegistry()
     models.discover(settings.models_dir)
     _apply_recovery(settings, agents, models, events)

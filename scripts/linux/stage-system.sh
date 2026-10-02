@@ -158,6 +158,10 @@ if [[ "${want_system}" -eq 1 ]]; then
     "${dest}/etc/systemd/system/omne-reboot-listen.service"
   cp "${root}/system/linux/omne-reboot-listen" "${dest}/usr/bin/omne-reboot-listen"
   chmod 755 "${dest}/usr/bin/omne-reboot-listen"
+  cp "${root}/system/linux/omne-persist.service" "${dest}/etc/systemd/system/omne-persist.service"
+  cp "${root}/system/linux/omne-persist" "${dest}/usr/bin/omne-persist"
+  chmod 755 "${dest}/usr/bin/omne-persist"
+  cp "${root}/system/linux/state.conf" "${dest}/etc/omne/state.conf"
   cp "${root}/LICENSE" "${dest}/usr/share/doc/omne-system/copyright"
 fi
 

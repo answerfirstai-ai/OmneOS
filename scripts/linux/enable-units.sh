@@ -5,6 +5,7 @@ enable_omne_units() {
   local system="${dest}/etc/systemd/system"
   local multi="${system}/multi-user.target.wants"
   local sockets="${system}/sockets.target.wants"
+  local filesystems="${system}/local-fs.target.wants"
   local unit
   mkdir -p "${multi}" "${sockets}"
   # omne-doctor is pulled in by omne-session. Linking it from multi-user
@@ -18,6 +19,10 @@ enable_omne_units() {
   done
   if [[ -e "${system}/omne-reboot.socket" ]]; then
     ln -sfn "/etc/systemd/system/omne-reboot.socket" "${sockets}/omne-reboot.socket"
+  fi
+  mkdir -p "${filesystems}"
+  if [[ -e "${system}/omne-persist.service" ]]; then
+    ln -sfn "/etc/systemd/system/omne-persist.service" "${filesystems}/omne-persist.service"
   fi
 }
 

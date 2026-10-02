@@ -3,8 +3,10 @@ import test from "node:test";
 
 import {
   DESKTOP_SURFACES,
+  agentTaskPayload,
   intelligenceBanner,
   maySendObjective,
+  readCreatedAgent,
   readIntelligence,
   sessionLine,
 } from "./session.js";
@@ -27,4 +29,14 @@ test("a connected model is the only way an objective is sent", () => {
   const view = readIntelligence({ enabled: true, desktop: true, reason: "ready" });
   assert.equal(maySendObjective(view.enabled), true);
   assert.equal(intelligenceBanner(true), "Intelligence is connected.");
+});
+
+test("a task sentence is the agent request and weights stay off", () => {
+  assert.equal(agentTaskPayload("  "), null);
+  assert.deepEqual(agentTaskPayload("  review my notes  "), { task: "review my notes" });
+  assert.equal(
+    readCreatedAgent({ agent: { id: "review-my-notes" }, weights: false }),
+    "review-my-notes",
+  );
+  assert.equal(readCreatedAgent({ agent: { id: "review-my-notes" }, weights: true }), null);
 });

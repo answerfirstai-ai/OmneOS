@@ -131,11 +131,18 @@ unit paths. With no API key and no local model, the desktop still opens after th
 files, settings, and Wi-Fi status stay available. Intelligence stays off until an API key is stored
 in the secret service or a local model id is selected. The key is not written into `theme.json`, and
 model weights are not downloaded. Models can be added, removed, and chosen by difficulty for the
-core or for an agent. A task sentence can create an agent the existing worker pool can admit. Task
-notes are markdown files in a vault folder under the data directory.
+core or for an agent. After unlock, the shell can save an API key or a local model id, and a task
+sentence can create an agent the existing worker pool can admit. Task notes are markdown files in a
+vault folder under the data directory.
 
-The ISO keeps `/var` in memory (`systemd.volatile=state`), so a repeated boot of the ISO image
-starts setup again. A machine install and this simulation keep the data directory on disk.
+The ISO still boots with `systemd.volatile=state`, so the rest of `/var` stays in memory. Setup
+state does not. The image carries a 64 MiB ext4 partition labeled `OMNE-STATE`, appended by the ISO
+builder as a file under its temporary work directory, not as a write to a host disk. On a USB stick
+written with `dd`, that partition is mounted at `/var/lib/omne` after the volatile `/var` exists.
+The setup flag and the password verifier live there, so the next USB boot asks only for the
+password. QEMU's ISO test attaches the image as a read-only CD-ROM, which does not expose that
+partition, so a virtual reboot of the ISO still starts setup. A machine install keeps the data
+directory on its own disk.
 
 ## Limits
 

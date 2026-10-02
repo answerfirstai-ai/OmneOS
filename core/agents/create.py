@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 from core.agents.manifest import AgentManifest, LifecycleSpec, load_manifest
+from core.agents.registry import AgentRegistry
 
 _OS_ROOTS = (
     Path("/boot"),
@@ -117,3 +118,28 @@ def _refuse(path: Path) -> None:
     for root in _OS_ROOTS:
         if resolved == root or root in resolved.parents:
             raise AgentPathError()
+
+
+def load_saved_agents(
+    registry: AgentRegistry,
+    directory: Path,
+    *,
+    known_tools: set[str],
+) -> list[AgentManifest]:
+    """Load agents written under OMNE state. Broken files are skipped."""
+
+    if not directory.is_dir():
+        return []
+    loaded: list[AgentManifest] = []
+    known = {agent.id for agent in registry.all()}
+    for path in sorted(directory.rglob("agent.toml")):
+        try:
+            manifest = load_manifest(path, known_tools=known_tools)
+        except (OSError, ValueError):
+            continue
+        if manifest.id in known:
+            continue
+        registry.register(manifest)
+        known.add(manifest.id)
+        loaded.append(manifest)
+    return loaded

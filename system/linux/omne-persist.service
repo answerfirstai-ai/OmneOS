@@ -1,0 +1,14 @@
+[Unit]
+Description=Attach OMNE persistent state
+DefaultDependencies=no
+After=systemd-udevd.service local-fs-pre.target var.mount var-lib-omne.mount
+Before=local-fs.target omne-core.service omne-login.service
+Conflicts=umount.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/omne-persist
+
+[Install]
+WantedBy=local-fs.target

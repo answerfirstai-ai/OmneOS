@@ -429,6 +429,57 @@ class OMNE:
             environment=self._environment,
         )
 
+    def create_task_agent(self, task: str) -> dict[str, object]:
+        """Write an on-demand agent for one task. Weights are not downloaded."""
+
+        from pydantic import ValidationError
+
+        from core.agents.create import agent_for_task, load_created, write_agent
+        from core.models.catalog import CatalogModel, ModelCatalog
+        from omne.connection import intelligence_view
+
+        manifest = agent_for_task(task)
+        directory = self._state_dir() / "agents"
+        current = next((item for item in self._agents.all() if item.id == manifest.id), None)
+        created = False
+        if current is None:
+            path = write_agent(directory, manifest)
+            current = load_created(path)
+            self._agents.register(current)
+            self._lifecycle.register(current.id)
+            created = True
+        status = intelligence_view(
+            self._state_dir(),
+            secrets=self._secrets,
+            environment=self._environment,
+        )
+        catalog = ModelCatalog()
+        local = status.get("local_model")
+        models: list[str] = []
+        chosen: str | None = None
+        if isinstance(local, str) and local:
+            try:
+                catalog.add(
+                    CatalogModel(id=local, provider="local", difficulty="normal", local=True)
+                )
+            except ValidationError:
+                local = None
+            else:
+                catalog.add_to_agent(current.id, local)
+                models = catalog.models_for(current.id)
+                chosen = catalog.route("normal", agent_id=current.id).id
+        return {
+            "agent": {
+                "id": current.id,
+                "name": current.name,
+                "description": current.description,
+                "created": created,
+            },
+            "models": models,
+            "model": chosen,
+            "weights": False,
+        }
+
     def _state_dir(self) -> Path:
         if self._data_dir is None:
             raise ValueError("OMNE state is not configured")
