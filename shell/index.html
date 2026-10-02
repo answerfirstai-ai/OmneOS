@@ -657,6 +657,26 @@
         <time id="clock"></time>
       </div>
     </footer>
+    <script>
+      (function () {
+        if (new URLSearchParams(window.location.search).get("surface") !== "desktop") {
+          return;
+        }
+        document.body.dataset.gate = "open";
+        var gate = document.getElementById("boot-gate");
+        if (gate) {
+          gate.hidden = true;
+        }
+        var desktop = document.getElementById("desktop");
+        if (desktop) {
+          desktop.removeAttribute("inert");
+        }
+        var taskbar = document.querySelector(".taskbar");
+        if (taskbar) {
+          taskbar.removeAttribute("inert");
+        }
+      })();
+    </script>
     <script type="module" src="./dist/main.js"></script>
   </body>
 </html>

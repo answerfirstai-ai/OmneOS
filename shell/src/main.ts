@@ -1,4 +1,5 @@
 import { coreApiUrl, fetchJson } from "./api.js";
+import { isDesktopSurface } from "./display-surface.js";
 import {
   COLOR_PRESETS,
   TYPE_PRESETS,
@@ -2392,6 +2393,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 async function enterShell(coreUrl: string): Promise<void> {
+  // The password gate already ran. ?surface=desktop is the desktop, not the splash.
+  if (isDesktopSurface(window.location.search)) {
+    revealDesktop(coreUrl);
+    return;
+  }
   if (bootFlight || desktopStarted) {
     return;
   }

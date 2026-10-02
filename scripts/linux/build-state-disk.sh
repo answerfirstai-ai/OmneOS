@@ -577,12 +577,21 @@ fi
 cp "${script_root}/system/linux/omne-session" "${init}/usr/bin/omne-session"
 cp "${script_root}/system/linux/omne-hello" "${init}/usr/lib/omne/applications/omne-hello"
 cp "${script_root}/system/linux/state-desktop" "${init}/usr/lib/omne/state-desktop"
+if [[ ! -f "${script_root}/shell/dist/main.js" ]]; then
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "shell bundle is missing and npm is not available; no disk was written" >&2
+    exit 2
+  fi
+  (cd "${script_root}" && npm run build)
+fi
+if [[ ! -f "${script_root}/shell/dist/main.js" ]]; then
+  echo "shell bundle is missing; no disk was written" >&2
+  exit 2
+fi
 cp "${script_root}/shell/index.html" "${init}/usr/share/omne/shell/index.html"
 cp "${script_root}/shell/styles.css" "${init}/usr/share/omne/shell/styles.css"
-if [[ -d "${script_root}/shell/dist" ]]; then
-  mkdir -p "${init}/usr/share/omne/shell/dist"
-  cp -a "${script_root}/shell/dist/." "${init}/usr/share/omne/shell/dist/"
-fi
+mkdir -p "${init}/usr/share/omne/shell/dist"
+cp -a "${script_root}/shell/dist/." "${init}/usr/share/omne/shell/dist/"
 chmod 755 "${init}/usr/bin/omne-session" "${init}/usr/lib/omne/applications/omne-hello" "${init}/usr/lib/omne/state-desktop"
 
 mkdir -p "${work}/esp/EFI/BOOT" "${work}/esp/EFI/systemd" "${work}/esp/loader/entries" "${work}/esp/omne"

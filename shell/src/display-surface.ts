@@ -7,3 +7,8 @@ export function desktopSurfaceUrl(shellUrl: string): string {
   url.searchParams.set("surface", "desktop");
   return url.toString();
 }
+
+/** True when the compositor opened the shell after the password gate. */
+export function isDesktopSurface(search: string): boolean {
+  return new URLSearchParams(search).get("surface") === "desktop";
+}
