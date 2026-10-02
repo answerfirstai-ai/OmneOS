@@ -65,6 +65,52 @@ echo "OMNE desktop DRM ${devices}"
   exit 1
 }
 
+# Same program and settings as omne-core.service. This initramfs is not systemd.
+if [ ! -x /usr/bin/OMNE ] || [ ! -f /etc/omne/OMNE.toml ]; then
+  echo "OMNE core missing" >&2
+  exit 1
+fi
+if /bin/busybox grep -q " /var/lib/omne " /proc/mounts; then
+  /bin/busybox mount -o remount,rw /var/lib/omne || {
+    echo "OMNE core: state is not writable" >&2
+    exit 1
+  }
+fi
+/bin/busybox mkdir -p /var/lib/omne/workspace /var/lib/omne/memory
+(
+  cd /var/lib/omne || exit 1
+  OMNE_ENVIRONMENT=production OMNE_CONFIG=/etc/omne/OMNE.toml /usr/bin/OMNE serve
+) >/tmp/omne-core.log 2>&1 &
+core_pid=$!
+ready=0
+tries=0
+while [ "${tries}" -lt 40 ]; do
+  if /usr/bin/python3 -c 'import json, urllib.request
+try:
+    health = json.load(urllib.request.urlopen("http://127.0.0.1:8787/health", timeout=2))
+    intel = json.load(urllib.request.urlopen("http://127.0.0.1:8787/intelligence", timeout=2))
+except Exception:
+    raise SystemExit(1)
+ok = health.get("status") == "ok" and health.get("service") == "OMNE-core"
+off = intel.get("enabled") is False and intel.get("desktop") is True
+raise SystemExit(0 if ok and off else 1)' >/dev/null 2>&1; then
+    ready=1
+    break
+  fi
+  if ! /bin/busybox kill -0 "${core_pid}" 2>/dev/null; then
+    break
+  fi
+  tries=$((tries + 1))
+  /bin/busybox sleep 1
+done
+if [ "${ready}" -ne 1 ]; then
+  echo "OMNE core did not answer" >&2
+  /bin/busybox cat /tmp/omne-core.log >&2 || true
+  exit 1
+fi
+echo "OMNE core up"
+echo "OMNE intelligence off"
+
 if [ ! -f /usr/share/omne/shell/index.html ]; then
   echo "OMNE shell missing" >&2
   exit 1

@@ -66,6 +66,7 @@ echo "kernel: linux-image-generic"
 echo "base: ${OMNE_BASE_ID} ${OMNE_BASE_VERSION} (${OMNE_BASE_CODENAME})"
 echo "init: state-disk initramfs (build-disk.sh and build-iso.sh use systemd)"
 echo "compositor: labwc"
+echo "core: OMNE serve on 127.0.0.1:8787"
 echo "state: ${OMNE_STATE_LABEL} mounted at ${OMNE_STATE_MOUNT}"
 echo "volatile /var: kept"
 echo "host disk: not written"
@@ -593,6 +594,43 @@ cp "${script_root}/shell/styles.css" "${init}/usr/share/omne/shell/styles.css"
 mkdir -p "${init}/usr/share/omne/shell/dist"
 cp -a "${script_root}/shell/dist/." "${init}/usr/share/omne/shell/dist/"
 chmod 755 "${init}/usr/bin/omne-session" "${init}/usr/lib/omne/applications/omne-hello" "${init}/usr/lib/omne/state-desktop"
+
+# The ISO starts this through omne-core.service. The initramfs runs the same program.
+mkdir -p "${init}/etc/omne" "${init}/usr/bin" "${init}/usr/lib/omne/python" \
+  "${init}/usr/lib/omne/agents" "${init}/usr/lib/omne/models/manifests"
+cp "${script_root}/system/linux/OMNE" "${init}/usr/bin/OMNE"
+cp "${script_root}/system/linux/OMNE.toml" "${init}/etc/omne/OMNE.toml"
+chmod 755 "${init}/usr/bin/OMNE"
+python3 - "${script_root}" "${init}" <<'ENDCORE'
+import shutil
+import sys
+from pathlib import Path
+
+repo = Path(sys.argv[1])
+init = Path(sys.argv[2])
+
+def copy_tree(source: Path, dest: Path) -> None:
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.copytree(
+        source,
+        dest,
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
+
+copy_tree(repo / "core", init / "usr/lib/omne/python/core")
+copy_tree(repo / "omne", init / "usr/lib/omne/python/omne")
+copy_tree(repo / "agents", init / "usr/lib/omne/agents")
+copy_tree(repo / "models" / "manifests", init / "usr/lib/omne/models/manifests")
+print("packed OMNE core")
+ENDCORE
+mkdir -p "${init}/var/lib/omne/workspace" "${init}/var/lib/omne/memory"
+if sudo -n env PYTHONDONTWRITEBYTECODE=1 PYTHONHOME=/usr PYTHONPATH=/usr/lib/omne/python:/usr/lib/omne/site LD_LIBRARY_PATH=/lib/x86_64-linux-gnu OMNE_ENVIRONMENT=production OMNE_CONFIG=/etc/omne/OMNE.toml chroot "${init}" /usr/bin/OMNE check | grep -q "ok"; then
+  echo "guest python can start OMNE core"
+else
+  echo "guest python cannot start OMNE core; no disk was written" >&2
+  exit 2
+fi
 
 mkdir -p "${work}/esp/EFI/BOOT" "${work}/esp/EFI/systemd" "${work}/esp/loader/entries" "${work}/esp/omne"
 cp "${efi_source}" "${work}/esp/EFI/BOOT/BOOTX64.EFI"

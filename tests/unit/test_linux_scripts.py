@@ -837,10 +837,16 @@ def test_state_disk_starts_labwc_after_unlock() -> None:
     assert 'code}" -eq 0' in init
     assert "labwc" in desktop
     assert "/usr/bin/omne-session" in desktop
+    assert "/usr/bin/OMNE serve" in desktop
+    assert "127.0.0.1:8787" in desktop
+    assert "OMNE core up" in desktop
     assert "4173" in desktop
     assert "/usr/share/omne/shell" in desktop
     assert "/usr/bin/labwc" in builder
     assert "/usr/bin/cog" in builder
+    assert "/usr/bin/OMNE" in builder
+    assert "OMNE.toml" in builder
+    assert "core: OMNE serve on 127.0.0.1:8787" in builder
     assert "omne-session" in builder
     assert "systemd-boot" in builder
     assert "linux-image-generic" in builder
