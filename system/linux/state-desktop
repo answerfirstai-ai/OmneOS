@@ -43,22 +43,33 @@ while [ "${waited}" -lt 15 ]; do
   /bin/busybox sleep 1
 done
 
-devices=""
+chosen=""
+virtio=""
 for node in /dev/dri/card*; do
-  if [ -e "${node}" ]; then
-    if [ -n "${devices}" ]; then
-      devices="${devices}:${node}"
-    else
-      devices="${node}"
-    fi
+  if [ ! -e "${node}" ]; then
+    continue
+  fi
+  name="${node##*/}"
+  driver=""
+  if [ -L "/sys/class/drm/${name}/device/driver" ]; then
+    driver="$(/bin/busybox readlink "/sys/class/drm/${name}/device/driver")"
+  fi
+  case "${driver}" in
+    *virtio*) virtio="${node}" ;;
+  esac
+  if [ -z "${chosen}" ]; then
+    chosen="${node}"
   fi
 done
-if [ -z "${devices}" ]; then
+if [ -n "${virtio}" ]; then
+  chosen="${virtio}"
+fi
+if [ -z "${chosen}" ]; then
   echo "OMNE desktop: no DRM device" >&2
   exit 1
 fi
-export WLR_DRM_DEVICES="${devices}"
-echo "OMNE desktop DRM ${devices}"
+export WLR_DRM_DEVICES="${chosen}"
+echo "OMNE desktop DRM ${chosen}"
 
 /bin/busybox ip link set lo up || {
   echo "OMNE shell: loopback did not start" >&2

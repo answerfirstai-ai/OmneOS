@@ -446,6 +446,30 @@ if present and module_dir.is_dir():
     print(f"packed {len(input_lines)} input kernel modules")
 elif not present:
     print("keyboard drivers are built in")
+
+storage_names = ["sd_mod", "usb_storage", "uas"]
+storage_present = [name for name in storage_names if name in name_to_path]
+storage_builtin = (
+    flags.get("CONFIG_BLK_DEV_SD") == "y"
+    and flags.get("CONFIG_USB_STORAGE") == "y"
+)
+if storage_present and module_dir.is_dir():
+    storage_lines = materialize(collect(storage_present))
+    (init / "etc/omne/modules.disk").write_text("\n".join(storage_lines) + "\n", encoding="utf-8")
+    print("disk modules: " + " ".join(storage_present))
+    print(f"packed {len(storage_lines)} disk kernel modules")
+elif storage_builtin:
+    print("usb-storage and sd_mod are built in")
+elif "usb_storage" not in name_to_path and flags.get("CONFIG_USB_STORAGE") != "y":
+    raise SystemExit("usb_storage module was not found; a written USB stick would not see OMNE-STATE")
+if "simpledrm" in name_to_path and module_dir.is_dir():
+    simple_lines = materialize(collect(["simpledrm"]))
+    desktop_path = init / "etc/omne/modules.desktop"
+    existing = desktop_path.read_text(encoding="utf-8") if desktop_path.exists() else ""
+    desktop_path.write_text(existing + "\n".join(simple_lines) + "\n", encoding="utf-8")
+    print(f"packed {len(simple_lines)} simpledrm kernel modules")
+else:
+    print("simpledrm is built in or absent; NVIDIA is not required")
 PY
 
 if ! command -v ldconfig >/dev/null 2>&1 || ! ldconfig -r "${init}" >/dev/null 2>&1; then

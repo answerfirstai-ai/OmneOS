@@ -132,9 +132,11 @@ finishes setup once, reboots, and the next boot waits for a typed password, then
 `OMNE-STATE` and mounts it from `fstab`. The full ISO and the full installed disk still
 use systemd. The state-disk initramfs is the small boot used when a rootfs is not built.
 
+The USB stick is this disk file, not the ISO. Write steps, including the warning not to select the Windows drive, are in the README.
+
 ```bash
-bash scripts/linux/build-state-disk.sh --dest /var/tmp/OMNE-STATE.img
-bash scripts/linux/vm-boot.sh --run --headless /var/tmp/OMNE-STATE.img
+bash scripts/linux/build-state-disk.sh --dest /var/tmp/OMNE-USB.img
+OMNE_QEMU_ACCEL=tcg bash scripts/linux/vm-boot.sh --run --headless /var/tmp/OMNE-USB.img
 ```
 
 ## Not in this step

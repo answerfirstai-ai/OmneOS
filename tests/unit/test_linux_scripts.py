@@ -856,3 +856,6 @@ def test_state_disk_starts_labwc_after_unlock() -> None:
     assert "OMNE_GATE_PASSWORD" in gate
     assert "OMNE_GATE_PASSWORD" not in init
     assert "modules.input" in init
+    assert "modules.disk" in init
+    assert init.index("modules.disk") < init.index('if [ -b /dev/vda ]')
+    assert "usb_storage" in builder

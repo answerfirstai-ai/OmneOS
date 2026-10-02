@@ -24,33 +24,43 @@ if /bin/busybox grep -q "systemd.volatile=state" /proc/cmdline; then
   /bin/busybox echo "volatile /var: tmpfs"
 fi
 
-if [ -f /etc/omne/modules.load ]; then
-  while IFS= read -r module; do
-    if [ -n "${module}" ]; then
-      /bin/busybox insmod "${module}" || /bin/busybox echo "module failed ${module}"
-    fi
-  done < /etc/omne/modules.load
-fi
+load_modules() {
+  list="$1"
+  if [ -f "${list}" ]; then
+    while IFS= read -r module; do
+      if [ -n "${module}" ]; then
+        /bin/busybox insmod "${module}" || /bin/busybox echo "module failed ${module}"
+      fi
+    done < "${list}"
+  fi
+}
+
+# Block, USB host, and USB storage before the disk scan.
+# QEMU uses built-in virtio-blk. A stick written with Etcher or dd is /dev/sda.
+load_modules /etc/omne/modules.load
+load_modules /etc/omne/modules.input
+load_modules /etc/omne/modules.disk
 
 waited=0
-while [ "${waited}" -lt 15 ]; do
-  if [ -b /dev/vda ] || [ -b /dev/sda ]; then
+while [ "${waited}" -lt 30 ]; do
+  if [ -b /dev/vda ] || [ -b /dev/sda ] || [ -b /dev/nvme0n1 ]; then
     break
   fi
   waited=$((waited + 1))
   /bin/busybox sleep 1
 done
 
-if [ -f /etc/omne/modules.input ]; then
-  while IFS= read -r module; do
-    if [ -n "${module}" ]; then
-      /bin/busybox insmod "${module}" || /bin/busybox echo "module failed ${module}"
-    fi
-  done < /etc/omne/modules.input
-fi
-
-/usr/bin/python3 /usr/lib/omne/state-gate.py
-code=$?
+code=1
+tries=0
+while [ "${tries}" -lt 15 ]; do
+  /usr/bin/python3 /usr/lib/omne/state-gate.py
+  code=$?
+  if [ "${code}" -eq 0 ] || [ "${code}" -eq 10 ]; then
+    break
+  fi
+  tries=$((tries + 1))
+  /bin/busybox sleep 1
+done
 /bin/busybox sync
 if /bin/busybox grep -q " /var/lib/omne " /proc/mounts; then
   /bin/busybox mount -o remount,ro /var/lib/omne || true

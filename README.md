@@ -93,67 +93,48 @@ system/linux/         User unit, system units, and the Ubuntu 24.04 base pin
 
 ## USB image and first boot
 
-Build the USB image with the existing ISO script. It uses Ubuntu's kernel from that script. Do not
-add another kernel.
+The file you write to a USB stick is a whole disk, not a CD. It has an EFI system partition, a small root, and an ext4 partition labeled `OMNE-STATE`. balenaEtcher and `dd` write that file the same way they write other disk images. Do not mount it as a CD, and do not use the ISO for the stick.
+
+The image is not stored in git. This command downloads Ubuntu 24.04's `linux-image-generic` and `systemd-boot`, then writes the disk file. It does not download model weights and it does not invent a kernel.
 
 ```bash
-sudo bash scripts/linux/build-iso.sh --dest /var/tmp/OMNE-OS.iso
+bash scripts/linux/build-state-disk.sh --dest /var/tmp/OMNE-USB.img
 ```
 
-Write that file to a USB stick. `lsblk` shows the stick. Replace `sdX` with that device, not the
-computer's disk. This erases the stick.
+Run that on Ubuntu 24.04 x86-64. The host needs `sudo`, `python3`, `npm`, `curl`, `gzip`, `cpio`, `dpkg-deb`, `gdisk`, `dosfstools`, `e2fsprogs`, `mtools`, `zstd`, `busybox`, `labwc`, `seatd`, `cog`, and the XKB data. A missing tool exits 2 and writes nothing. The command refuses `/dev`, `/boot`, and the source tree. It never writes the computer's own disk.
+
+### Write the stick
+
+This erases the stick. The disk Windows is installed on is not the stick. Do not select it. In Etcher that disk is often the internal drive Windows boots from. In `lsblk` it is the disk that has the Windows partitions, not the removable USB disk.
+
+On Windows, install balenaEtcher from https://etcher.balena.io/, choose Flash from file, and select `OMNE-USB.img`. When Etcher asks for the target, select the USB stick only. Do not select the Windows drive. Then flash.
+
+On Linux, identify the stick first:
 
 ```bash
-sudo dd if=/var/tmp/OMNE-OS.iso of=/dev/sdX bs=4M conv=fsync status=progress
+lsblk
+sudo dd if=/var/tmp/OMNE-USB.img of=/dev/sdX bs=4M conv=fsync status=progress
 ```
 
-Run the PC-boot simulation without writing a disk:
+Replace `sdX` with the USB stick. Do not use the drive Windows is installed on, and do not use this computer's system disk.
+
+Boot the PC from that stick with UEFI. The first boot stores setup on `OMNE-STATE` and restarts. The second boot waits until a password is typed on the keyboard, then starts labwc and the OMNE shell. With no API key and no local model, intelligence stays off and the desktop still opens. An API key in the secret store, or a local model id, is the existing way to turn it on. Model weights are not in the image.
+
+An NVIDIA RTX 5060 may need a newer driver than Ubuntu 24.04's default kernel. This image does not install that driver and does not refuse to build without it. QEMU uses virtio-gpu. A machine without that device uses simpledrm when the Ubuntu kernel publishes it.
+
+Check the same file in QEMU without writing a stick. TCG is the software CPU. KVM is not required.
 
 ```bash
-bash scripts/linux/vm-boot.sh --dry-run /var/tmp/OMNE-OS.iso
-bash scripts/linux/vm-boot.sh --run --headless /var/tmp/OMNE-OS.iso
-bash scripts/linux/vm-test.sh --dry-run --iso /var/tmp/OMNE-OS.iso
-bash scripts/linux/vm-test.sh --iso /var/tmp/OMNE-OS.iso
+OMNE_QEMU_ACCEL=tcg bash scripts/linux/vm-boot.sh --run --headless /var/tmp/OMNE-USB.img
 ```
 
-On Windows, `scripts/windows/install-simulation.cmd` installs the tools, builds the shell, and opens
-the desktop. See `docs/ISO_BUILD.md` and `docs/VM_TEST.md`.
+### What the first boots do
 
-The first time the shell starts, OMNE shows setup: a name, a look (color, type, and wallpaper), and
-a password. Staged dependencies are listed while that happens. Model weights are not downloaded.
-Finishing setup stores a done flag and a password hash in the data directory (`memory/` here,
-`/var/lib/omne/memory/` on a machine). Later boots show only the password screen. The correct
-password opens the desktop. A wrong password stays on that screen. Setup does not run again.
+The first time the shell starts, OMNE shows setup: a name, a look (color, type, and wallpaper), and a password. Staged dependencies are listed while that happens. Model weights are not downloaded. Finishing setup stores a done flag and a password hash in the data directory (`memory/` here, `/var/lib/omne/memory/` on a machine). Later boots show only the password screen. The correct password opens the desktop. A wrong password stays on that screen. Setup does not run again.
 
-Colors, type, and wallpaper come from `theme.json` in that data directory.
-`OMNE theme apply configs/development/theme.json` writes that file and refuses boot, package, and
-unit paths. With no API key and no local model, the desktop still opens after the password. Browse,
-files, settings, and Wi-Fi status stay available. Intelligence stays off until an API key is stored
-in the secret service or a local model id is selected. The key is not written into `theme.json`, and
-model weights are not downloaded. Models can be added, removed, and chosen by difficulty for the
-core or for an agent. After unlock, the shell can save an API key or a local model id, and a task
-sentence can create an agent the existing worker pool can admit. Task notes are markdown files in a
-vault folder under the data directory.
+Colors, type, and wallpaper come from `theme.json` in that data directory. `OMNE theme apply configs/development/theme.json` writes that file and refuses boot, package, and unit paths. With no API key and no local model, the desktop still opens after the password. Browse, files, settings, and Wi-Fi status stay available. Intelligence stays off until an API key is stored in the secret service or a local model id is selected. The key is not written into `theme.json`, and model weights are not downloaded. Models can be added, removed, and chosen by difficulty for the core or for an agent. After unlock, the shell can save an API key or a local model id, and a task sentence can create an agent the existing worker pool can admit. Task notes are markdown files in a vault folder under the data directory.
 
-The ISO still boots with `systemd.volatile=state`, so the rest of `/var` stays in memory. Setup
-state does not. The image carries a 64 MiB ext4 partition labeled `OMNE-STATE`, appended by the ISO
-builder as a file under its temporary work directory, not as a write to a host disk. On a USB stick
-written with `dd`, that partition is mounted at `/var/lib/omne` after the volatile `/var` exists.
-The setup flag and the password verifier live there, so the next USB boot asks only for the
-password. QEMU's ISO test attaches the image as a read-only CD-ROM, which does not expose that
-partition, so a virtual reboot of the ISO still starts setup. A machine install keeps the data
-directory on its own disk.
-
-`scripts/linux/build-state-disk.sh` writes a GPT disk file instead of a CD. The same Ubuntu kernel
-and systemd-boot are reused. The third partition is `OMNE-STATE`, so the guest can see it.
-`systemd.volatile=state` still drops the rest of `/var`. The first boot stores setup on that
-partition and reboots. The second boot waits until a password is typed on the keyboard, then starts labwc and maps the OMNE shell with cog. `build-disk.sh` leaves the same
-partition on a full rootfs disk. Neither script writes a host disk or a block device.
-
-```bash
-bash scripts/linux/build-state-disk.sh --dest /var/tmp/OMNE-STATE.img
-bash scripts/linux/vm-boot.sh --run --headless /var/tmp/OMNE-STATE.img
-```
+The state disk keeps `systemd.volatile=state`, so the rest of `/var` stays in memory. `OMNE-STATE` does not. `scripts/linux/build-disk.sh` leaves the same partition on a full rootfs disk. Neither script writes a host disk or a block device. `scripts/linux/build-iso.sh` still writes a CD image. QEMU's ISO test attaches that image as a read-only CD-ROM, which hides `OMNE-STATE`. That ISO is not the USB stick.
 
 ## Limits
 
@@ -174,8 +155,7 @@ installed desktop applications and does not start a shell. `OMNE browser` report
 availability and does not launch a browser or import Playwright. `OMNE processes` reports the
 process table and does not signal a process. `OMNE updates` reports signed catalog status and does
 not install packages. `OMNE recover` explains startup failures and does not erase user data or
-reinstall the OS. `OMNE models` reports the model registry and does not download weights. Physical
-hardware installation is not implemented.
+reinstall the OS. `OMNE models` reports the model registry and does not download weights. The USB file above is a bootable disk image, not an installer that repartitions the Windows drive. Physical installation onto an internal disk is not implemented. An NVIDIA RTX 5060 may need a newer driver than Ubuntu 24.04's kernel; the image is not blocked on that driver.
 
 ## License
 
