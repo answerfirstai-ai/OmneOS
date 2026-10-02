@@ -218,6 +218,29 @@
           <form id="launcher" class="window-body command-surface">
             <p class="command-mark">OMNE</p>
             <p id="launcher-prompt">What do you want to do?</p>
+            <p id="intelligence-note">
+              Intelligence is off until an API key or a local model is connected.
+            </p>
+            <p id="session-capabilities">
+              Desktop is available. Files are in Project. Wi-Fi: unknown.
+            </p>
+            <details id="intelligence-connect">
+              <summary>Connect intelligence</summary>
+              <label for="intelligence-provider">API provider</label>
+              <select id="intelligence-provider">
+                <option value="xai">xAI</option>
+                <option value="nvidia">NVIDIA</option>
+              </select>
+              <label for="intelligence-key">API key</label>
+              <input id="intelligence-key" type="password" autocomplete="off" />
+              <button type="button" id="intelligence-save-key">Save key</button>
+              <label for="intelligence-model">Local model id</label>
+              <input id="intelligence-model" type="text" placeholder="local-notes" />
+              <button type="button" id="intelligence-save-model">Use local model</button>
+              <p class="boot-note">
+                No model weights are downloaded. The key is not stored in the theme.
+              </p>
+            </details>
             <ul id="launcher-actions" class="launcher-actions"></ul>
             <label for="objective">Or describe it</label>
             <input id="objective" name="objective" type="text" placeholder="Build me a website" />

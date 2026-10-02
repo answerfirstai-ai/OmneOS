@@ -79,6 +79,7 @@ from omne.processes.select import process_service
 from omne.processes.service import ProcessService
 from omne.recovery.select import recovery_service
 from omne.recovery.service import RecoveryService
+from omne.secrets.service import SecretService
 from omne.storage.select import storage_service
 from omne.storage.service import StorageService
 from omne.updates.service import UpdateService
@@ -199,6 +200,7 @@ class OMNE:
         self._cortex = cortex
         self._nvidia_configured = nvidia_configured
         self._environment = environment
+        self._secrets: SecretService | None = None
         self._context_items = context_item_limit
         self._context_chars = context_char_limit
         self._memory_limit = memory_retrieve_limit
@@ -388,6 +390,44 @@ class OMNE:
 
         apply_theme(self._state_dir(), document)
         return load_theme(self._state_dir()).model_dump()
+
+    def intelligence_status(self) -> dict[str, object]:
+        """Whether a model is connected. The desktop stays available either way."""
+
+        from omne.connection import intelligence_view
+
+        return intelligence_view(
+            self._state_dir(),
+            secrets=self._secrets,
+            environment=self._environment,
+        )
+
+    def connect_api_key(self, provider: str, key: str) -> dict[str, object]:
+        """Store a provider key in the secret service. The theme file is not written."""
+
+        from omne.connection import connect_api_key
+
+        if self._secrets is None:
+            raise ValueError("secret storage is not configured")
+        return connect_api_key(
+            self._state_dir(),
+            self._secrets,
+            environment=self._environment,
+            provider=provider,
+            key=key,
+        )
+
+    def select_local_model(self, model_id: str) -> dict[str, object]:
+        """Select a local model id. Weights are not downloaded."""
+
+        from omne.connection import select_local_model
+
+        return select_local_model(
+            self._state_dir(),
+            model_id,
+            secrets=self._secrets,
+            environment=self._environment,
+        )
 
     def _state_dir(self) -> Path:
         if self._data_dir is None:

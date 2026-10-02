@@ -241,6 +241,7 @@ def build_OMNE(settings: Settings) -> OMNE:
     omne._hardware = hardware
     omne._storage = storage
     omne._input = controls
+    omne._secrets = secrets
     return omne
 
 

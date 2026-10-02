@@ -10,7 +10,9 @@ from pydantic import ValidationError
 from core.memory.retrieval import MemoryAccessError
 from core.mission.model import InvalidMissionTransition
 from core.orchestrator.service import OMNE, mission_document, task_document
+from omne.connection import ConnectionPathError
 from omne.firstboot import SetupClosed, ThemePathError
+from omne.secrets.model import SecretError
 
 Payload = dict[str, object]
 
@@ -26,6 +28,8 @@ def route_get(
         return HTTPStatus.OK, runtime.setup_status()
     if path == "/theme":
         return HTTPStatus.OK, {"theme": runtime.theme_status()}
+    if path == "/intelligence":
+        return HTTPStatus.OK, runtime.intelligence_status()
     if path == "/tasks":
         return HTTPStatus.OK, {"tasks": [task_document(task) for task in runtime.list_tasks()]}
     if path == "/events":
@@ -151,6 +155,23 @@ def route_post(
             return HTTPStatus.BAD_REQUEST, {"error": str(exc)}
         except (ValidationError, ValueError):
             return HTTPStatus.BAD_REQUEST, {"error": "theme was not accepted"}
+    if path == "/intelligence/key":
+        provider = body.get("provider")
+        key = body.get("key")
+        if not isinstance(provider, str) or not isinstance(key, str):
+            return HTTPStatus.BAD_REQUEST, {"error": "intelligence was not connected"}
+        try:
+            return HTTPStatus.OK, runtime.connect_api_key(provider, key)
+        except (ConnectionPathError, SecretError, ValueError):
+            return HTTPStatus.BAD_REQUEST, {"error": "intelligence was not connected"}
+    if path == "/intelligence/local":
+        model_id = body.get("model_id")
+        if not isinstance(model_id, str):
+            return HTTPStatus.BAD_REQUEST, {"error": "model was not selected"}
+        try:
+            return HTTPStatus.OK, runtime.select_local_model(model_id)
+        except (ConnectionPathError, ValueError):
+            return HTTPStatus.BAD_REQUEST, {"error": "model was not selected"}
     if path == "/tasks":
         objective = body.get("objective")
         if not isinstance(objective, str) or not objective.strip():

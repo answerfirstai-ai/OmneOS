@@ -77,6 +77,7 @@ import { inspectMission } from "./mission-view.js";
 import { noticesFromEvents } from "./notify.js";
 import { permissionPrompt } from "./permission-view.js";
 import { LAUNCHER_ACTIONS } from "./launcher.js";
+import { intelligenceBanner, maySendObjective, readIntelligence, sessionLine } from "./session.js";
 import { coreRenderer, presenceView } from "./presence.js";
 import { readRecovery, type RecoveryState } from "./recovery.js";
 import { matchDesktopCommand, matchShortcut, type DesktopCommand } from "./shortcuts.js";
@@ -1504,6 +1505,13 @@ async function confirmTask(taskId: string, approved: boolean): Promise<void> {
 }
 
 function runObjective(objective: string): Promise<void> {
+  if (!maySendObjective(intelligenceOn)) {
+    const blocked = listElement("launch-result");
+    if (blocked !== null) {
+      blocked.textContent = intelligenceBanner(false);
+    }
+    return Promise.resolve();
+  }
   const launcher = document.getElementById("launcher");
   const submit = launcher?.querySelector("button[type='submit']");
   const actions = Array.from(
@@ -2080,6 +2088,8 @@ function hideStartMenu(): void {
 }
 
 let desktopStarted = false;
+let intelligenceOn = false;
+let intelligenceWired = false;
 let bootFlight = false;
 const setupDraft: SetupDraft = {
   name: "",
@@ -2447,6 +2457,8 @@ function startDesktop(coreUrl: string): void {
     }
     bindDesktop();
     paintHud();
+    wireIntelligence(coreUrl);
+    void refreshIntelligence(coreUrl);
     void refresh(status, detail);
     void refreshCompute(coreUrl);
     void refreshNetwork(coreUrl);
@@ -2466,6 +2478,74 @@ function startDesktop(coreUrl: string): void {
     }, 4000);
   } catch (error) {
     console.error(error);
+  }
+}
+
+function wireIntelligence(coreUrl: string): void {
+  if (intelligenceWired) {
+    return;
+  }
+  intelligenceWired = true;
+  document.getElementById("intelligence-save-key")?.addEventListener("click", () => {
+    const provider = document.getElementById("intelligence-provider");
+    const key = document.getElementById("intelligence-key");
+    if (!(provider instanceof HTMLSelectElement) || !(key instanceof HTMLInputElement)) {
+      return;
+    }
+    void postJson(coreApiUrl(coreUrl, "/intelligence/key"), {
+      provider: provider.value,
+      key: key.value,
+    }).then((result) => {
+      key.value = "";
+      if (result.status === 200) {
+        void refreshIntelligence(coreUrl);
+        return;
+      }
+      const note = document.getElementById("intelligence-note");
+      if (note instanceof HTMLElement) {
+        note.textContent = "The key was not saved.";
+      }
+    });
+  });
+  document.getElementById("intelligence-save-model")?.addEventListener("click", () => {
+    const field = document.getElementById("intelligence-model");
+    if (!(field instanceof HTMLInputElement)) {
+      return;
+    }
+    void postJson(coreApiUrl(coreUrl, "/intelligence/local"), {
+      model_id: field.value.trim(),
+    }).then((result) => {
+      if (result.status === 200) {
+        void refreshIntelligence(coreUrl);
+        return;
+      }
+      const note = document.getElementById("intelligence-note");
+      if (note instanceof HTMLElement) {
+        note.textContent = "That model id was not accepted. Weights are not downloaded.";
+      }
+    });
+  });
+}
+
+async function refreshIntelligence(coreUrl: string): Promise<void> {
+  const note = document.getElementById("intelligence-note");
+  const session = document.getElementById("session-capabilities");
+  try {
+    const payload = await fetchJson(coreApiUrl(coreUrl, "/intelligence"));
+    const view = readIntelligence(payload);
+    intelligenceOn = view.enabled;
+    if (note instanceof HTMLElement) {
+      note.textContent = view.enabled ? intelligenceBanner(true) : view.reason;
+    }
+  } catch {
+    intelligenceOn = false;
+    if (note instanceof HTMLElement) {
+      note.textContent = intelligenceBanner(false);
+    }
+  }
+  const wifi = document.getElementById("network-status");
+  if (session instanceof HTMLElement) {
+    session.textContent = sessionLine(wifi instanceof HTMLElement ? (wifi.textContent ?? "") : "");
   }
 }
 

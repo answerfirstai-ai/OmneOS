@@ -127,8 +127,15 @@ password opens the desktop. A wrong password stays on that screen. Setup does no
 
 Colors, type, and wallpaper come from `theme.json` in that data directory.
 `OMNE theme apply configs/development/theme.json` writes that file and refuses boot, package, and
-unit paths. The ISO keeps `/var` in memory (`systemd.volatile=state`), so a repeated boot of the ISO
-image starts setup again. A machine install and this simulation keep the data directory on disk.
+unit paths. With no API key and no local model, the desktop still opens after the password. Browse,
+files, settings, and Wi-Fi status stay available. Intelligence stays off until an API key is stored
+in the secret service or a local model id is selected. The key is not written into `theme.json`, and
+model weights are not downloaded. Models can be added, removed, and chosen by difficulty for the
+core or for an agent. A task sentence can create an agent the existing worker pool can admit. Task
+notes are markdown files in a vault folder under the data directory.
+
+The ISO keeps `/var` in memory (`systemd.volatile=state`), so a repeated boot of the ISO image
+starts setup again. A machine install and this simulation keep the data directory on disk.
 
 ## Limits
 
