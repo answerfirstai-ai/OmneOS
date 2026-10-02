@@ -8,6 +8,12 @@ export HOME="/tmp/omne-home"
 export XDG_RUNTIME_DIR="/run/omne"
 export XKB_CONFIG_ROOT="/usr/share/X11/xkb"
 export WLR_RENDERER="${WLR_RENDERER:-pixman}"
+# virtio-vga has no virgl here. cog paints through llvmpipe shared-memory buffers.
+export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
+export GALLIUM_DRIVER="${GALLIUM_DRIVER:-llvmpipe}"
+export COG_PLATFORM_WL_VIEW_FULLSCREEN="${COG_PLATFORM_WL_VIEW_FULLSCREEN:-1}"
+export FONTCONFIG_PATH="${FONTCONFIG_PATH:-/etc/fonts}"
+export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS="${WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS:-1}"
 export LIBSEAT_BACKEND="${LIBSEAT_BACKEND:-seatd}"
 
 /bin/busybox mkdir -p /run /tmp/omne-home /run/omne /dev/shm /dev/dri

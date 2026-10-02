@@ -41,6 +41,14 @@ while [ "${waited}" -lt 15 ]; do
   /bin/busybox sleep 1
 done
 
+if [ -f /etc/omne/modules.input ]; then
+  while IFS= read -r module; do
+    if [ -n "${module}" ]; then
+      /bin/busybox insmod "${module}" || /bin/busybox echo "module failed ${module}"
+    fi
+  done < /etc/omne/modules.input
+fi
+
 /usr/bin/python3 /usr/lib/omne/state-gate.py
 code=$?
 /bin/busybox sync

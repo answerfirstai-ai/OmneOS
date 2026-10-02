@@ -99,6 +99,10 @@ if [[ ! -x /usr/bin/labwc || ! -x /usr/bin/seatd-launch || ! -x /usr/sbin/seatd 
   echo "labwc or seatd is missing; no disk was written" >&2
   exit 2
 fi
+if [[ ! -x /usr/bin/cog ]]; then
+  echo "cog is missing; no disk was written" >&2
+  exit 2
+fi
 if [[ ! -d /usr/share/X11/xkb ]]; then
   echo "xkb data is missing; no disk was written" >&2
   exit 2
@@ -422,6 +426,25 @@ if gpu_seeds:
     print(f"packed {len(gpu_lines)} desktop kernel modules")
 elif gpu_builtin:
     print("kernel has virtio-gpu built in")
+input_names = [
+    "evdev",
+    "usbhid",
+    "hid_generic",
+    "hid",
+    "usbcore",
+    "usb_common",
+    "xhci_hcd",
+    "xhci_pci_renesas",
+    "xhci_pci",
+]
+present = [name for name in input_names if name in name_to_path]
+if present and module_dir.is_dir():
+    input_lines = materialize(collect(present))
+    (init / "etc/omne/modules.input").write_text("\n".join(input_lines) + "\n", encoding="utf-8")
+    print("input modules: " + " ".join(present))
+    print(f"packed {len(input_lines)} input kernel modules")
+elif not present:
+    print("keyboard drivers are built in")
 PY
 
 if ! command -v ldconfig >/dev/null 2>&1 || ! ldconfig -r "${init}" >/dev/null 2>&1; then
@@ -441,6 +464,7 @@ else
 fi
 
 python3 - "${init}" <<'ENDPACK'
+import os
 import shutil
 import subprocess
 import sys
@@ -488,11 +512,68 @@ def closure(paths: list[Path]) -> None:
                 pending.append(Path(stripped.split()[0]))
         install(current)
 
-closure([Path("/usr/bin/labwc"), Path("/usr/bin/Xwayland"), Path("/usr/bin/seatd-launch"), Path("/usr/sbin/seatd")])
-print("packed labwc and seatd")
+roots = [
+    Path("/usr/bin/labwc"),
+    Path("/usr/bin/Xwayland"),
+    Path("/usr/bin/seatd-launch"),
+    Path("/usr/sbin/seatd"),
+    Path("/usr/bin/cog"),
+    Path("/usr/lib/x86_64-linux-gnu/cog/modules/libcogplatform-wl.so"),
+    Path("/usr/lib/x86_64-linux-gnu/libEGL_mesa.so.0"),
+    Path("/usr/lib/x86_64-linux-gnu/dri/swrast_dri.so"),
+    Path("/usr/lib/x86_64-linux-gnu/dri/kms_swrast_dri.so"),
+]
+webkit = Path("/usr/lib/x86_64-linux-gnu/wpe-webkit-2.0")
+if webkit.is_dir():
+    for binary in webkit.iterdir():
+        if binary.is_file() and os.access(binary, os.X_OK):
+            roots.append(binary)
+roots.extend(Path("/usr/lib/x86_64-linux-gnu").glob("libgallium*.so*"))
+roots.extend(Path("/usr/lib/x86_64-linux-gnu").glob("libLLVM.so*"))
+closure(roots)
+# dlopen asks for libWPEBackend-fdo-1.0.so. ldd only copies the SONAME.
+for host_lib in (Path("/usr/lib/x86_64-linux-gnu"), Path("/lib/x86_64-linux-gnu")):
+    if not host_lib.is_dir():
+        continue
+    for link in host_lib.glob("*.so"):
+        if not link.is_symlink():
+            continue
+        resolved_name = link.resolve().name
+        relative = link.readlink()
+        for guest_lib in (
+            init / "lib/x86_64-linux-gnu",
+            init / "usr/lib/x86_64-linux-gnu",
+        ):
+            if not (guest_lib / resolved_name).exists():
+                continue
+            dest = guest_lib / link.name
+            if dest.exists() or dest.is_symlink():
+                continue
+            dest.symlink_to(relative.name if relative.is_absolute() else relative)
+if webkit.is_dir():
+    shutil.copytree(
+        webkit,
+        init / "usr/lib/x86_64-linux-gnu/wpe-webkit-2.0",
+        dirs_exist_ok=True,
+        symlinks=True,
+    )
+print("packed labwc, seatd, and cog")
 ENDPACK
 mkdir -p "${init}/usr/share/X11" "${init}/usr/bin" "${init}/usr/lib/omne/applications" "${init}/usr/share/omne/shell"
 cp -a /usr/share/X11/xkb "${init}/usr/share/X11/xkb"
+mkdir -p "${init}/usr/share/glvnd/egl_vendor.d" "${init}/etc" "${init}/usr/share/fonts/truetype"
+if [[ -f /usr/share/glvnd/egl_vendor.d/50_mesa.json ]]; then
+  cp -a /usr/share/glvnd/egl_vendor.d/50_mesa.json "${init}/usr/share/glvnd/egl_vendor.d/50_mesa.json"
+fi
+if [[ -d /etc/fonts ]]; then
+  cp -a /etc/fonts "${init}/etc/fonts"
+fi
+if [[ -d /usr/share/fontconfig ]]; then
+  cp -a /usr/share/fontconfig "${init}/usr/share/fontconfig"
+fi
+if [[ -d /usr/share/fonts/truetype/dejavu ]]; then
+  cp -a /usr/share/fonts/truetype/dejavu "${init}/usr/share/fonts/truetype/dejavu"
+fi
 cp "${script_root}/system/linux/omne-session" "${init}/usr/bin/omne-session"
 cp "${script_root}/system/linux/omne-hello" "${init}/usr/lib/omne/applications/omne-hello"
 cp "${script_root}/system/linux/state-desktop" "${init}/usr/lib/omne/state-desktop"
@@ -548,5 +629,5 @@ bash "${script_root}/scripts/linux/assemble-disk-image.sh" \
   --state-label "${OMNE_STATE_LABEL}"
 
 echo "state disk written to ${dest}"
-echo "second boot reads ${OMNE_STATE_LABEL}, accepts the password, and starts labwc"
+echo "second boot reads ${OMNE_STATE_LABEL}, waits for a typed password, and starts labwc"
 echo "no host disk and no block device were written"

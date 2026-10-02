@@ -840,6 +840,13 @@ def test_state_disk_starts_labwc_after_unlock() -> None:
     assert "4173" in desktop
     assert "/usr/share/omne/shell" in desktop
     assert "/usr/bin/labwc" in builder
+    assert "/usr/bin/cog" in builder
     assert "omne-session" in builder
     assert "systemd-boot" in builder
     assert "linux-image-generic" in builder
+    gate = (ROOT / "system/linux/state-gate.py").read_text(encoding="utf-8")
+    assert "unlock(_DATA, _PASSWORD)" not in gate
+    assert "/dev/tty0" in gate
+    assert "OMNE_GATE_PASSWORD" in gate
+    assert "OMNE_GATE_PASSWORD" not in init
+    assert "modules.input" in init

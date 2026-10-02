@@ -62,7 +62,7 @@ def test_labwc_uses_drm_instead_of_a_nested_display() -> None:
 
 def test_shell_surface_uses_the_desktop_client_without_a_shell() -> None:
     argv = session.shell_surface_argv(["/usr/bin/firefox", "/usr/bin/cog"])
-    assert argv == ["cog", "-P", "http://127.0.0.1:4173/?surface=desktop"]
+    assert argv == ["cog", "-P", "wl", "http://127.0.0.1:4173/?surface=desktop"]
     assert session.shell_surface_argv(["/usr/bin/bash"]) is None
     env = session.shell_client_environment(
         {"DISPLAY": ":0", "HOME": "/var/lib/omne"},
@@ -72,6 +72,13 @@ def test_shell_surface_uses_the_desktop_client_without_a_shell() -> None:
     assert env["WAYLAND_DISPLAY"] == "wayland-0"
     assert env["XDG_RUNTIME_DIR"] == "/run/omne"
     assert "DISPLAY" not in env
+    pixman = session.shell_client_environment(
+        {"WLR_RENDERER": "pixman", "HOME": "/var/lib/omne"},
+        runtime="/run/omne",
+        display="wayland-0",
+    )
+    assert pixman["LIBGL_ALWAYS_SOFTWARE"] == "1"
+    assert pixman["GALLIUM_DRIVER"] == "llvmpipe"
 
 
 def test_owned_application_marker_requires_the_fixed_program() -> None:
