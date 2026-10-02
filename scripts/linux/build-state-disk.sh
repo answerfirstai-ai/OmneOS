@@ -65,7 +65,7 @@ echo "bootloader: systemd-boot"
 echo "kernel: linux-image-generic"
 echo "base: ${OMNE_BASE_ID} ${OMNE_BASE_VERSION} (${OMNE_BASE_CODENAME})"
 echo "init: state-disk initramfs (build-disk.sh and build-iso.sh use systemd)"
-echo "compositor: labwc on the full image"
+echo "compositor: labwc"
 echo "state: ${OMNE_STATE_LABEL} mounted at ${OMNE_STATE_MOUNT}"
 echo "volatile /var: kept"
 echo "host disk: not written"
@@ -93,6 +93,14 @@ for tool in curl gzip cpio python3 dpkg-deb sgdisk mkfs.vfat mkfs.ext4 mcopy mmd
 done
 if [[ ! -x /usr/bin/busybox && ! -x /bin/busybox ]]; then
   echo "busybox is missing; no disk was written" >&2
+  exit 2
+fi
+if [[ ! -x /usr/bin/labwc || ! -x /usr/bin/seatd-launch || ! -x /usr/sbin/seatd ]]; then
+  echo "labwc or seatd is missing; no disk was written" >&2
+  exit 2
+fi
+if [[ ! -d /usr/share/X11/xkb ]]; then
+  echo "xkb data is missing; no disk was written" >&2
   exit 2
 fi
 
@@ -201,6 +209,12 @@ mkdir -p "${init}/bin" "${init}/usr/lib/omne" "${init}/usr/bin"
 busybox="$(command -v busybox)"
 cp "${busybox}" "${init}/bin/busybox"
 "${init}/bin/busybox" --install -s "${init}/bin"
+# --install records the build path. The guest only has /bin/busybox.
+for link in "${init}/bin/"*; do
+  if [[ -L "${link}" ]]; then
+    ln -sfn busybox "${link}"
+  fi
+done
 cp "${script_root}/system/linux/state-disk-init" "${init}/init"
 cp "${script_root}/system/linux/state-gate.py" "${init}/usr/lib/omne/state-gate.py"
 chmod 755 "${init}/init" "${init}/usr/lib/omne/state-gate.py"
@@ -328,66 +342,86 @@ crypt = list(target_stdlib.glob("lib-dynload/*.so"))
 closure([*native, *crypt, *libs_of(binary)])
 
 config = next(modules_root.rglob(f"config-{kver}"), None)
-builtin = False
+flags: dict[str, str] = {}
 if config is not None:
-    flags = {}
     for line in config.read_text(encoding="utf-8", errors="replace").splitlines():
         if line.startswith("CONFIG_") and "=" in line:
             key, value = line.split("=", 1)
             flags[key] = value
-    builtin = flags.get("CONFIG_EXT4_FS") == "y" and flags.get("CONFIG_VIRTIO_BLK") == "y"
-if builtin:
-    print("kernel has ext4 and virtio-blk built in")
-    raise SystemExit(0)
+builtin = flags.get("CONFIG_EXT4_FS") == "y" and flags.get("CONFIG_VIRTIO_BLK") == "y"
+gpu_builtin = flags.get("CONFIG_DRM_VIRTIO_GPU") == "y"
 
 module_dir = modules_root / "lib/modules" / kver
-if not module_dir.is_dir():
-    raise SystemExit("kernel modules are required and were not extracted")
 name_to_path: dict[str, Path] = {}
-for ko in module_dir.rglob("*.ko*"):
-    name = subprocess.check_output(["modinfo", "-F", "name", str(ko)], text=True).strip()
-    if name:
-        name_to_path[name] = ko
+if module_dir.is_dir():
+    for ko in module_dir.rglob("*.ko*"):
+        name = subprocess.check_output(["modinfo", "-F", "name", str(ko)], text=True).strip()
+        if name:
+            name_to_path[name] = ko
 
 def dependencies(ko: Path) -> list[str]:
     text = subprocess.check_output(["modinfo", "-F", "depends", str(ko)], text=True).strip()
     return [item for item in text.split(",") if item]
 
-order: list[Path] = []
-seen: set[str] = set()
+def collect(seeds: list[str]) -> list[Path]:
+    order: list[Path] = []
+    seen: set[str] = set()
 
-def add(name: str) -> None:
-    if name in seen:
-        return
-    seen.add(name)
-    ko = name_to_path.get(name)
-    if ko is None:
-        return
-    for item in dependencies(ko):
-        add(item)
-    order.append(ko)
+    def add(name: str) -> None:
+        if name in seen:
+            return
+        seen.add(name)
+        ko = name_to_path.get(name)
+        if ko is None:
+            return
+        for item in dependencies(ko):
+            add(item)
+        order.append(ko)
 
-for seed in ("virtio_blk", "ext4"):
-    add(seed)
-if not order:
-    raise SystemExit("ext4 or virtio_blk module was not found")
+    for seed in seeds:
+        if seed not in name_to_path:
+            raise SystemExit(f"{seed} module was not found")
+        add(seed)
+    return order
+
+def materialize(order: list[Path]) -> list[str]:
+    written: list[str] = []
+    for ko in order:
+        relative = ko.relative_to(module_dir)
+        target = destination_root / relative
+        target = target.with_suffix("") if target.name.endswith(".zst") else target
+        if ko.name.endswith(".ko.zst"):
+            target = target.with_name(target.name[:-4]) if target.name.endswith(".zst") else target
+            target.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["zstd", "-d", "-f", "-o", str(target), str(ko)], check=True)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ko, target)
+        written.append(str(Path("/") / target.relative_to(init)))
+    return written
+
+block_seeds = [] if builtin else ["virtio_blk", "ext4"]
+gpu_seeds = [] if gpu_builtin else ["virtio_gpu"]
+if (block_seeds or gpu_seeds) and not module_dir.is_dir():
+    raise SystemExit("kernel modules are required and were not extracted")
 destination_root = init / "lib/modules" / kver
-lines = []
-for ko in order:
-    relative = ko.relative_to(module_dir)
-    target = destination_root / relative
-    target = target.with_suffix("") if target.name.endswith(".zst") else target
-    if ko.name.endswith(".ko.zst"):
-        target = target.with_name(target.name[:-4]) if target.name.endswith(".zst") else target
-        target.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["zstd", "-d", "-f", "-o", str(target), str(ko)], check=True)
-    else:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(ko, target)
-    lines.append(str(Path("/") / target.relative_to(init)))
 (init / "etc/omne").mkdir(parents=True, exist_ok=True)
-(init / "etc/omne/modules.load").write_text("\n".join(lines) + "\n", encoding="utf-8")
-print(f"packed {len(lines)} kernel modules")
+if block_seeds:
+    block_lines = materialize(collect(block_seeds))
+    if not block_lines:
+        raise SystemExit("ext4 or virtio_blk module was not found")
+    (init / "etc/omne/modules.load").write_text("\n".join(block_lines) + "\n", encoding="utf-8")
+    print(f"packed {len(block_lines)} kernel modules")
+elif builtin:
+    print("kernel has ext4 and virtio-blk built in")
+if gpu_seeds:
+    gpu_lines = materialize(collect(gpu_seeds))
+    if not gpu_lines:
+        raise SystemExit("virtio_gpu module was not found")
+    (init / "etc/omne/modules.desktop").write_text("\n".join(gpu_lines) + "\n", encoding="utf-8")
+    print(f"packed {len(gpu_lines)} desktop kernel modules")
+elif gpu_builtin:
+    print("kernel has virtio-gpu built in")
 PY
 
 if ! command -v ldconfig >/dev/null 2>&1 || ! ldconfig -r "${init}" >/dev/null 2>&1; then
@@ -405,6 +439,70 @@ else
   echo "guest python cannot import the boot gate; no disk was written" >&2
   exit 2
 fi
+
+python3 - "${init}" <<'ENDPACK'
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+init = Path(sys.argv[1])
+
+def install(src: Path) -> None:
+    dest = init / src.as_posix().lstrip("/")
+    if dest.exists() or dest.is_symlink():
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if src.is_symlink():
+        link = src.readlink()
+        dest.symlink_to(link)
+        if link.is_absolute():
+            install(Path(link))
+        else:
+            expected = dest.parent / link
+            expected.parent.mkdir(parents=True, exist_ok=True)
+            if not expected.exists() and not expected.is_symlink():
+                shutil.copy2(src.resolve(), expected)
+        return
+    shutil.copy2(src, dest)
+
+def closure(paths: list[Path]) -> None:
+    pending = [item for item in paths if item.exists()]
+    seen: set[Path] = set()
+    while pending:
+        current = pending.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        try:
+            listed = subprocess.check_output(["ldd", str(current)], text=True, stderr=subprocess.DEVNULL)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            listed = ""
+        for line in listed.splitlines():
+            stripped = line.strip()
+            if "=>" in stripped:
+                parts = stripped.split()
+                if len(parts) >= 3 and parts[2].startswith("/"):
+                    pending.append(Path(parts[2]))
+            elif stripped.startswith("/") and "ld-linux" in stripped:
+                pending.append(Path(stripped.split()[0]))
+        install(current)
+
+closure([Path("/usr/bin/labwc"), Path("/usr/bin/Xwayland"), Path("/usr/bin/seatd-launch"), Path("/usr/sbin/seatd")])
+print("packed labwc and seatd")
+ENDPACK
+mkdir -p "${init}/usr/share/X11" "${init}/usr/bin" "${init}/usr/lib/omne/applications" "${init}/usr/share/omne/shell"
+cp -a /usr/share/X11/xkb "${init}/usr/share/X11/xkb"
+cp "${script_root}/system/linux/omne-session" "${init}/usr/bin/omne-session"
+cp "${script_root}/system/linux/omne-hello" "${init}/usr/lib/omne/applications/omne-hello"
+cp "${script_root}/system/linux/state-desktop" "${init}/usr/lib/omne/state-desktop"
+cp "${script_root}/shell/index.html" "${init}/usr/share/omne/shell/index.html"
+cp "${script_root}/shell/styles.css" "${init}/usr/share/omne/shell/styles.css"
+if [[ -d "${script_root}/shell/dist" ]]; then
+  mkdir -p "${init}/usr/share/omne/shell/dist"
+  cp -a "${script_root}/shell/dist/." "${init}/usr/share/omne/shell/dist/"
+fi
+chmod 755 "${init}/usr/bin/omne-session" "${init}/usr/lib/omne/applications/omne-hello" "${init}/usr/lib/omne/state-desktop"
 
 mkdir -p "${work}/esp/EFI/BOOT" "${work}/esp/EFI/systemd" "${work}/esp/loader/entries" "${work}/esp/omne"
 cp "${efi_source}" "${work}/esp/EFI/BOOT/BOOTX64.EFI"
@@ -450,5 +548,5 @@ bash "${script_root}/scripts/linux/assemble-disk-image.sh" \
   --state-label "${OMNE_STATE_LABEL}"
 
 echo "state disk written to ${dest}"
-echo "second boot reads ${OMNE_STATE_LABEL} and shows the password gate"
+echo "second boot reads ${OMNE_STATE_LABEL}, accepts the password, and starts labwc"
 echo "no host disk and no block device were written"

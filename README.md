@@ -147,7 +147,7 @@ directory on its own disk.
 `scripts/linux/build-state-disk.sh` writes a GPT disk file instead of a CD. The same Ubuntu kernel
 and systemd-boot are reused. The third partition is `OMNE-STATE`, so the guest can see it.
 `systemd.volatile=state` still drops the rest of `/var`. The first boot stores setup on that
-partition and reboots. The second boot shows the password gate. `build-disk.sh` leaves the same
+partition and reboots. The second boot accepts the password and starts labwc with the OMNE shell. `build-disk.sh` leaves the same
 partition on a full rootfs disk. Neither script writes a host disk or a block device.
 
 ```bash

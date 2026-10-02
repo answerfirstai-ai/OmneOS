@@ -125,7 +125,7 @@ an ESP with systemd-boot and Ubuntu's `linux-image-generic`, a small root, and a
 ext4 filesystem labeled `OMNE-STATE`. The file is assembled under `/var/tmp`. It is not
 written with `losetup` and it is not a host block device. The kernel command line keeps
 `systemd.volatile=state`. The initramfs mounts the labeled partition at `/var/lib/omne`,
-finishes setup once, reboots, and the next boot is the password gate.
+finishes setup once, reboots, and the next boot accepts the password and starts labwc with the OMNE shell.
 
 `scripts/linux/assemble-disk-image.sh` is the file layout `build-disk.sh` grows into.
 `build-disk.sh` itself, when run as root with a rootfs, now also formats partition 3 as

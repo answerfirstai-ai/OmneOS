@@ -1,0 +1,96 @@
+#!/bin/sh
+# After the password unlock, start the existing OMNE session.
+# labwc is the compositor. The shell is the existing page on port 4173.
+# This initramfs is not systemd. A full rootfs still uses omne-session.service.
+export PATH="/usr/sbin:/usr/bin:/bin:/sbin"
+export LD_LIBRARY_PATH="/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export HOME="/tmp/omne-home"
+export XDG_RUNTIME_DIR="/run/omne"
+export XKB_CONFIG_ROOT="/usr/share/X11/xkb"
+export WLR_RENDERER="${WLR_RENDERER:-pixman}"
+export LIBSEAT_BACKEND="${LIBSEAT_BACKEND:-seatd}"
+
+/bin/busybox mkdir -p /run /tmp/omne-home /run/omne /dev/shm /dev/dri
+if ! /bin/busybox grep -q " /run " /proc/mounts; then
+  /bin/busybox mount -t tmpfs -o mode=755 tmpfs /run
+fi
+/bin/busybox mkdir -p /run/omne
+/bin/busybox chmod 700 /run/omne /tmp/omne-home
+if ! /bin/busybox grep -q " /dev/shm " /proc/mounts; then
+  /bin/busybox mount -t tmpfs -o mode=1777 tmpfs /dev/shm || true
+fi
+
+if [ -f /etc/omne/modules.desktop ]; then
+  while IFS= read -r module; do
+    if [ -n "${module}" ]; then
+      /bin/busybox insmod "${module}" 2>/dev/null || true
+    fi
+  done < /etc/omne/modules.desktop
+fi
+
+waited=0
+while [ "${waited}" -lt 15 ]; do
+  if /bin/busybox ls /dev/dri/card* >/dev/null 2>&1; then
+    break
+  fi
+  waited=$((waited + 1))
+  /bin/busybox sleep 1
+done
+
+devices=""
+for node in /dev/dri/card*; do
+  if [ -e "${node}" ]; then
+    if [ -n "${devices}" ]; then
+      devices="${devices}:${node}"
+    else
+      devices="${node}"
+    fi
+  fi
+done
+if [ -z "${devices}" ]; then
+  echo "OMNE desktop: no DRM device" >&2
+  exit 1
+fi
+export WLR_DRM_DEVICES="${devices}"
+echo "OMNE desktop DRM ${devices}"
+
+/bin/busybox ip link set lo up || {
+  echo "OMNE shell: loopback did not start" >&2
+  exit 1
+}
+
+if [ ! -f /usr/share/omne/shell/index.html ]; then
+  echo "OMNE shell missing" >&2
+  exit 1
+fi
+if [ ! -x /usr/bin/labwc ] || [ ! -x /usr/bin/seatd-launch ]; then
+  echo "labwc missing" >&2
+  exit 1
+fi
+
+/usr/bin/python3 -m http.server --directory /usr/share/omne/shell --bind 127.0.0.1 4173 >/tmp/omne-shell.log 2>&1 &
+
+ready=0
+tries=0
+while [ "${tries}" -lt 25 ]; do
+  if /usr/bin/python3 -c 'import urllib.request
+try:
+    body = urllib.request.urlopen("http://127.0.0.1:4173/", timeout=2).read().decode("utf-8", "replace")
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if "id=\"desktop\"" in body else 1)' >/dev/null 2>&1; then
+    ready=1
+    break
+  fi
+  tries=$((tries + 1))
+  /bin/busybox sleep 1
+done
+if [ "${ready}" -ne 1 ]; then
+  echo "OMNE shell did not answer" >&2
+  /bin/busybox cat /tmp/omne-shell.log >&2 || true
+  exit 1
+fi
+echo "OMNE shell up"
+
+echo "starting labwc"
+exec /usr/bin/seatd-launch /usr/bin/python3 /usr/bin/omne-session

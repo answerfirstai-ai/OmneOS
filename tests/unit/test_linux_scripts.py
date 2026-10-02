@@ -826,3 +826,20 @@ def test_assemble_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert "host disk: not written" in result.stdout
     assert "dry-run: no disk was written" in result.stdout
     assert not dest.exists()
+
+
+def test_state_disk_starts_labwc_after_unlock() -> None:
+    init = (ROOT / "system/linux/state-disk-init").read_text(encoding="utf-8")
+    desktop = (ROOT / "system/linux/state-desktop").read_text(encoding="utf-8")
+    builder = (ROOT / "scripts/linux/build-state-disk.sh").read_text(encoding="utf-8")
+
+    assert init.index("state-desktop") < init.index("poweroff -f")
+    assert 'code}" -eq 0' in init
+    assert "labwc" in desktop
+    assert "/usr/bin/omne-session" in desktop
+    assert "4173" in desktop
+    assert "/usr/share/omne/shell" in desktop
+    assert "/usr/bin/labwc" in builder
+    assert "omne-session" in builder
+    assert "systemd-boot" in builder
+    assert "linux-image-generic" in builder

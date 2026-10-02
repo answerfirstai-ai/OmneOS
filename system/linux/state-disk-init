@@ -51,8 +51,16 @@ if [ "${code}" -eq 10 ]; then
   /bin/busybox echo "rebooting into the password gate"
   /bin/busybox reboot -f
 fi
-if [ "${code}" -eq 0 ] && [ -c /dev/tty0 ]; then
-  /bin/busybox printf "\033[2J\033[HOMNE\n\nPassword\n" >/dev/tty0
+if [ "${code}" -eq 0 ]; then
+  if [ -c /dev/tty0 ]; then
+    /bin/busybox printf "\033[2J\033[HOMNE\n\nPassword\n" >/dev/tty0
+  fi
+  # The gate already accepted the setup password. Continue into the session.
+  /bin/busybox sh /usr/lib/omne/state-desktop
+  desk=$?
+  if [ "${desk}" -ne 0 ]; then
+    /bin/busybox echo "OMNE desktop failed"
+  fi
 fi
 /bin/busybox echo "password gate holding"
 /bin/busybox poweroff -f
