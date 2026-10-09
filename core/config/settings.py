@@ -69,7 +69,10 @@ ENV_TO_FIELD: dict[str, str] = {
     "OMNE_SECRETS_DEV_FALLBACK": "secrets_dev_fallback",
 }
 
-KNOWN_ENVIRONMENT_VARIABLES: frozenset[str] = frozenset(ENV_TO_FIELD) | {"OMNE_CONFIG"}
+KNOWN_ENVIRONMENT_VARIABLES: frozenset[str] = frozenset(ENV_TO_FIELD) | {
+    "OMNE_CONFIG",
+    "OMNE_HUB_TOKEN",
+}
 
 
 class Settings(BaseModel):

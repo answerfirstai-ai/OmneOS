@@ -790,10 +790,18 @@ def test_state_disk_dry_run_writes_nothing(tmp_path: Path) -> None:
 
 
 def test_state_disk_refuses_boot_and_block_devices(tmp_path: Path) -> None:
-    boot = _run(["bash", "scripts/linux/build-state-disk.sh", "--dry-run", "--dest", "/boot/omne.img"])
+    boot = _run(
+        ["bash", "scripts/linux/build-state-disk.sh", "--dry-run", "--dest", "/boot/omne.img"]
+    )
     block = _run(["bash", "scripts/linux/build-state-disk.sh", "--dest", "/dev/sda"])
     source = _run(
-        ["bash", "scripts/linux/build-state-disk.sh", "--dry-run", "--dest", str(ROOT / "OMNE-STATE.img")]
+        [
+            "bash",
+            "scripts/linux/build-state-disk.sh",
+            "--dry-run",
+            "--dest",
+            str(ROOT / "OMNE-STATE.img"),
+        ]
     )
     text = (ROOT / "scripts/linux/build-state-disk.sh").read_text(encoding="utf-8")
     assemble = (ROOT / "scripts/linux/assemble-disk-image.sh").read_text(encoding="utf-8")
@@ -810,7 +818,9 @@ def test_state_disk_refuses_boot_and_block_devices(tmp_path: Path) -> None:
     assert "losetup" not in assemble
     assert "of=/dev" not in assemble
     assert "systemd.volatile=state" in text
-    assert "OMNE-STATE" in (ROOT / "scripts/linux/build-disk.sh").read_text(encoding="utf-8")
+    disk_plan = _run(["bash", "scripts/linux/build-disk.sh", "--dry-run"])
+    assert disk_plan.returncode == 0
+    assert "state: OMNE-STATE mounted at" in disk_plan.stdout
     assert not (tmp_path / "OMNE-STATE.img").exists()
     assert not Path("/boot/omne.img").exists()
 
@@ -818,7 +828,15 @@ def test_state_disk_refuses_boot_and_block_devices(tmp_path: Path) -> None:
 def test_assemble_dry_run_writes_nothing(tmp_path: Path) -> None:
     dest = tmp_path / "disk.img"
     result = _run(
-        ["bash", "scripts/linux/assemble-disk-image.sh", "--dry-run", "--dest", str(dest), "--esp-dir", str(tmp_path)]
+        [
+            "bash",
+            "scripts/linux/assemble-disk-image.sh",
+            "--dry-run",
+            "--dest",
+            str(dest),
+            "--esp-dir",
+            str(tmp_path),
+        ]
     )
 
     assert result.returncode == 0
@@ -857,5 +875,5 @@ def test_state_disk_starts_labwc_after_unlock() -> None:
     assert "OMNE_GATE_PASSWORD" not in init
     assert "modules.input" in init
     assert "modules.disk" in init
-    assert init.index("modules.disk") < init.index('if [ -b /dev/vda ]')
+    assert init.index("modules.disk") < init.index("if [ -b /dev/vda ]")
     assert "usb_storage" in builder

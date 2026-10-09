@@ -6,7 +6,8 @@ on:
 
 jobs:
   python:
-    runs-on: ubuntu-latest
+    # The namespace sandbox tests need an unprivileged-userns-capable runner.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
