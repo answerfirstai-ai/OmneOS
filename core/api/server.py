@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import threading
 from collections.abc import Mapping
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from core import __version__
 from core.api.routes import route_get, route_post
 from core.config.settings import Settings
+from core.harnesses.service import HubService
 from core.logging_config import get_logger
 from core.orchestrator.service import OMNE
 
@@ -47,7 +50,20 @@ class CoreHTTPServer(ThreadingHTTPServer):
     def __init__(self, settings: Settings, runtime: OMNE | None = None) -> None:
         self.settings = settings
         self.runtime = runtime
+        self.hub: HubService | None = None
         super().__init__((settings.host, settings.port), CoreRequestHandler)
+        if runtime is not None:
+            try:
+                self.hub = HubService(runtime, settings.data_dir)
+            except Exception:
+                super().server_close()
+                raise
+
+    def server_close(self) -> None:
+        super().server_close()
+        hub, self.hub = self.hub, None
+        if hub is not None:
+            hub.close()
 
 
 class CoreRequestHandler(BaseHTTPRequestHandler):
@@ -57,6 +73,11 @@ class CoreRequestHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def do_GET(self) -> None:
+        if self._serve_hub_asset():
+            return
+        if urlparse(self.path).path.startswith("/hub/api/"):
+            self._hub_request()
+            return
         status = HTTPStatus.INTERNAL_SERVER_ERROR
         payload: Mapping[str, object] = {"error": "internal_error"}
         try:
@@ -74,6 +95,9 @@ class CoreRequestHandler(BaseHTTPRequestHandler):
         )
 
     def do_POST(self) -> None:
+        if urlparse(self.path).path.startswith("/hub/api/"):
+            self._hub_request()
+            return
         status = HTTPStatus.INTERNAL_SERVER_ERROR
         payload: Mapping[str, object] = {"error": "internal_error"}
         try:
@@ -94,6 +118,64 @@ class CoreRequestHandler(BaseHTTPRequestHandler):
             int(status),
         )
 
+    def _serve_hub_asset(self) -> bool:
+        path = urlparse(self.path).path
+        assets = {
+            "/hub/": ("index.html", "text/html"),
+            "/hub/index.html": ("index.html", "text/html"),
+            "/hub/style.css": ("style.css", "text/css"),
+            "/hub/app.js": ("app.js", "text/javascript"),
+        }
+        if path not in assets:
+            return False
+        name, mime = assets[path]
+        asset = Path(__file__).resolve().parents[2] / "shell" / "hub" / name
+        if not asset.is_file():
+            self._send_json(HTTPStatus.NOT_FOUND, {"error": "Hub assets are not installed"})
+            return True
+        body = asset.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", mime + "; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(body)
+        return True
+
+    def _hub_request(self) -> None:
+        hub = self.server.hub
+        if hub is None:
+            self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "runtime_unavailable"})
+            return
+        origin = self.headers.get("Origin")
+        allowed = set(self.server.settings.cors_origins)
+        if self.server.settings.host in {"127.0.0.1", "localhost"}:
+            port = self.server.server_address[1]
+            allowed.update({f"http://127.0.0.1:{port}", f"http://localhost:{port}"})
+        if origin and origin not in allowed:
+            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Add this origin to OMNE_CORS_ORIGINS"})
+            return
+        supplied = self.headers.get("Authorization", "")
+        if not hmac.compare_digest(supplied.encode(), ("Bearer " + hub.token).encode()):
+            self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "Invalid OMNE hub access token"})
+            return
+        parsed = urlparse(self.path)
+        path = parsed.path.removeprefix("/hub/api/")
+        try:
+            if self.command == "GET":
+                after = int(parse_qs(parsed.query).get("after", ["0"])[0])
+                payload = hub.get(path, max(0, after))
+            else:
+                payload = hub.post(path, _read_json_body(self))
+            self._send_json(HTTPStatus.OK, payload)
+        except KeyError:
+            self._send_json(HTTPStatus.NOT_FOUND, {"error": "Not found or missing required field"})
+        except (ValueError, TypeError) as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)[:500]})
+        except Exception:
+            logger.exception("hub request failed")
+            self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "Hub request failed"})
+
     def do_PUT(self) -> None:
         self._reject_method()
 
@@ -108,7 +190,8 @@ class CoreRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.send_header("Connection", "close")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
         self._apply_cors()
         self.end_headers()
 
@@ -146,6 +229,7 @@ class CoreRequestHandler(BaseHTTPRequestHandler):
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
             self.send_header("Connection", "close")
             self._apply_cors()
             self.end_headers()

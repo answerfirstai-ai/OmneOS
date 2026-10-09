@@ -9,7 +9,7 @@ import threading
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from core.agents.communication import AgentMailbox
@@ -86,6 +86,10 @@ from omne.updates.service import UpdateService
 from omne.windowing.model import WindowRequest
 from omne.windowing.select import windowing_service
 from omne.windowing.service import WindowingService
+
+if TYPE_CHECKING:
+    from core.models.types import GenerateResponse
+
 
 _MODEL_CAPABILITY = {
     "conversation": "reasoning",
@@ -571,6 +575,77 @@ class OMNE:
                 if cloud and view.get("engine") is None:
                     view["gpu"] = "cloud"
         return views
+
+    async def generate_harness(self, model_id: str, prompt: str, system: str) -> GenerateResponse:
+        """Use existing provider credentials and shared model resource admission."""
+        from core.compute.manager import ReservationState
+        from core.models.types import GenerateRequest, GenerateResponse, ProviderError
+
+        if model_id == "auto":
+            ready = self._available_model_ids()
+            available = {
+                m.id for m in self._models.enabled() if m.provider != "mock" and m.id in ready
+            }
+            mode = "local" if self._mode in {"offline", "local"} else "production"
+            choice = self._router.choose(
+                ["reasoning"], self.compute_status(), mode=mode, available=available
+            )
+            if choice.model is None:
+                raise ValueError("OMNE model routing: " + choice.reason)
+            model_id = choice.model.id
+        model = self._models.get(model_id)
+        if model.provider == "mock":
+            raise ValueError("Connect a real local or API model to generate a harness.")
+        if model_id not in self._available_model_ids():
+            raise ValueError("This OMNE model is not available. Configure it in the desktop.")
+        if self._mode in {"offline", "local"} and not model.local:
+            raise ValueError("Cloud models are disabled by OMNE's execution mode.")
+        if model.context_window and len((prompt + system).encode()) + 8192 > model.context_window:
+            raise ValueError("Context exceeds this model's conservative capacity. Shorten it.")
+        if model.local and self.model_runtime is not None:
+            result = await self.model_runtime.generate(model_id, prompt, system=system)
+            if not result.performed or result.code != "ok":
+                raise ValueError(result.reason)
+            return GenerateResponse(text=result.text, model=model.model_name, provider="local")
+        provider = self._providers.get(model_id)
+        if provider is None or self.resources is None:
+            raise ValueError("Model provider or resource manager is unavailable.")
+        reservation = self.resources.request(
+            model.requirements,
+            owner="harness:" + model_id,
+            kind="model",
+            local=model.local,
+            cloud_available=False,
+        )
+        try:
+            if reservation.state is not ReservationState.RESERVE:
+                raise ValueError("OMNE compute admission: " + reservation.reason)
+            self.resources.run(reservation.id)
+            self._events.publish("model.requested", source="harnesses", model_id=model_id)
+            response = await provider.generate(
+                GenerateRequest(
+                    model=self._model_names.get(model_id, model.model_name),
+                    prompt=prompt,
+                    system=system,
+                )
+            )
+            self._events.publish("model.completed", source="harnesses", model_id=model_id)
+            return response
+        except ProviderError as exc:
+            self._events.publish(
+                "model.failed", source="harnesses", model_id=model_id, payload={"code": exc.code}
+            )
+            raise ValueError("OMNE model request failed: " + exc.code) from None
+        finally:
+            self.resources.release(reservation.id)
+
+    def publish_harness_event(self, message: str, harness_id: str | None) -> None:
+        """Make compact harness updates visible to the existing OMNE observers."""
+        self._events.publish(
+            "harness.updated",
+            source="harnesses",
+            payload={"harness_id": harness_id, "message": message},
+        )
 
     def nvidia_status(self) -> dict[str, object]:
         """Report NVIDIA configuration without calling the network."""

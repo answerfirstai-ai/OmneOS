@@ -116,23 +116,23 @@ create it. A continuous-integration job uses an `ubuntu-24.04` runner with sudo 
 command, started by `workflow_dispatch`. The image is not built on every pull request. The default
 suite does not run debootstrap.
 
-
 ## Disk image
 
 QEMU boots an ISO with `-cdrom`, and that hides the appended `OMNE-STATE` partition.
-`scripts/linux/build-state-disk.sh` writes a GPT disk file the guest can partition-scan:
-an ESP with systemd-boot and Ubuntu's `linux-image-generic`, a small root, and a 64 MiB
-ext4 filesystem labeled `OMNE-STATE`. The file is assembled under `/var/tmp`. It is not
-written with `losetup` and it is not a host block device. The kernel command line keeps
-`systemd.volatile=state`. The initramfs mounts the labeled partition at `/var/lib/omne`,
-finishes setup once, reboots, and the next boot waits for a typed password, then starts labwc and maps the OMNE shell with cog.
+`scripts/linux/build-state-disk.sh` writes a GPT disk file the guest can partition-scan: an ESP with
+systemd-boot and Ubuntu's `linux-image-generic`, a small root, and a 64 MiB ext4 filesystem labeled
+`OMNE-STATE`. The file is assembled under `/var/tmp`. It is not written with `losetup` and it is not
+a host block device. The kernel command line keeps `systemd.volatile=state`. The initramfs mounts
+the labeled partition at `/var/lib/omne`, finishes setup once, reboots, and the next boot waits for
+a typed password, then starts labwc and maps the OMNE shell with cog.
 
 `scripts/linux/assemble-disk-image.sh` is the file layout `build-disk.sh` grows into.
-`build-disk.sh` itself, when run as root with a rootfs, now also formats partition 3 as
-`OMNE-STATE` and mounts it from `fstab`. The full ISO and the full installed disk still
-use systemd. The state-disk initramfs is the small boot used when a rootfs is not built.
+`build-disk.sh` itself, when run as root with a rootfs, now also formats partition 3 as `OMNE-STATE`
+and mounts it from `fstab`. The full ISO and the full installed disk still use systemd. The
+state-disk initramfs is the small boot used when a rootfs is not built.
 
-The USB stick is this disk file, not the ISO. Write steps, including the warning not to select the Windows drive, are in the README.
+The USB stick is this disk file, not the ISO. Write steps, including the warning not to select the
+Windows drive, are in the README.
 
 ```bash
 bash scripts/linux/build-state-disk.sh --dest /var/tmp/OMNE-USB.img
