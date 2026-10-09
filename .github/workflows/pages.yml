@@ -12,7 +12,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    # Keep the existing namespace sandbox tests enabled without relaxing host controls.
+    runs-on: ubuntu-22.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
